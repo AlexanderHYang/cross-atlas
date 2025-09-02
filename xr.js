@@ -4,7 +4,6 @@ import * as GUI from "@babylonjs/gui";
 import { setLayout, addChart, removeChart } from "./layout.js";
 
 export async function setupWebXR(scene) {
-   
     // initialize XR
     const xr = await scene.createDefaultXRExperienceAsync({
         optionalFeatures: true,
@@ -21,25 +20,18 @@ export async function setupWebXR(scene) {
 
     const manager = new GUI3D.GUI3DManager(scene);
 
-    // Hand Menu
-    const handMenu = new GUI.HandMenu(xr.baseExperience, "menu");
-    const handConstraintBehavior = handMenu.handConstraintBehavior;
-    handConstraintBehavior.palmUpStrictness = 0.8;
-    handConstraintBehavior.handConstraintVisibility = BABYLON.HandConstraintVisibility.PALM_UP;
-    handConstraintBehavior.targetZone = BABYLON.HandConstraintZone.ULNAR_SIDE;
-    handConstraintBehavior.nodeOrientationMode = BABYLON.HandConstraintOrientation.HAND_ROTATION;
-    handConstraintBehavior.targetOffset = 0.15;
-    handConstraintBehavior.handedness = "left";
-    handMenu.columns = 2;
-    manager.addControl(handMenu);
-    handMenu.backPlateMargin = 0.1;
-    handMenu.scaling = new BABYLON.Vector3(0.06, 0.06, 0.06);
+    // Floating menu in VR environment
+    const panel = new GUI3D.PlanePanel();
+    panel.margin = 0.2;
+    panel.position = new BABYLON.Vector3(0, 1.5, 2.5); // Floating in front of user
+    panel.scaling = new BABYLON.Vector3(0.5, 0.5, 0.5);
+    manager.addControl(panel);
 
-    // Helper function to create UI buttons for handMenu
+    // Helper function to create UI buttons for floating menu
     const createButton = (name, text, shareMaterial = true) => {
-        const button = new GUI.TouchHolographicButton(name, shareMaterial);
+        const button = new GUI3D.HolographicButton(name, shareMaterial);
         button.text = text;
-        handMenu.addButton(button);
+        panel.addControl(button);
         return button;
     };
 
