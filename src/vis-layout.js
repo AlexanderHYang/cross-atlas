@@ -117,29 +117,6 @@ export function setLayout(val) {
                 _layoutObj.sphereLayout();
                 break;
         }
-
-        // After layout is applied, rotate all pie charts to face forward
-        const scene = _sceneInstance;
-        if (scene) {
-            const allCharts = anu.selectTag("chart", scene);
-            allCharts.forEach((chart) => {
-                // Check if this is a pie chart by looking for cylinder children with arc property
-                const pieSegments = chart
-                    .getChildMeshes()
-                    .filter(
-                        (mesh) =>
-                            mesh.geometry &&
-                            mesh.geometry.getClassName() === "CylinderGeometry" &&
-                            mesh.metadata &&
-                            mesh.metadata.arc
-                    );
-
-                if (pieSegments.length > 0) {
-                    // This is a pie chart, rotate it to face forward
-                    chart.rotation = new BABYLON.Vector3(-Math.PI / 2, 0, 0);
-                }
-            });
-        }
     }
 }
 
