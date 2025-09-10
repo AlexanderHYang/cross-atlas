@@ -9,7 +9,7 @@ import {
     updateCurve,
     updateMarginX,
     updateMarginY,
-} from "./layout.js";
+} from "./vis-layout.js";
 
 export async function setupWebXR(scene) {
     // --- WebXR Initialization ---
@@ -24,6 +24,8 @@ export async function setupWebXR(scene) {
         xr.baseExperience.camera.position.set(0.0, 2.0, -1);
         // xr.baseExperience.camera.setTarget(new BABYLON.Vector3(0, 0, 0));
     });
+
+    
 
     // --- THEME ---
     const THEME = {
@@ -56,22 +58,19 @@ export async function setupWebXR(scene) {
     // panelMesh.lookAt(xr.baseExperience.camera.position);
     panelMesh.rotation = new BABYLON.Vector3(0, -Math.PI / 4, 0);
 
+    // Position for debugging
+    // panelMesh.position = new BABYLON.Vector3(0, 1.5, 4);
+
     const advancedTexture = GUI.AdvancedDynamicTexture.CreateForMesh(panelMesh, 3000, 3500, true);
-    // optional: match mock’s look
-    // advancedTexture.rootContainer.fontFamily = "Inter, system-ui, -apple-system, Segoe UI";
 
     // Panel container
     const authoringPanel = new GUI.Rectangle("authoringPanel");
     authoringPanel.width = 1;
     authoringPanel.height = 1;
-    authoringPanel.cornerRadius = 108;
+    authoringPanel.cornerRadius = 150;
     authoringPanel.thickness = 6;
     authoringPanel.color = THEME.panelStroke;
     authoringPanel.background = THEME.panelBg;
-    authoringPanel.shadowBlur = 72;
-    authoringPanel.shadowOffsetX = 0;
-    authoringPanel.shadowOffsetY = 24;
-    authoringPanel.shadowColor = "#00000088";
     advancedTexture.addControl(authoringPanel);
 
     // Stack layout
@@ -117,40 +116,50 @@ export async function setupWebXR(scene) {
         row.isVertical = false;
         row.height = `220px`;
         row.width = 1;
-        row.spacing = 48;
+        row.spacing = 60;
         row.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+        row.paddingLeft = "60px";
+        row.paddingRight = "60px";
 
         const label = new GUI.TextBlock();
         label.text = labelText;
-        label.width = `660px`;
+        label.width = `500px`;
         label.color = THEME.text;
         label.fontSize = 90;
-        // label.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+        label.paddingLeft = "100px";
+        label.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+        label.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
 
         const slider = new GUI.Slider();
         slider.minimum = min;
         slider.maximum = max;
         slider.value = value;
         slider.height = `48px`;
-        slider.width = "2000px";
+        slider.width = "1600px";
         slider.background = THEME.sliderBar;
         slider.color = THEME.sliderFill;
         slider.isThumbClamped = true;
         slider.borderColor = THEME.sliderBar;
         slider.thumbWidth = 84;
         slider.thumbHeight = 84;
+        slider.paddingLeft = "100px";
+        slider.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
         slider.isPointerBlocker = true;
 
         const valueBox = new GUI.Rectangle();
-        valueBox.width = `240px`;
+        valueBox.width = `280px`;
         valueBox.height = `132px`;
         valueBox.cornerRadius = 36;
         valueBox.thickness = 0;
         valueBox.background = THEME.valueBoxBg;
+        valueBox.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+
         const valueText = new GUI.TextBlock();
         valueText.text = Number(value).toFixed(2).replace(/\.00$/, "");
         valueText.color = THEME.valueBoxTx;
         valueText.fontSize = 78;
+        valueText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+        valueText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
         valueBox.addControl(valueText);
 
         slider.onValueChangedObservable.add(function (v) {
@@ -192,14 +201,14 @@ export async function setupWebXR(scene) {
     radioStack.isVertical = true;
     radioStack.width = 1;
     radioStack.spacing = 24;
-    radioStack.paddingTop = "24px";
-    radioStack.paddingBottom = "24px";
+    radioStack.paddingTop = "50px";
+    radioStack.paddingBottom = "50px";
     radioSection.addControl(radioStack);
 
     const chartTypes = [
         { label: "2D Bar Chart", value: "2d" },
         { label: "3D Bar Chart", value: "3d" },
-        { label: "Pie Chart", value: "pie" },
+        { label: "3D Scatter Plot", value: "scatter" },
         { label: "Line Chart", value: "line" },
     ];
     var selectedChartType = chartTypes[0].value;
@@ -212,6 +221,7 @@ export async function setupWebXR(scene) {
         row.spacing = 48;
         row.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
         row.paddingLeft = "150px";
+        row.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
 
         const radio = new GUI.RadioButton();
         radio.width = `108px`;
@@ -220,6 +230,7 @@ export async function setupWebXR(scene) {
         radio.background = "#111827";
         radio.isChecked = isChecked;
         radio.group = "chartTypes";
+        radio.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
 
         radio.onIsCheckedChangedObservable.add(function (state) {
             if (state) radio.color = THEME.radioFill;
@@ -233,6 +244,9 @@ export async function setupWebXR(scene) {
         label.color = THEME.text;
         label.fontSize = 84;
         label.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+        label.textVerticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+        label.paddingLeft = "24px";
+        label.paddingTop = "45px";
 
         row.addControl(radio);
         row.addControl(label);
@@ -285,6 +299,11 @@ export async function setupWebXR(scene) {
     addBtn.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
     addBtn.onPointerUpObservable.add(function () {
         if (typeof addChart === "function") addChart(scene, selectedChartType);
+        // Only pie charts are not implemented yet
+        if (selectedChartType === "pie") {
+            console.log("Pie charts coming soon!");
+            return;
+        }
     });
 
     const removeBtn = GUI.Button.CreateSimpleButton("removeChartBtn", "Remove Chart");
@@ -312,14 +331,15 @@ export async function setupWebXR(scene) {
     const layoutRow = new GUI.StackPanel();
     layoutRow.isVertical = false;
     layoutRow.height = `240px`;
-    // layoutRow.width not set so it sizes to content
+    layoutRow.width = 1;
     layoutRow.spacing = 72;
     layoutRow.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+    layoutRow.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
     layoutSection.addControl(layoutRow);
 
     function makeGrayButton(id, text, onClick) {
         const b = GUI.Button.CreateSimpleButton(id, text);
-        b.width = `900px`;
+        b.width = `850px`;
         b.height = `240px`;
         b.cornerRadius = 80;
         b.thickness = 0;
@@ -327,6 +347,7 @@ export async function setupWebXR(scene) {
         b.color = THEME.grayBtnTxt;
         b.fontSize = 128;
         b.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+        b.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
         b.onPointerUpObservable.add(onClick);
         return b;
     }

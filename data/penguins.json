@@ -1,0 +1,212 @@
+[
+    {
+        "Species": "Adelie",
+        "Beak Length (mm)": 39.1,
+        "Beak Depth (mm)": 18.7,
+        "Flipper Length (mm)": 181,
+        "Body Mass (g)": 3750
+    },
+    {
+        "Species": "Adelie",
+        "Beak Length (mm)": 39.5,
+        "Beak Depth (mm)": 17.4,
+        "Flipper Length (mm)": 186,
+        "Body Mass (g)": 3800
+    },
+    {
+        "Species": "Adelie",
+        "Beak Length (mm)": 40.3,
+        "Beak Depth (mm)": 18.0,
+        "Flipper Length (mm)": 183,
+        "Body Mass (g)": 3700
+    },
+    {
+        "Species": "Adelie",
+        "Beak Length (mm)": 38.8,
+        "Beak Depth (mm)": 17.8,
+        "Flipper Length (mm)": 180,
+        "Body Mass (g)": 3650
+    },
+    {
+        "Species": "Adelie",
+        "Beak Length (mm)": 39.7,
+        "Beak Depth (mm)": 18.2,
+        "Flipper Length (mm)": 182,
+        "Body Mass (g)": 3725
+    },
+    {
+        "Species": "Adelie",
+        "Beak Length (mm)": 38.9,
+        "Beak Depth (mm)": 17.9,
+        "Flipper Length (mm)": 179,
+        "Body Mass (g)": 3600
+    },
+    {
+        "Species": "Gentoo",
+        "Beak Length (mm)": 47.3,
+        "Beak Depth (mm)": 15.3,
+        "Flipper Length (mm)": 222,
+        "Body Mass (g)": 5550
+    },
+    {
+        "Species": "Gentoo",
+        "Beak Length (mm)": 46.2,
+        "Beak Depth (mm)": 14.4,
+        "Flipper Length (mm)": 214,
+        "Body Mass (g)": 4650
+    },
+    {
+        "Species": "Gentoo",
+        "Beak Length (mm)": 48.1,
+        "Beak Depth (mm)": 15.1,
+        "Flipper Length (mm)": 220,
+        "Body Mass (g)": 5400
+    },
+    {
+        "Species": "Gentoo",
+        "Beak Length (mm)": 47.8,
+        "Beak Depth (mm)": 15.0,
+        "Flipper Length (mm)": 218,
+        "Body Mass (g)": 5200
+    },
+    {
+        "Species": "Gentoo",
+        "Beak Length (mm)": 46.9,
+        "Beak Depth (mm)": 14.8,
+        "Flipper Length (mm)": 216,
+        "Body Mass (g)": 5100
+    },
+    {
+        "Species": "Gentoo",
+        "Beak Length (mm)": 47.5,
+        "Beak Depth (mm)": 15.2,
+        "Flipper Length (mm)": 221,
+        "Body Mass (g)": 5450
+    },
+    {
+        "Species": "Chinstrap",
+        "Beak Length (mm)": 48.1,
+        "Beak Depth (mm)": 16.4,
+        "Flipper Length (mm)": 195,
+        "Body Mass (g)": 3500
+    },
+    {
+        "Species": "Chinstrap",
+        "Beak Length (mm)": 46.5,
+        "Beak Depth (mm)": 17.9,
+        "Flipper Length (mm)": 192,
+        "Body Mass (g)": 3500
+    },
+    {
+        "Species": "Chinstrap",
+        "Beak Length (mm)": 47.4,
+        "Beak Depth (mm)": 16.8,
+        "Flipper Length (mm)": 194,
+        "Body Mass (g)": 3550
+    },
+    {
+        "Species": "Chinstrap",
+        "Beak Length (mm)": 47.8,
+        "Beak Depth (mm)": 17.2,
+        "Flipper Length (mm)": 196,
+        "Body Mass (g)": 3600
+    },
+    {
+        "Species": "Chinstrap",
+        "Beak Length (mm)": 46.9,
+        "Beak Depth (mm)": 16.6,
+        "Flipper Length (mm)": 193,
+        "Body Mass (g)": 3475
+    },
+    {
+        "Species": "Adelie",
+        "Beak Length (mm)": 39.3,
+        "Beak Depth (mm)": 18.1,
+        "Flipper Length (mm)": 184,
+        "Body Mass (g)": 3775
+    },
+    {
+        "Species": "Adelie",
+        "Beak Length (mm)": 38.6,
+        "Beak Depth (mm)": 17.7,
+        "Flipper Length (mm)": 178,
+        "Body Mass (g)": 3575
+    },
+    {
+        "Species": "Gentoo",
+        "Beak Length (mm)": 47.1,
+        "Beak Depth (mm)": 14.9,
+        "Flipper Length (mm)": 217,
+        "Body Mass (g)": 5150
+    },
+    {
+        "Species": "Gentoo",
+        "Beak Length (mm)": 48.0,
+        "Beak Depth (mm)": 15.4,
+        "Flipper Length (mm)": 223,
+        "Body Mass (g)": 5600
+    },
+    {
+        "Species": "Chinstrap",
+        "Beak Length (mm)": 47.2,
+        "Beak Depth (mm)": 16.9,
+        "Flipper Length (mm)": 191,
+        "Body Mass (g)": 3525
+    },
+    {
+        "Species": "Chinstrap",
+        "Beak Length (mm)": 48.0,
+        "Beak Depth (mm)": 17.3,
+        "Flipper Length (mm)": 197,
+        "Body Mass (g)": 3625
+    },
+    {
+        "Species": "Adelie",
+        "Beak Length (mm)": 40.1,
+        "Beak Depth (mm)": 18.3,
+        "Flipper Length (mm)": 185,
+        "Body Mass (g)": 3825
+    },
+    {
+        "Species": "Gentoo",
+        "Beak Length (mm)": 46.7,
+        "Beak Depth (mm)": 14.6,
+        "Flipper Length (mm)": 215,
+        "Body Mass (g)": 4950
+    },
+    {
+        "Species": "Gentoo",
+        "Beak Length (mm)": 47.7,
+        "Beak Depth (mm)": 15.5,
+        "Flipper Length (mm)": 219,
+        "Body Mass (g)": 5300
+    },
+    {
+        "Species": "Chinstrap",
+        "Beak Length (mm)": 47.6,
+        "Beak Depth (mm)": 17.1,
+        "Flipper Length (mm)": 194,
+        "Body Mass (g)": 3575
+    },
+    {
+        "Species": "Adelie",
+        "Beak Length (mm)": 39.9,
+        "Beak Depth (mm)": 18.4,
+        "Flipper Length (mm)": 183,
+        "Body Mass (g)": 3750
+    },
+    {
+        "Species": "Adelie",
+        "Beak Length (mm)": 39.2,
+        "Beak Depth (mm)": 17.6,
+        "Flipper Length (mm)": 182,
+        "Body Mass (g)": 3700
+    },
+    {
+        "Species": "Gentoo",
+        "Beak Length (mm)": 47.4,
+        "Beak Depth (mm)": 15.0,
+        "Flipper Length (mm)": 220,
+        "Body Mass (g)": 5250
+    }
+]
