@@ -10,36 +10,12 @@ export async function setupWebXR(scene) {
         optionalFeatures: true,
     });
 
+    // VR camera initialization
     const xrSessionManager = xr.baseExperience.sessionManager;
-
     xrSessionManager.onXRFrameObservable.addOnce(() => {
-        xr.baseExperience.camera.position.set(0, 0.5, 1);
-        xr.baseExperience.camera.setTarget(new BABYLON.Vector3(0, 0, 0));
+        xr.baseExperience.camera.position.set(0.0, 2.0, -1);
+        // xr.baseExperience.camera.setTarget(new BABYLON.Vector3(0, 0, 0));
     });
-
-    xrSessionManager.onXRSessionInit.add(() => {
-        currentlyInXr = true;
-        currCam = xr.baseExperience.camera;
-        console.log("XR Session Initialized");
-    });
-    xrSessionManager.onXRSessionEnded.add(() => {
-        currentlyInXr = false;
-        currCam = camera;
-        console.log("XR Session Ended");
-    });
-
-    // Hand tracking (best-effort)
-    if (xr && xr.baseExperience && xr.baseExperience.featuresManager) {
-        try {
-            await xr.baseExperience.featuresManager.enableFeature(
-                BABYLON.WebXRFeatureName.HAND_TRACKING,
-                "latest",
-                { xrInput: xr.input }
-            );
-        } catch (e) {
-            // ignore if not available
-        }
-    }
 
     // --- THEME ---
     const THEME = {
@@ -60,16 +36,19 @@ export async function setupWebXR(scene) {
     };
 
     // --- Panel Mesh (floating 2D panel in 3D) ---
-    const panelWidth = 1.2; // meters
-    const panelHeight = 0.9; // meters
+    const panelWidth = 3.6; // meters (scaled 3x)
+    const panelHeight = 2.7; // meters (scaled 3x)
     const panelMesh = BABYLON.MeshBuilder.CreatePlane(
         "authoringPanelMesh",
         { width: panelWidth, height: panelHeight },
         scene
     );
-    panelMesh.position = new BABYLON.Vector3(-1, 1.5, 0.1);
 
-    const advancedTexture = GUI.AdvancedDynamicTexture.CreateForMesh(panelMesh, 1200, 900, true);
+    panelMesh.position = new BABYLON.Vector3(-5, 1.5, 4);
+    // panelMesh.lookAt(xr.baseExperience.camera.position);
+    panelMesh.rotation = new BABYLON.Vector3(0, -Math.PI / 4, 0);
+
+    const advancedTexture = GUI.AdvancedDynamicTexture.CreateForMesh(panelMesh, 3600, 2700, true);
     // optional: match mock’s look
     // advancedTexture.rootContainer.fontFamily = "Inter, system-ui, -apple-system, Segoe UI";
 
@@ -77,34 +56,34 @@ export async function setupWebXR(scene) {
     const authoringPanel = new GUI.Rectangle("authoringPanel");
     authoringPanel.width = 1;
     authoringPanel.height = 1;
-    authoringPanel.cornerRadius = 36;
-    authoringPanel.thickness = 2;
+    authoringPanel.cornerRadius = 108;
+    authoringPanel.thickness = 6;
     authoringPanel.color = THEME.panelStroke;
     authoringPanel.background = THEME.panelBg;
-    authoringPanel.shadowBlur = 24;
+    authoringPanel.shadowBlur = 72;
     authoringPanel.shadowOffsetX = 0;
-    authoringPanel.shadowOffsetY = 8;
+    authoringPanel.shadowOffsetY = 24;
     authoringPanel.shadowColor = "#00000088";
     advancedTexture.addControl(authoringPanel);
 
     // Stack layout
     const authoringStack = new GUI.StackPanel("authoringStack");
     authoringStack.isVertical = true;
-    authoringStack.paddingTop = "28px";
-    authoringStack.paddingLeft = "28px";
-    authoringStack.paddingRight = "28px";
+    authoringStack.paddingTop = `84px`;
+    authoringStack.paddingLeft = `84px`;
+    authoringStack.paddingRight = `84px`;
     authoringStack.width = 1;
     authoringPanel.addControl(authoringStack);
 
     // Title
     const title = new GUI.TextBlock("title", "Authoring Panel");
-    title.height = "64px";
+    title.height = `192px`;
     title.color = THEME.text;
-    title.fontSize = 48;
+    title.fontSize = 144;
     title.fontStyle = "bold";
     title.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
     title.textVerticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-    title.paddingBottom = "16px";
+    title.paddingBottom = `48px`;
     authoringStack.addControl(title);
 
     // Group section helper
@@ -113,14 +92,14 @@ export async function setupWebXR(scene) {
         r.width = 1;
         r.thickness = 0;
         r.background = "#111827cc";
-        r.cornerRadius = 18;
-        r.paddingTop = "12px";
-        r.paddingBottom = "12px";
-        r.paddingLeft = "16px";
-        r.paddingRight = "16px";
+        r.cornerRadius = 54;
+        r.paddingTop = `36px`;
+        r.paddingBottom = `36px`;
+        r.paddingLeft = `48px`;
+        r.paddingRight = `48px`;
         r.height = "auto";
         r.adaptHeightToChildren = true;
-        r.marginBottom = "16px";
+        r.marginBottom = `48px`;
         return r;
     }
 
@@ -128,41 +107,41 @@ export async function setupWebXR(scene) {
     function addSliderRow(parent, labelText, min, max, value, callback) {
         const row = new GUI.StackPanel();
         row.isVertical = false;
-        row.height = "60px";
+        row.height = `180px`;
         row.width = 1;
-        row.spacing = 8;
+        row.spacing = 24;
 
         const label = new GUI.TextBlock();
         label.text = labelText;
-        label.width = "220px";
+        label.width = `660px`;
         label.color = THEME.text;
-        label.fontSize = 30;
+        label.fontSize = 90;
         label.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
 
         const slider = new GUI.Slider();
         slider.minimum = min;
         slider.maximum = max;
         slider.value = value;
-        slider.height = "16px";
+        slider.height = `48px`;
         slider.width = "68%";
         slider.background = THEME.sliderBar;
         slider.color = THEME.sliderFill;
         slider.isThumbClamped = true;
         slider.borderColor = THEME.sliderBar;
-        slider.thumbWidth = 28;
-        slider.thumbHeight = 28;
+        slider.thumbWidth = 84;
+        slider.thumbHeight = 84;
         slider.isPointerBlocker = true;
 
         const valueBox = new GUI.Rectangle();
-        valueBox.width = "80px";
-        valueBox.height = "44px";
-        valueBox.cornerRadius = 12;
+        valueBox.width = `240px`;
+        valueBox.height = `132px`;
+        valueBox.cornerRadius = 36;
         valueBox.thickness = 0;
         valueBox.background = THEME.valueBoxBg;
         const valueText = new GUI.TextBlock();
         valueText.text = Number(value).toFixed(2).replace(/\.00$/, "");
         valueText.color = THEME.valueBoxTx;
-        valueText.fontSize = 26;
+        valueText.fontSize = 78;
         valueBox.addControl(valueText);
 
         slider.onValueChangedObservable.add(function (v) {
@@ -222,13 +201,13 @@ export async function setupWebXR(scene) {
     function addRadioRow(text, isChecked, onCheck) {
         const row = new GUI.StackPanel();
         row.isVertical = false;
-        row.height = "48px";
+        row.height = `144px`;
         row.width = 1;
-        row.spacing = 10;
+        row.spacing = 30;
 
         const radio = new GUI.RadioButton();
-        radio.width = "32px";
-        radio.height = "32px";
+        radio.width = `96px`;
+        radio.height = `96px`;
         radio.color = THEME.radioFill; // ring
         radio.background = "#111827";
         radio.isChecked = isChecked;
@@ -244,7 +223,7 @@ export async function setupWebXR(scene) {
         const label = new GUI.TextBlock();
         label.text = text;
         label.color = THEME.text;
-        label.fontSize = 28;
+        label.fontSize = 84;
         label.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
 
         row.addControl(radio);
@@ -260,14 +239,14 @@ export async function setupWebXR(scene) {
 
     // --- Primary "Add Chart" button ---
     const addBtn = GUI.Button.CreateSimpleButton("addChartBtn", "Add Chart");
-    addBtn.width = "220px";
-    addBtn.height = "60px";
+    addBtn.width = `660px`;
+    addBtn.height = `180px`;
     addBtn.color = "#0b1a14";
     addBtn.background = THEME.mint;
-    addBtn.cornerRadius = 16;
+    addBtn.cornerRadius = 48;
     addBtn.thickness = 0;
-    addBtn.fontSize = 32;
-    addBtn.marginTop = "8px";
+    addBtn.fontSize = 96;
+    addBtn.marginTop = `24px`;
     addBtn.onPointerUpObservable.add(function () {
         if (typeof addChart === "function") addChart(scene, selectedChartType);
     });
@@ -279,21 +258,21 @@ export async function setupWebXR(scene) {
 
     const layoutRow = new GUI.StackPanel();
     layoutRow.isVertical = false;
-    layoutRow.height = "44px";
+    layoutRow.height = `132px`;
     layoutRow.width = 1;
-    layoutRow.spacing = 10;
+    layoutRow.spacing = 30;
     layoutRow.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
     layoutSection.addControl(layoutRow);
 
     function makeGrayButton(id, text, onClick) {
         const b = GUI.Button.CreateSimpleButton(id, text);
-        b.width = "180px";
-        b.height = "54px";
-        b.cornerRadius = 14;
+        b.width = `540px`;
+        b.height = `162px`;
+        b.cornerRadius = 42;
         b.thickness = 0;
         b.background = THEME.grayBtn;
         b.color = THEME.grayBtnTxt;
-        b.fontSize = 26;
+        b.fontSize = 78;
         b.onPointerUpObservable.add(onClick);
         return b;
     }
@@ -316,14 +295,14 @@ export async function setupWebXR(scene) {
 
     // --- Danger "Remove Chart" button ---
     const removeBtn = GUI.Button.CreateSimpleButton("removeChartBtn", "Remove Chart");
-    removeBtn.width = "220px";
-    removeBtn.height = "60px";
+    removeBtn.width = `660px`;
+    removeBtn.height = `180px`;
     removeBtn.color = "#fff";
     removeBtn.background = THEME.danger;
-    removeBtn.cornerRadius = 16;
+    removeBtn.cornerRadius = 48;
     removeBtn.thickness = 0;
-    removeBtn.fontSize = 32;
-    removeBtn.marginTop = "12px";
+    removeBtn.fontSize = 96;
+    removeBtn.marginTop = `24px`;
     removeBtn.onPointerUpObservable.add(function () {
         removeChart(scene);
     });
