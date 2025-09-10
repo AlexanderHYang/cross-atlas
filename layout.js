@@ -53,47 +53,13 @@ export function layout(engine) {
         .attr("radius", curve)
         .attr("margin", margin);
 
-    //Define functions to update layout properties which will be called from UI events
-    const updateRows = (val) => {
-        rows = Math.floor(val);
-        layoutObj.attr("row", rows);
-    };
+    // Set module-level refs for update functions
+    _layoutObjRef = layoutObj;
+    _rowsRef = rows;
+    _curveRef = curve;
+    _marginRef = { x: margin.x, y: margin.y };
 
-    const updateCurve = (val) => {
-        curve = val;
-        layoutObj.attr("radius", curve);
-    };
-
-    const updateMarginX = (val) => {
-        margin.x = val;
-        layoutObj.attr("margin", margin);
-    };
-
-    const updateMarginY = (val) => {
-        margin.y = val;
-        layoutObj.attr("margin", margin);
-    };
-
-    // Sliders for rows, curve, marginX, marginY (spread horizontally)
-    function createHoloSlider(label, min, max, value, callback, position) {
-        const slider = new GUI3D.Slider3D(label);
-        slider.minimum = min;
-        slider.maximum = max;
-        slider.value = value;
-        slider.position = position;
-        slider.onValueChangedObservable.add(callback);
-        manager.addControl(slider);
-        // Add a label
-        const text = new GUI.TextBlock();
-        text.text = label;
-        slider.thumbContent = text;
-        return slider;
-    }
-
-    createHoloSlider("Rows", 1, 8, rows, updateRows, new BABYLON.Vector3(-2.0, 0, 2.5));
-    createHoloSlider("Curvature", 0, 10, curve, updateCurve, new BABYLON.Vector3(-1, 0, 2.5));
-    createHoloSlider("Margin X", 0, 10, margin.x, updateMarginX, new BABYLON.Vector3(0, 0, 2.5));
-    createHoloSlider("Margin Y", 0, 10, margin.y, updateMarginY, new BABYLON.Vector3(1.0, 0, 2.5));
+    // All slider callbacks are now handled by the 2D panel in xr.js. No sliders are created here.
 
     // Initialize globals for exported functions
     initLayoutGlobals(layoutObj, allCharts, scene);
@@ -101,11 +67,41 @@ export function layout(engine) {
 }
 // Removed misplaced closing brace here
 
+// Module-level refs for update functions
+let _layoutObjRef = null;
+let _rowsRef = 3;
+let _curveRef = 5;
+let _marginRef = { x: 0.5, y: 0.5 };
+
+// Function definitions
+function updateRows(val) {
+    _rowsRef = Math.floor(val);
+    if (_layoutObjRef) _layoutObjRef.attr("row", _rowsRef);
+}
+
+function updateCurve(val) {
+    _curveRef = val;
+    if (_layoutObjRef) _layoutObjRef.attr("radius", _curveRef);
+}
+
+function updateMarginX(val) {
+    _marginRef.x = val;
+    if (_layoutObjRef) _layoutObjRef.attr("margin", _marginRef);
+}
+
+function updateMarginY(val) {
+    _marginRef.y = val;
+    if (_layoutObjRef) _layoutObjRef.attr("margin", _marginRef);
+}
+
 // Exported functions for use in xr.js
 let _layoutInstance = null;
 let _sceneInstance = null;
 let _allChartsInstance = null;
 let _layoutObj = null;
+
+// Export update functions at the top level
+export { updateRows, updateCurve, updateMarginX, updateMarginY };
 
 export function setLayout(val) {
     if (_layoutObj) {
