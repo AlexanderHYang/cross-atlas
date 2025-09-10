@@ -25,7 +25,33 @@ export async function setupWebXR(scene) {
         // xr.baseExperience.camera.setTarget(new BABYLON.Vector3(0, 0, 0));
     });
 
-    
+    // Enable hand tracking feature
+    const featuresManager = xr.baseExperience.featuresManager;
+    const handTracking = featuresManager.enableFeature(
+        BABYLON.WebXRFeatureName.HAND_TRACKING,
+        "latest",
+        {
+            xrInput: xr.input,
+            jointMeshes: {
+                enablePhysics: false,
+                sphereRadius: 0.01,
+                invisible: false,
+                materialColor: new BABYLON.Color3(1, 1, 1), // White color for joints
+            },
+        }
+    );
+
+    // Track when hands are detected
+    handTracking.onHandAddedObservable.add((hand) => {
+        console.log(`Hand ${hand.xrController.inputSource.handedness} detected`);
+    });
+
+    // Customize joint mesh appearance
+    handTracking.onHandJointMeshGeneratedObservable.add((jointMesh) => {
+        jointMesh.material = new BABYLON.StandardMaterial("jointMaterial", scene);
+        jointMesh.material.emissiveColor = new BABYLON.Color3(1, 1, 1); // Make joints glow white
+        jointMesh.material.alpha = 0.8; // Slight transparency
+    });
 
     // --- THEME ---
     const THEME = {

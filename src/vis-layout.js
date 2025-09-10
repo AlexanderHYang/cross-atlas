@@ -95,7 +95,7 @@ function updateMarginY(val) {
     if (_layoutObjRef) _layoutObjRef.attr("margin", _marginRef);
 }
 
-// Exported functions for use in xr.js
+// Exported functions for use in gui.js
 let _layoutInstance = null;
 let _sceneInstance = null;
 let _allChartsInstance = null;
