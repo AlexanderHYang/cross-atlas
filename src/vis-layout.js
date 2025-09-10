@@ -198,8 +198,8 @@ function makeLineChart(id, scene) {
         }, {})
     );
 
-    // Smooth the paths
-    paths = paths.map((path) => BABYLON.Curve3.CreateCatmullRomSpline(path, 20, false).getPoints());
+    // Smooth the paths with fewer subdivisions
+    paths = paths.map((path) => BABYLON.Curve3.CreateCatmullRomSpline(path, 10, false).getPoints());
 
     // Create the chart container
     let CoT = anu.create("cot", "cot" + id);
@@ -239,10 +239,11 @@ function generateStockData() {
 
     symbols.forEach((symbol) => {
         let price = 100 + Math.random() * 100;
-        for (let i = 0; i < 365; i++) {
+        // Generate weekly data points instead of daily (52 weeks)
+        for (let i = 0; i < 52; i++) {
             data.push({
                 symbol,
-                date: new Date(baseDate.getTime() + i * 24 * 60 * 60 * 1000),
+                date: new Date(baseDate.getTime() + i * 7 * 24 * 60 * 60 * 1000),
                 price: price + (Math.random() - 0.5) * 10,
             });
             price += (Math.random() - 0.5) * 5;
