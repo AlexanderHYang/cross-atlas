@@ -14,7 +14,7 @@ const babylonEngine = new BABYLON.Engine(canvas, true);
 const scene = layout(babylonEngine);
 
 // Configure Babylon.js to only show error level logs
-BABYLON.Logger.LogLevels = BABYLON.Logger.ErrorLogLevel;
+// BABYLON.Logger.LogLevels = BABYLON.Logger.ErrorLogLevel;
 
 // initialize XR
 setupWebXR(scene);

@@ -25,7 +25,13 @@ export async function setupWebXR(scene) {
         // xr.baseExperience.camera.setTarget(new BABYLON.Vector3(0, 0, 0));
     });
 
-    
+    // Disable hand mesh, controller only
+    try {
+        const fm = xr.baseExperience?.featuresManager;
+        if (fm) {
+            fm.disableFeature(BABYLON.WebXRFeatureName.HAND_TRACKING);
+        }
+    } catch {}
 
     // --- THEME ---
     const THEME = {
