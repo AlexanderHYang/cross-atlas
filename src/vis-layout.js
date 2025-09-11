@@ -34,8 +34,8 @@ export function layout(engine) {
     for (let i = 0; i < 15; i++) {
         let chart =
             Math.random() > 0.5
-                ? make2Dchart(Math.random() * 100, scene)
-                : make3Dchart(Math.random() * 100, scene);
+                ? create2DBarChart(Math.random() * 100, scene)
+                : create3DBarChart(Math.random() * 100, scene);
         allCharts.push(chart);
     }
 
@@ -127,19 +127,19 @@ export function addChart(scene, chartType = "2d") {
 
         switch (chartType) {
             case "2d":
-                chart = make2Dchart(id, scene);
+                chart = create2DBarChart(id, scene);
                 break;
             case "3d":
-                chart = make3Dchart(id, scene);
+                chart = create3DBarChart(id, scene);
                 break;
             case "line":
-                chart = makeLineChart(id, scene);
+                chart = createLineChart(id, scene);
                 break;
             case "scatter":
-                chart = makeScatterPlot(id, scene);
+                chart = createScatterPlot(id, scene);
                 break;
             default:
-                chart = make2Dchart(id, scene); // fallback to 2D
+                chart = create2DBarChart(id, scene); // fallback to 2D
         }
 
         if (chart) {
@@ -167,7 +167,7 @@ export function initLayoutGlobals(layoutObj, allCharts, scene) {
 }
 
 //Code for line chart
-function makeLineChart(id, scene) {
+function createLineChart(id, scene) {
     // Simulated stock data since we don't have the CSV
     const stockData = generateStockData();
 
@@ -215,19 +215,17 @@ function makeLineChart(id, scene) {
     });
 
     // Add axes
-    anu.createAxes("myAxes", {
-        scale: { x: scaleX, y: scaleY },
-        parent: chart,
-        domainMaterialOptions: { width: 0.01 },
-        labelTicks: { x: scaleX.ticks(d3.timeYear) },
-        labelFormat: { x: dateFormat, y: (text) => "$" + text },
-    });
+    // Axes with grid disabled
+    const axesOptionsLine = new anu.AxesConfig({ x: scaleX, y: scaleY });
+    axesOptionsLine.parent = chart;
+    axesOptionsLine.grid = false;
+    axesOptionsLine.labelOptions = { size: 0.25 }; // increase label text size
+    axesOptionsLine.domainMaterialOptions = { width: 0.01 };
+    axesOptionsLine.labelTicks = { x: scaleX.ticks(d3.timeYear) };
+    axesOptionsLine.labelFormat = { x: dateFormat, y: (text) => "$" + text };
+    anu.createAxes("myAxes", axesOptionsLine);
 
-    chart
-        .scaling(
-            BABYLON.Vector3.Maximize(BABYLON.Vector3.Random(), BABYLON.Vector3.One().scale(0.5))
-        )
-        .addTags("chart");
+    chart.addTags("chart").addTags("LineChart");
     return chart;
 }
 
@@ -254,7 +252,7 @@ function generateStockData() {
 }
 
 //Code from 2D bar chart example
-function make2Dchart(id, scene) {
+function create2DBarChart(id, scene) {
     const cylinders = [...new Set(carData.map((item) => item.Cylinders))].sort();
     let carsRollup = d3.flatRollup(
         carData,
@@ -288,18 +286,24 @@ function make2Dchart(id, scene) {
         .positionY((d) => scaleY(d.Horsepower) / 2)
         .material((d, i) => scaleC(d.Miles_per_Gallon));
 
-    anu.createAxes("myAxes", { scale: { x: scaleX, y: scaleY }, parent: chart });
+    // Axes with label scaling (grid default = true)
+    const axesOptions2D = new anu.AxesConfig({ x: scaleX, y: scaleY });
+    axesOptions2D.parent = chart;
+    axesOptions2D.labelOptions = { size: 0.25 };
+    anu.createAxes("myAxes", axesOptions2D);
 
     chart
-        .scaling(
-            BABYLON.Vector3.Maximize(BABYLON.Vector3.Random(), BABYLON.Vector3.One().scale(0.5))
-        )
-        .addTags("chart");
+        .addTags("chart")
+        .addTags("2DBarChart")
+        .positionUI()
+        .rotateUI()
+        .scaleUI({ minimum: 0.5, maximum: 2 });
+
     return chart;
 }
 
-// Pie chart implementation
-function makeScatterPlot(id, scene) {
+// Scatter Plot implementation
+function createScatterPlot(id, scene) {
     // Create the D3 scales
     let scaleX = d3
         .scaleLinear()
@@ -345,22 +349,20 @@ function makeScatterPlot(id, scene) {
         .material((d) => scaleC(d.Species));
 
     // Add axes
-    anu.createAxes("myAxes", {
-        scale: { x: scaleX, y: scaleY, z: scaleZ },
-        parent: chart,
-    });
+    // Axes with grid disabled
+    const axesOptionsScatter = new anu.AxesConfig({ x: scaleX, y: scaleY, z: scaleZ });
+    axesOptionsScatter.parent = chart;
+    axesOptionsScatter.grid = false;
+    axesOptionsScatter.labelOptions = { size: 0.25 }; // increase label text size
+    anu.createAxes("myAxes", axesOptionsScatter);
 
-    chart
-        .scaling(
-            BABYLON.Vector3.Maximize(BABYLON.Vector3.Random(), BABYLON.Vector3.One().scale(0.5))
-        )
-        .addTags("chart");
+    chart.addTags("chart").addTags("ScatterPlot");
 
     return chart;
 }
 
 //Code from 3D bar chart example
-function make3Dchart(id, scene) {
+function create3DBarChart(id, scene) {
     const origin = [...new Set(carData.map((item) => item.Origin))];
     const cylinders = [...new Set(carData.map((item) => item.Cylinders))].sort().reverse();
     let carsRollup = d3.flatRollup(
@@ -399,12 +401,12 @@ function make3Dchart(id, scene) {
         .positionY((d) => scaleY(d.Horsepower) / 2)
         .material((d, i) => scaleC(d.Miles_per_Gallon));
 
-    anu.createAxes("myAxes", { scale: { x: scaleX, y: scaleY, z: scaleZ }, parent: chart });
+    // Axes with label scaling (grid default = true)
+    const axesOptions3D = new anu.AxesConfig({ x: scaleX, y: scaleY, z: scaleZ });
+    axesOptions3D.parent = chart;
+    axesOptions3D.labelOptions = { size: 0.25 };
+    anu.createAxes("myAxes", axesOptions3D);
 
-    chart
-        .scaling(
-            BABYLON.Vector3.Maximize(BABYLON.Vector3.Random(), BABYLON.Vector3.One().scale(0.5))
-        )
-        .addTags("chart");
+    chart.addTags("chart").addTags("3DBarChart");
     return chart;
 }
