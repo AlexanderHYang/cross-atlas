@@ -72,8 +72,8 @@ export async function setupWebXR(scene) {
     };
 
     // --- Panel Mesh (floating 2D panel in 3D) ---
-    const panelWidth = 3; // meters (scaled 3x)
-    const panelHeight = 3.5; // meters (scaled 3x)
+    const panelWidth = 3;
+    const panelHeight = 3.5;
     const panelMesh = BABYLON.MeshBuilder.CreatePlane(
         "authoringPanelMesh",
         { width: panelWidth, height: panelHeight },
