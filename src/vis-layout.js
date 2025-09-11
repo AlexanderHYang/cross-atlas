@@ -9,6 +9,11 @@ import * as d3 from "d3";
 import carData from "../data/cars.json" assert { type: "json" };
 import penguinData from "../data/penguins.json" assert { type: "json" };
 
+// Centralized layout defaults
+const DEFAULT_ROWS = 3;
+const DEFAULT_CURVE = 5;
+const DEFAULT_MARGIN = new BABYLON.Vector2(0.5, 0.5);
+
 export function layout(engine) {
     //Create an empty Scene
     const scene = new BABYLON.Scene(engine);
@@ -39,28 +44,26 @@ export function layout(engine) {
         allCharts.push(chart);
     }
 
-    //Layout variables
-    let rows = 3;
-    let curve = 5;
-    let margin = new BABYLON.Vector2(0.5, 0.5);
+    // Layout variables (use centralized defaults)
+    const margin = DEFAULT_MARGIN.clone();
 
     //Create the layout, specify the layout type, parent name, and layout configurations
     let layoutObj = new anu.cylinderLayout(
         "Layout",
-        { selection: anu.selectTag("chart", scene), rows: rows, radius: curve, margin: margin },
+        {
+            selection: anu.selectTag("chart", scene),
+            rows: DEFAULT_ROWS,
+            radius: DEFAULT_CURVE,
+            margin: margin,
+        },
         scene
-    )
-        .attr("row", rows)
-        .attr("radius", curve)
-        .attr("margin", margin);
+    );
 
     // Set module-level refs for update functions
     _layoutObjRef = layoutObj;
-    _rowsRef = rows;
-    _curveRef = curve;
+    _rowsRef = DEFAULT_ROWS;
+    _curveRef = DEFAULT_CURVE;
     _marginRef = { x: margin.x, y: margin.y };
-
-    // All slider callbacks are now handled by the 2D panel in xr.js. No sliders are created here.
 
     // Initialize globals for exported functions
     initLayoutGlobals(layoutObj, allCharts, scene);
