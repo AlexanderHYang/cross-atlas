@@ -14,6 +14,14 @@ const DEFAULT_ROWS = 3;
 const DEFAULT_CURVE = 5;
 const DEFAULT_MARGIN = new BABYLON.Vector2(0.5, 0.5);
 
+// Module-level refs
+let _rowsRef = DEFAULT_ROWS;
+let _curveRef = DEFAULT_CURVE;
+let _marginRef = DEFAULT_MARGIN.clone();
+let _layoutObj = null;
+let _allChartsInstance = null;
+let _sceneInstance = null;
+
 export function layout(engine) {
     //Create an empty Scene
     const scene = new BABYLON.Scene(engine);
@@ -44,9 +52,6 @@ export function layout(engine) {
         allCharts.push(chart);
     }
 
-    // Layout variables (use centralized defaults)
-    const margin = DEFAULT_MARGIN.clone();
-
     //Create the layout, specify the layout type, parent name, and layout configurations
     let layoutObj = new anu.cylinderLayout(
         "Layout",
@@ -54,55 +59,39 @@ export function layout(engine) {
             selection: anu.selectTag("chart", scene),
             rows: DEFAULT_ROWS,
             radius: DEFAULT_CURVE,
-            margin: margin,
+            margin: DEFAULT_MARGIN.clone(),
         },
         scene
     );
 
-    // Set module-level refs for update functions
-    _layoutObjRef = layoutObj;
-    _rowsRef = DEFAULT_ROWS;
-    _curveRef = DEFAULT_CURVE;
-    _marginRef = { x: margin.x, y: margin.y };
+    // Initialize module-level refs for GUI controls
+    _layoutObj = layoutObj;
+    _allChartsInstance = allCharts;
+    _sceneInstance = scene;
 
-    // Initialize globals for exported functions
-    initLayoutGlobals(layoutObj, allCharts, scene);
     return scene;
 }
-// Removed misplaced closing brace here
-
-// Module-level refs for update functions
-let _layoutObjRef = null;
-let _rowsRef = 3;
-let _curveRef = 5;
-let _marginRef = { x: 0.5, y: 0.5 };
 
 // Function definitions
 function updateRows(val) {
     _rowsRef = Math.floor(val);
-    if (_layoutObjRef) _layoutObjRef.attr("row", _rowsRef);
+    if (_layoutObj) _layoutObj.attr("row", _rowsRef);
 }
 
 function updateCurve(val) {
     _curveRef = val;
-    if (_layoutObjRef) _layoutObjRef.attr("radius", _curveRef);
+    if (_layoutObj) _layoutObj.attr("radius", _curveRef);
 }
 
 function updateMarginX(val) {
     _marginRef.x = val;
-    if (_layoutObjRef) _layoutObjRef.attr("margin", _marginRef);
+    if (_layoutObj) _layoutObj.attr("margin", _marginRef);
 }
 
 function updateMarginY(val) {
     _marginRef.y = val;
-    if (_layoutObjRef) _layoutObjRef.attr("margin", _marginRef);
+    if (_layoutObj) _layoutObj.attr("margin", _marginRef);
 }
-
-// Exported functions for use in gui.js
-let _layoutInstance = null;
-let _sceneInstance = null;
-let _allChartsInstance = null;
-let _layoutObj = null;
 
 // Export update functions at the top level
 export { updateRows, updateCurve, updateMarginX, updateMarginY };
@@ -160,13 +149,6 @@ export function removeChart(scene) {
         _layoutObj.options.selection = anu.selectTag("chart", scene);
         _layoutObj.update();
     }
-}
-
-// Patch the layout function to set instances for exported functions
-export function initLayoutGlobals(layoutObj, allCharts, scene) {
-    _layoutObj = layoutObj;
-    _allChartsInstance = allCharts;
-    _sceneInstance = scene;
 }
 
 //Code for line chart
