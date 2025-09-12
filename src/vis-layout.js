@@ -289,13 +289,14 @@ function create2DBarChart(id, scene) {
     axesOptions2D.labelOptions = { size: 0.25 };
     anu.createAxes("myAxes", axesOptions2D);
 
+    const yOffset = -0.2;
     chart
         .scaling(BABYLON.Vector3.One().scale(CHART_SCALE_FACTOR))
         .addTags("chart")
-        .addTags("2DBarChart");
-    // .positionUI()
-    // .rotateUI()
-    // .scaleUI({ minimum: 0.5, maximum: 2 });
+        .addTags("2DBarChart")
+        .positionUI({ width:0.5, radius:0.03,position: new BABYLON.Vector3(0, yOffset, 0) })
+        .rotateUI({ diameter:0.1,position: new BABYLON.Vector3(0, yOffset, 0) })
+        .scaleUI({ diameter:0.06, minimum: 0.5, maximum: 2, position: new BABYLON.Vector3(0, yOffset, 0) });
 
     return chart;
 }
