@@ -9,6 +9,9 @@ import {
     updateCurve,
     updateMarginX,
     updateMarginY,
+    DEFAULT_ROWS,
+    DEFAULT_CURVE,
+    DEFAULT_MARGIN,
 } from "./vis-layout.js";
 
 export async function setupWebXR(scene) {
@@ -194,10 +197,10 @@ export async function setupWebXR(scene) {
     slidersSection.addControl(slidersStack);
 
     // Slider callbacks now use the update functions from layout.js
-    addSliderRow(slidersStack, "Rows", 1, 8, 3, updateRows);
-    addSliderRow(slidersStack, "Curvature", 0, 10, 5, updateCurve);
-    addSliderRow(slidersStack, "Margin X", 0, 10, 0.5, updateMarginX);
-    addSliderRow(slidersStack, "Margin Y", 0, 10, 0.5, updateMarginY);
+    addSliderRow(slidersStack, "Rows", 1, 8, DEFAULT_ROWS, updateRows);
+    addSliderRow(slidersStack, "Curvature", 0, 10, DEFAULT_CURVE, updateCurve);
+    addSliderRow(slidersStack, "Margin X", 0, 10, DEFAULT_MARGIN.x, updateMarginX);
+    addSliderRow(slidersStack, "Margin Y", 0, 10, DEFAULT_MARGIN.y, updateMarginY);
 
     // --- Chart Type Radios ---
     const radioSection = makeSection();

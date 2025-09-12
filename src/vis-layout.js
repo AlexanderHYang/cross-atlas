@@ -10,9 +10,10 @@ import carData from "../data/cars.json" assert { type: "json" };
 import penguinData from "../data/penguins.json" assert { type: "json" };
 
 // Centralized layout defaults
-const DEFAULT_ROWS = 3;
-const DEFAULT_CURVE = 5;
-const DEFAULT_MARGIN = new BABYLON.Vector2(0.5, 0.5);
+export const DEFAULT_ROWS = 3;
+export const DEFAULT_CURVE = 8;
+export const DEFAULT_MARGIN = new BABYLON.Vector2(3, 0.5);
+export const CHART_SCALE_FACTOR = 0.8;
 
 // Module-level refs
 let _rowsRef = DEFAULT_ROWS;
@@ -45,10 +46,18 @@ export function layout(engine) {
     //To use layouts we need charts to begin with, generate 15 charts
     let allCharts = [];
     for (let i = 0; i < 15; i++) {
-        let chart =
-            Math.random() > 0.5
-                ? create2DBarChart(Math.random() * 100, scene)
-                : create3DBarChart(Math.random() * 100, scene);
+        const r = Math.random();
+        let chart;
+        const id = Math.random() * 100;
+        if (r < 0.25) {
+            chart = create2DBarChart(id, scene);
+        } else if (r < 0.5) {
+            chart = create3DBarChart(id, scene);
+        } else if (r < 0.75) {
+            chart = createScatterPlot(id, scene);
+        } else {
+            chart = createLineChart(id, scene);
+        }
         allCharts.push(chart);
     }
 
@@ -168,7 +177,7 @@ function createLineChart(id, scene) {
     let scaleY = d3
         .scaleLinear()
         .domain([0, d3.max(stockData, (d) => d.price)])
-        .range([-1, 1])
+        .range([0, 2])
         .nice();
 
     // Color scale using Anu helper
@@ -210,7 +219,10 @@ function createLineChart(id, scene) {
     axesOptionsLine.labelFormat = { x: dateFormat, y: (text) => "$" + text };
     anu.createAxes("myAxes", axesOptionsLine);
 
-    chart.addTags("chart").addTags("LineChart");
+    chart
+        .scaling(BABYLON.Vector3.One().scale(CHART_SCALE_FACTOR))
+        .addTags("chart")
+        .addTags("LineChart");
     return chart;
 }
 
@@ -278,11 +290,12 @@ function create2DBarChart(id, scene) {
     anu.createAxes("myAxes", axesOptions2D);
 
     chart
+        .scaling(BABYLON.Vector3.One().scale(CHART_SCALE_FACTOR))
         .addTags("chart")
-        .addTags("2DBarChart")
-        .positionUI()
-        .rotateUI()
-        .scaleUI({ minimum: 0.5, maximum: 2 });
+        .addTags("2DBarChart");
+    // .positionUI()
+    // .rotateUI()
+    // .scaleUI({ minimum: 0.5, maximum: 2 });
 
     return chart;
 }
@@ -299,7 +312,7 @@ function createScatterPlot(id, scene) {
     let scaleY = d3
         .scaleLinear()
         .domain(d3.extent(d3.map(penguinData, (d) => d["Flipper Length (mm)"])))
-        .range([-1, 1])
+        .range([0, 2])
         .nice();
 
     let scaleZ = d3
@@ -341,7 +354,10 @@ function createScatterPlot(id, scene) {
     axesOptionsScatter.labelOptions = { size: 0.25 }; // increase label text size
     anu.createAxes("myAxes", axesOptionsScatter);
 
-    chart.addTags("chart").addTags("ScatterPlot");
+    chart
+        .scaling(BABYLON.Vector3.One().scale(CHART_SCALE_FACTOR))
+        .addTags("chart")
+        .addTags("ScatterPlot");
 
     return chart;
 }
@@ -370,7 +386,7 @@ function create3DBarChart(id, scene) {
 
     let scaleX = d3.scaleBand().domain(cylinders).range([-1, 1]).paddingInner(1).paddingOuter(0.5);
     let scaleY = d3.scaleLinear().domain(horsepowerMinMax).range([0, 2]);
-    let scaleZ = d3.scaleBand().domain(origin).range([-1, 1]).paddingInner(1).paddingOuter(0.5);
+    let scaleZ = d3.scaleBand().domain(origin).range([0, 2]).paddingInner(1).paddingOuter(0.5);
     let scaleC = d3
         .scaleSequential(anu.sequentialChromatic("OrRd").toStandardMaterial())
         .domain(MPGMinMax);
@@ -392,6 +408,11 @@ function create3DBarChart(id, scene) {
     axesOptions3D.labelOptions = { size: 0.25 };
     anu.createAxes("myAxes", axesOptions3D);
 
-    chart.addTags("chart").addTags("3DBarChart");
+    chart
+        .scaling(BABYLON.Vector3.One().scale(CHART_SCALE_FACTOR))
+        .addTags("chart")
+        .addTags("3DBarChart");
+
+    console.log();
     return chart;
 }
