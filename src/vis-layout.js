@@ -219,10 +219,25 @@ function createLineChart(id, scene) {
     axesOptionsLine.labelFormat = { x: dateFormat, y: (text) => "$" + text };
     anu.createAxes("myAxes", axesOptionsLine);
 
+    const yOffset = -0.2;
     chart
         .scaling(BABYLON.Vector3.One().scale(CHART_SCALE_FACTOR))
         .addTags("chart")
-        .addTags("LineChart");
+        .addTags("LineChart")
+        .positionUI({
+            visibility: 0.6,
+            width: 0.5,
+            radius: 0.03,
+            position: new BABYLON.Vector3(0, yOffset, 0),
+        })
+        .rotateUI({ visibility: 0.6, diameter: 0.08, position: new BABYLON.Vector3(0, yOffset, 0) })
+        .scaleUI({
+            visibility: 0.6,
+            diameter: 0.08,
+            minimum: 0.5,
+            maximum: 2,
+            position: new BABYLON.Vector3(0, yOffset + 0.025, 0),
+        });
     return chart;
 }
 
@@ -366,10 +381,25 @@ function createScatterPlot(id, scene) {
     axesOptionsScatter.labelOptions = { size: 0.25 }; // increase label text size
     anu.createAxes("myAxes", axesOptionsScatter);
 
+    const yOffset = -0.2;
     chart
         .scaling(BABYLON.Vector3.One().scale(CHART_SCALE_FACTOR))
         .addTags("chart")
-        .addTags("ScatterPlot");
+        .addTags("ScatterPlot")
+        .positionUI({
+            visibility: 0.6,
+            width: 0.5,
+            radius: 0.03,
+            position: new BABYLON.Vector3(0, yOffset, 0),
+        })
+        .rotateUI({ visibility: 0.6, diameter: 0.08, position: new BABYLON.Vector3(0, yOffset, 0) })
+        .scaleUI({
+            visibility: 0.6,
+            diameter: 0.08,
+            minimum: 0.5,
+            maximum: 2,
+            position: new BABYLON.Vector3(0, yOffset + 0.025, 0),
+        });
 
     return chart;
 }
@@ -420,10 +450,25 @@ function create3DBarChart(id, scene) {
     axesOptions3D.labelOptions = { size: 0.25 };
     anu.createAxes("myAxes", axesOptions3D);
 
+    const yOffset = -0.2;
     chart
         .scaling(BABYLON.Vector3.One().scale(CHART_SCALE_FACTOR))
         .addTags("chart")
-        .addTags("3DBarChart");
+        .addTags("3DBarChart")
+        .positionUI({
+            visibility: 0.6,
+            width: 0.5,
+            radius: 0.03,
+            position: new BABYLON.Vector3(0, yOffset, 0),
+        })
+        .rotateUI({ visibility: 0.6, diameter: 0.08, position: new BABYLON.Vector3(0, yOffset, 0) })
+        .scaleUI({
+            visibility: 0.6,
+            diameter: 0.08,
+            minimum: 0.5,
+            maximum: 2,
+            position: new BABYLON.Vector3(0, yOffset + 0.025, 0),
+        });
 
     console.log();
     return chart;
