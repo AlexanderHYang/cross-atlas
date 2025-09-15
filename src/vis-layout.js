@@ -294,9 +294,20 @@ function create2DBarChart(id, scene) {
         .scaling(BABYLON.Vector3.One().scale(CHART_SCALE_FACTOR))
         .addTags("chart")
         .addTags("2DBarChart")
-        .positionUI({ width:0.5, radius:0.03,position: new BABYLON.Vector3(0, yOffset, 0) })
-        .rotateUI({ diameter:0.1,position: new BABYLON.Vector3(0, yOffset, 0) })
-        .scaleUI({ diameter:0.06, minimum: 0.5, maximum: 2, position: new BABYLON.Vector3(0, yOffset, 0) });
+        .positionUI({
+            visibility: 0.6,
+            width: 0.5,
+            radius: 0.03,
+            position: new BABYLON.Vector3(0, yOffset, 0),
+        })
+        .rotateUI({ visibility: 0.6, diameter: 0.08, position: new BABYLON.Vector3(0, yOffset, 0) })
+        .scaleUI({
+            visibility: 0.6,
+            diameter: 0.08,
+            minimum: 0.5,
+            maximum: 2,
+            position: new BABYLON.Vector3(0, yOffset + 0.025, 0),
+        });
 
     return chart;
 }
