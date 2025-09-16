@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0
-// Copyright : J.P. Morgan Chase & Co.
-
 import * as anu from "@jpmorganchase/anu";
 import * as BABYLON from "@babylonjs/core";
 import * as GUI from "@babylonjs/gui";
