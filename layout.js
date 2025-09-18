@@ -9,28 +9,40 @@ import * as d3 from "d3";
 import data from "./data/cars.json" assert { type: "json" };
 
 import * as Y from "yjs";
-import { WebrtcProvider } from "y-webrtc"; // Replace WebsocketProvider with WebrtcProvider
+import { WebsocketProvider } from "y-websocket";
 
 // Create a shared Yjs doc
 const ydoc = new Y.Doc();
 
-// Connect to a WebRTC signaling server
-// Replace the room name "crossdash-room" with your desired room name
-const provider = new WebrtcProvider("crossdash-room", ydoc, {
-    signaling: ["wss://signaling.yjs.dev"],
-    peerOpts: {
-      config: {
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:global.stun.twilio.com:3478" }
-        ]
-      }
-    }
-  });
-  
+// Connect to local y-websocket server
+const provider = new WebsocketProvider(
+    "wss://192.168.1.254:4444",
+    "crossdash-room", 
+    ydoc
+);
+
+// Debug connection status
+provider.on('status', event => {
+    console.log('WebSocket Provider Status:', event.status);
+});
+
+provider.on('connection-close', event => {
+    console.log('WebSocket connection closed:', event);
+});
+
+provider.on('connection-error', event => {
+    console.error('WebSocket connection error:', event);
+});
+
 const yState = ydoc.getMap("sliders");
 
-console.log(provider.awareness.getStates());
+// Debug Yjs state changes
+yState.observe((event, transaction) => {
+    console.log("Yjs Map changed:", event.keysChanged, "Origin:", transaction.origin);
+    console.log("Current state:", yState.toJSON());
+});
+
+console.log("Initial provider awareness states:", provider.awareness.getStates());
 
 export function layout(engine) {
     // Create an empty Scene
@@ -110,6 +122,7 @@ export function layout(engine) {
 
         // Local → Remote
         slider.onValueChangedObservable.add((val) => {
+            console.log(`Local slider change - ${key}: ${val}`);
             yState.set(key, val);
             updateFn(val);
         });
@@ -118,8 +131,9 @@ export function layout(engine) {
         yState.observe((event) => {
             if (event.keysChanged.has(key)) {
                 const newVal = yState.get(key);
-                console.log(`Yjs state updated for ${key}:`, newVal);
+                console.log(`Remote state change detected - ${key}: ${newVal}, current slider: ${slider.value}`);
                 if (slider.value !== newVal) {
+                    console.log(`Updating slider ${key} from ${slider.value} to ${newVal}`);
                     slider.value = newVal;
                     updateFn(newVal); // apply to Babylon layout
                 }

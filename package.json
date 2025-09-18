@@ -1,25 +1,30 @@
 {
-  "name": "crossdash",
-  "private": true,
-  "version": "0.0.1",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-basic-ssl": "^1.2.0",
-    "vite": "latest"
-  },
-  "dependencies": {
-    "@babylonjs/core": "latest",
-    "@babylonjs/gui": "latest",
-    "@babylonjs/inspector": "latest",
-    "@jpmorganchase/anu": "latest",
-    "d3": "latest",
-    "y-webrtc": "^10.3.0",
-    "y-websocket": "^3.0.0",
-    "yjs": "^13.6.27"
-  }
+    "name": "crossdash",
+    "private": true,
+    "version": "0.0.1",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview",
+        "yws-ssl": "node yws-ssl-server.js",
+        "generate-certs": "node generate-certs.js"
+    },
+    "devDependencies": {
+        "@vitejs/plugin-basic-ssl": "^1.2.0",
+        "vite": "latest"
+    },
+    "dependencies": {
+        "@babylonjs/core": "latest",
+        "@babylonjs/gui": "latest",
+        "@babylonjs/inspector": "latest",
+        "@jpmorganchase/anu": "latest",
+        "d3": "latest",
+        "lib0": "^0.2.97",
+        "ws": "^8.14.2",
+        "y-protocols": "^1.0.6",
+        "y-webrtc": "^10.3.0",
+        "y-websocket": "^3.0.0",
+        "yjs": "^13.6.27"
+    }
 }
