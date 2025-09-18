@@ -13,10 +13,13 @@
     "vite": "latest"
   },
   "dependencies": {
-    "@babylonjs/inspector": "latest",
     "@babylonjs/core": "latest",
     "@babylonjs/gui": "latest",
+    "@babylonjs/inspector": "latest",
     "@jpmorganchase/anu": "latest",
-    "d3": "latest"
+    "d3": "latest",
+    "y-webrtc": "^10.3.0",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.27"
   }
 }

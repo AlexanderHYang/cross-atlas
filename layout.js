@@ -8,13 +8,39 @@ import * as GUI3D from "@babylonjs/gui/3D";
 import * as d3 from "d3";
 import data from "./data/cars.json" assert { type: "json" };
 
+import * as Y from "yjs";
+import { WebrtcProvider } from "y-webrtc"; // Replace WebsocketProvider with WebrtcProvider
+
+// Create a shared Yjs doc
+const ydoc = new Y.Doc();
+
+// Connect to a WebRTC signaling server
+// Replace the room name "crossdash-room" with your desired room name
+const provider = new WebrtcProvider("crossdash-room", ydoc, {
+    signaling: ["wss://signaling.yjs.dev"],
+    peerOpts: {
+      config: {
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:global.stun.twilio.com:3478" }
+        ]
+      }
+    }
+  });
+  
+const yState = ydoc.getMap("sliders");
+
+console.log(provider.awareness.getStates());
+
 export function layout(engine) {
-    //Create an empty Scene
+    // Create an empty Scene
     const scene = new BABYLON.Scene(engine);
     const manager = new GUI3D.GUI3DManager(scene);
-    //Add some lighting
+
+    // Add some lighting
     new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 10, 0), scene);
-    //Add a camera that rotates around the origin and adjust its properties
+
+    // Add a camera that rotates around the origin and adjust its properties
     const camera = new BABYLON.ArcRotateCamera(
         "Camera",
         0,
@@ -28,7 +54,7 @@ export function layout(engine) {
     camera.minZ = 0;
     camera.attachControl(true);
 
-    //To use layouts we need charts to begin with, generate 15 charts
+    // To use layouts we need charts to begin with, generate 15 charts
     let allCharts = [];
     for (let i = 0; i < 15; i++) {
         let chart =
@@ -38,12 +64,12 @@ export function layout(engine) {
         allCharts.push(chart);
     }
 
-    //Layout variables
+    // Layout variables
     let rows = 3;
     let curve = 5;
     let margin = new BABYLON.Vector2(0.5, 0.5);
 
-    //Create the layout, specify the layout type, parent name, and layout configurations
+    // Create the layout, specify the layout type, parent name, and layout configurations
     let layoutObj = new anu.cylinderLayout(
         "Layout",
         { selection: anu.selectTag("chart", scene), rows: rows, radius: curve, margin: margin },
@@ -53,7 +79,7 @@ export function layout(engine) {
         .attr("radius", curve)
         .attr("margin", margin);
 
-    //Define functions to update layout properties which will be called from UI events
+    // Define functions to update layout properties which will be called from UI events
     const updateRows = (val) => {
         rows = Math.floor(val);
         layoutObj.attr("row", rows);
@@ -75,31 +101,57 @@ export function layout(engine) {
     };
 
     // Sliders for rows, curve, marginX, marginY (spread horizontally)
-    function createHoloSlider(label, min, max, value, callback, position) {
+    function bindSliderToYjs(label, min, max, initial, updateFn, position, key) {
         const slider = new GUI3D.Slider3D(label);
         slider.minimum = min;
         slider.maximum = max;
-        slider.value = value;
+        slider.value = initial;
         slider.position = position;
-        slider.onValueChangedObservable.add(callback);
+
+        // Local → Remote
+        slider.onValueChangedObservable.add((val) => {
+            yState.set(key, val);
+            updateFn(val);
+        });
+
+        // Remote → Local
+        yState.observe((event) => {
+            if (event.keysChanged.has(key)) {
+                const newVal = yState.get(key);
+                console.log(`Yjs state updated for ${key}:`, newVal);
+                if (slider.value !== newVal) {
+                    slider.value = newVal;
+                    updateFn(newVal); // apply to Babylon layout
+                }
+            }
+        });
+
+        // Set initial state in Yjs if not yet present
+        if (!yState.has(key)) {
+            yState.set(key, initial);
+        } else {
+            // Apply existing Yjs value (e.g. when a new client joins)
+            const val = yState.get(key);
+            slider.value = val;
+            updateFn(val);
+        }
+
         manager.addControl(slider);
-        // Add a label
         const text = new GUI.TextBlock();
         text.text = label;
         slider.thumbContent = text;
         return slider;
     }
 
-    createHoloSlider("Rows", 1, 8, rows, updateRows, new BABYLON.Vector3(-2.0, 0, 2.5));
-    createHoloSlider("Curvature", 0, 10, curve, updateCurve, new BABYLON.Vector3(-1, 0, 2.5));
-    createHoloSlider("Margin X", 0, 10, margin.x, updateMarginX, new BABYLON.Vector3(0, 0, 2.5));
-    createHoloSlider("Margin Y", 0, 10, margin.y, updateMarginY, new BABYLON.Vector3(1.0, 0, 2.5));
+    bindSliderToYjs("Rows", 1, 8, rows, updateRows, new BABYLON.Vector3(-2.0, 0, 2.5), "rows");
+    bindSliderToYjs("Curvature", 0, 10, curve, updateCurve, new BABYLON.Vector3(-1, 0, 2.5), "curve");
+    bindSliderToYjs("Margin X", 0, 10, margin.x, updateMarginX, new BABYLON.Vector3(0, 0, 2.5), "marginX");
+    bindSliderToYjs("Margin Y", 0, 10, margin.y, updateMarginY, new BABYLON.Vector3(1.0, 0, 2.5), "marginY");
 
     // Initialize globals for exported functions
     initLayoutGlobals(layoutObj, allCharts, scene);
     return scene;
 }
-// Removed misplaced closing brace here
 
 // Exported functions for use in xr.js
 let _layoutInstance = null;

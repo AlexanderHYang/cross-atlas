@@ -7,5 +7,8 @@ export default defineConfig({
     },
     plugins: [
         basicSsl()
-    ]
+    ],
+    server: {
+        https: undefined,
+      }
 });
