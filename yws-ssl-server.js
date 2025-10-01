@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { createServer } from "https";
 import { createServer as createHttpServer } from "http";
 import { WebSocketServer } from "ws";
+import { networkInterfaces } from "os";
 import * as Y from "yjs";
 import * as encoding from "lib0/encoding.js";
 import * as decoding from "lib0/decoding.js";
@@ -17,6 +18,20 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const PORT = 4444;
+
+// Get local IP address dynamically
+function getLocalIpAddress() {
+    const interfaces = networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            // Skip internal and non-IPv4 addresses
+            if (!iface.internal && iface.family === "IPv4") {
+                return iface.address;
+            }
+        }
+    }
+    return "localhost";
+}
 
 // Try to load SSL certificates
 const certPath = join(__dirname, "certs", "cert.pem");
@@ -179,14 +194,14 @@ server.on("request", (req, res) => {
         <body>
             <div class="container">
                 <h1>CrossDash y-websocket Server</h1>
-                <p class="status">✅ Server is running!</p>
+                <p class="status">Server is running!</p>
                 <div class="info">
                     <h3>Connection Information:</h3>
                     <p><strong>Protocol:</strong> ${useSSL ? "WSS (Secure)" : "WS (Insecure)"}</p>
                     <p><strong>Local:</strong> ${useSSL ? "wss" : "ws"}://localhost:${PORT}/</p>
                     <p><strong>Network:</strong> ${
                         useSSL ? "wss" : "ws"
-                    }://192.168.1.254:${PORT}/</p>
+                    }://${getLocalIpAddress()}:${PORT}/</p>
                     <p><strong>Active Rooms:</strong> ${docs.size}</p>
                 </div>
                 <p>Your CrossDash application can now sync via this y-websocket server.</p>
@@ -199,11 +214,12 @@ server.on("request", (req, res) => {
 // Start server
 server.listen(PORT, "0.0.0.0", () => {
     const protocol = useSSL ? "wss" : "ws";
+    const localIp = getLocalIpAddress();
     console.log("=".repeat(60));
     console.log("CrossDash y-websocket Server Started");
     console.log("=".repeat(60));
     console.log(`Local access: ${protocol}://localhost:${PORT}/`);
-    console.log(`Network access: ${protocol}://192.168.1.254:${PORT}/`);
+    console.log(`Network access: ${protocol}://${localIp}:${PORT}/`);
     console.log(`SSL enabled: ${useSSL}`);
     console.log("=".repeat(60));
     console.log("Waiting for connections...");

@@ -15,23 +15,26 @@ import { WebsocketProvider } from "y-websocket";
 const ydoc = new Y.Doc();
 
 // Connect to local y-websocket server
-const provider = new WebsocketProvider(
-    "wss://192.168.1.254:4444",
-    "crossdash-room", 
-    ydoc
-);
+// Use current host IP (works when accessing via network IP) or fallback to localhost
+const currentHost = window.location.hostname;
+const websocketUrl =
+    currentHost === "localhost" ? "wss://localhost:4444" : `wss://${currentHost}:4444`;
+
+console.log(`Connecting to WebSocket server: ${websocketUrl}`);
+
+const provider = new WebsocketProvider(websocketUrl, "crossdash-room", ydoc);
 
 // Debug connection status
-provider.on('status', event => {
-    console.log('WebSocket Provider Status:', event.status);
+provider.on("status", (event) => {
+    console.log("WebSocket Provider Status:", event.status);
 });
 
-provider.on('connection-close', event => {
-    console.log('WebSocket connection closed:', event);
+provider.on("connection-close", (event) => {
+    console.log("WebSocket connection closed:", event);
 });
 
-provider.on('connection-error', event => {
-    console.error('WebSocket connection error:', event);
+provider.on("connection-error", (event) => {
+    console.error("WebSocket connection error:", event);
 });
 
 const yState = ydoc.getMap("sliders");
@@ -131,7 +134,9 @@ export function layout(engine) {
         yState.observe((event) => {
             if (event.keysChanged.has(key)) {
                 const newVal = yState.get(key);
-                console.log(`Remote state change detected - ${key}: ${newVal}, current slider: ${slider.value}`);
+                console.log(
+                    `Remote state change detected - ${key}: ${newVal}, current slider: ${slider.value}`
+                );
                 if (slider.value !== newVal) {
                     console.log(`Updating slider ${key} from ${slider.value} to ${newVal}`);
                     slider.value = newVal;
@@ -158,9 +163,33 @@ export function layout(engine) {
     }
 
     bindSliderToYjs("Rows", 1, 8, rows, updateRows, new BABYLON.Vector3(-2.0, 0, 2.5), "rows");
-    bindSliderToYjs("Curvature", 0, 10, curve, updateCurve, new BABYLON.Vector3(-1, 0, 2.5), "curve");
-    bindSliderToYjs("Margin X", 0, 10, margin.x, updateMarginX, new BABYLON.Vector3(0, 0, 2.5), "marginX");
-    bindSliderToYjs("Margin Y", 0, 10, margin.y, updateMarginY, new BABYLON.Vector3(1.0, 0, 2.5), "marginY");
+    bindSliderToYjs(
+        "Curvature",
+        0,
+        10,
+        curve,
+        updateCurve,
+        new BABYLON.Vector3(-1, 0, 2.5),
+        "curve"
+    );
+    bindSliderToYjs(
+        "Margin X",
+        0,
+        10,
+        margin.x,
+        updateMarginX,
+        new BABYLON.Vector3(0, 0, 2.5),
+        "marginX"
+    );
+    bindSliderToYjs(
+        "Margin Y",
+        0,
+        10,
+        margin.y,
+        updateMarginY,
+        new BABYLON.Vector3(1.0, 0, 2.5),
+        "marginY"
+    );
 
     // Initialize globals for exported functions
     initLayoutGlobals(layoutObj, allCharts, scene);
