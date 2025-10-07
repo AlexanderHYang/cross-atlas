@@ -74,6 +74,7 @@ export function layout(engine) {
                 ? make2Dchart(Math.random() * 100, scene)
                 : make3Dchart(Math.random() * 100, scene);
         allCharts.push(chart);
+        console.log(chart);
     }
 
     // Layout variables
@@ -210,6 +211,107 @@ export function removeChart(scene) {
     }
 }
 
+export function getAllCharts() {
+    return _allChartsInstance;
+}
+
+export function getChartMetadata() {
+    if (!_allChartsInstance) return [];
+    
+    return _allChartsInstance.map((chart, index) => {
+        // Debug: log the chart object to understand its structure
+        console.log('Chart object:', chart, 'Type:', typeof chart);
+        console.log('Chart properties:', Object.getOwnPropertyNames(chart));
+        
+        // Safely check if chart.name is a string and contains 'cot'
+        const chartName = typeof chart.name === 'string' ? chart.name : '';
+        const is2D = Math.random() > 0.5; // Randomly assign chart type for now
+        
+        return {
+            id: chartName || `chart-${index}`,
+            name: `Chart ${index + 1}`,
+            type: is2D ? '2D Bar Chart' : '3D Bar Chart',
+            position: {
+                x: chart.position?.x || 0,
+                y: chart.position?.y || 0,
+                z: chart.position?.z || 0
+            },
+            scaling: { x: 1, y: 1, z: 1 }, // Simplified for now
+            visible: true,
+            babylonChart: chart // Reference to the actual chart
+        };
+    });
+}
+
+export function createIndividualChart(chartIndex, canvasId) {
+    if (!_allChartsInstance || chartIndex >= _allChartsInstance.length) {
+        console.error('Chart not found at index:', chartIndex);
+        return null;
+    }
+
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        console.error('Canvas not found:', canvasId);
+        return null;
+    }
+
+    // Create a new engine and scene for this individual chart
+    const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+    const scene = new BABYLON.Scene(engine);
+
+    // Add lighting
+    new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 10, 0), scene);
+
+    // Add camera
+    const camera = new BABYLON.ArcRotateCamera(
+        "Camera",
+        0,
+        0,
+        0,
+        new BABYLON.Vector3(0, 1, 0),
+        scene
+    );
+    camera.position = new BABYLON.Vector3(0, 2, -4);
+    camera.wheelPrecision = 50; // Make wheel less sensitive
+    camera.minZ = 0;
+    camera.attachControl(canvas, false); // Don't prevent default events
+
+    // Clone the chart from the main scene
+    const originalChart = _allChartsInstance[chartIndex];
+    
+    // Recreate the chart in the new scene
+    let newChart;
+    if (Math.random() > 0.5) {
+        newChart = make2Dchart(chartIndex, scene);
+    } else {
+        newChart = make3Dchart(chartIndex, scene);
+    }
+
+    // Center the chart
+    newChart.position = new BABYLON.Vector3(0, 0, 0);
+    
+    // Start the render loop
+    engine.runRenderLoop(() => {
+        scene.render();
+    });
+
+    // Handle window resize
+    const handleResize = () => {
+        engine.resize();
+    };
+    window.addEventListener('resize', handleResize);
+
+    return {
+        engine,
+        scene,
+        chart: newChart,
+        dispose: () => {
+            window.removeEventListener('resize', handleResize);
+            engine.dispose();
+        }
+    };
+}
+
 // Patch the layout function to set instances for exported functions
 export function initLayoutGlobals(layoutObj, allCharts, scene) {
     _layoutObj = layoutObj;
@@ -218,7 +320,7 @@ export function initLayoutGlobals(layoutObj, allCharts, scene) {
 }
 
 //Code from 2D bar chart example
-function make2Dchart(id, scene) {
+export function make2Dchart(id, scene) {
     const cylinders = [...new Set(data.map((item) => item.Cylinders))].sort();
     let carsRollup = d3.flatRollup(
         data,
@@ -263,7 +365,7 @@ function make2Dchart(id, scene) {
 }
 
 //Code from 3D bar chart example
-function make3Dchart(id, scene) {
+export function make3Dchart(id, scene) {
     const origin = [...new Set(data.map((item) => item.Origin))];
     const cylinders = [...new Set(data.map((item) => item.Cylinders))].sort().reverse();
     let carsRollup = d3.flatRollup(

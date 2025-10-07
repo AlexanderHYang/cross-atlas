@@ -4,9 +4,37 @@
     <meta charset="UTF-8" />
     <link rel="stylesheet" href="style.css">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Anu Starter Template</title>
+    <title>CrossDash - 3D Layout</title>
+    <style>
+        .navigation {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .nav-button {
+            padding: 10px 20px;
+            margin-left: 10px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .nav-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
   </head>
   <body>
+    <div class="navigation">
+        <a href="./" class="nav-button">3D View</a>
+        <a href="./2D/vanilla.html" class="nav-button">2D Dashboard</a>
+    </div>
     <div id="app"></div>
     <script type="module" src="/main.js"></script>
   </body>
