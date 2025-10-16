@@ -1,3 +1,5 @@
+![demo](./demo.gif)
+
 # Setup
 
 1. Install dependencies:
