@@ -1,30 +1,27 @@
 {
-    "name": "crossdash",
-    "private": true,
-    "version": "0.0.1",
-    "type": "module",
-    "scripts": {
-        "dev": "vite",
-        "build": "vite build",
-        "preview": "vite preview",
-        "yws-ssl": "node yws-ssl-server.js",
-        "generate-certs": "node generate-certs.js"
-    },
-    "devDependencies": {
-        "@vitejs/plugin-basic-ssl": "^1.2.0",
-        "vite": "latest"
-    },
-    "dependencies": {
-        "@babylonjs/core": "latest",
-        "@babylonjs/gui": "latest",
-        "@babylonjs/inspector": "latest",
-        "@jpmorganchase/anu": "latest",
-        "d3": "latest",
-        "lib0": "^0.2.97",
-        "ws": "^8.14.2",
-        "y-protocols": "^1.0.6",
-        "y-webrtc": "^10.3.0",
-        "y-websocket": "^3.0.0",
-        "yjs": "^13.6.27"
-    }
+  "name": "babylon-projection",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev:2d": "vite --config packages/client-2d/vite.config.ts",
+    "dev:3d": "vite --config packages/client-3d/vite.config.ts"
+  },
+  "dependencies": {
+    "@babylonjs/core": "8.26.0",
+    "@babylonjs/gui": "^8.29.0",
+    "@babylonjs/materials": "^8.26.0",
+    "@jpmorganchase/anu": "^0.6.3",
+    "@y/websocket-server": "^0.1.1",
+    "d3": "^7.9.0",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.27"
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "@types/node": "^24.7.2",
+    "typescript": "^5.1.6",
+    "vite": "^5.0.0",
+    "vite-tsconfig-paths": "^5.1.4"
+  }
 }

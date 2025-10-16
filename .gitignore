@@ -1,2 +1,15 @@
-node_modules
-*.log
+# Node
+node_modules/
+dist/
+build/
+.env
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+# Vite
+.env.local
+npm-debug.log
+yarn-error.log
+cert.pem
+key.pem
