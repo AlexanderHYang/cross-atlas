@@ -11,6 +11,13 @@ export const DEFAULT_ROWS = 3;
 export const DEFAULT_CURVE = 8;
 export const DEFAULT_MARGIN = new BABYLON.Vector2(3, 0.5);
 export const CHART_SCALE_FACTOR = 0.8;
+export const DEFAULT_AXIS = "y";
+
+const AXIS_ROTATIONS = Object.freeze({
+    x: new BABYLON.Vector3(0, 0, -Math.PI / 2),
+    y: new BABYLON.Vector3(0, 0, 0),
+    z: new BABYLON.Vector3(Math.PI / 2, 0, 0),
+});
 
 // Module-level refs
 let _rowsRef = DEFAULT_ROWS;
@@ -19,6 +26,19 @@ let _marginRef = DEFAULT_MARGIN.clone();
 let _layoutObj = null;
 let _allChartsInstance = null;
 let _sceneInstance = null;
+let _axisRef = DEFAULT_AXIS;
+
+function applyAxisRotation() {
+    if (!_layoutObj) return;
+    const rotation = AXIS_ROTATIONS[_axisRef];
+    if (!rotation) return;
+    const root = _layoutObj.root;
+    if (!root) return;
+    if (root.rotationQuaternion) {
+        root.rotationQuaternion = null;
+    }
+    root.rotation.set(rotation.x, rotation.y, rotation.z);
+}
 
 export function layout(engine) {
     //Create an empty Scene
@@ -74,6 +94,7 @@ export function layout(engine) {
     _layoutObj = layoutObj;
     _allChartsInstance = allCharts;
     _sceneInstance = scene;
+    applyAxisRotation();
 
     return scene;
 }
@@ -81,22 +102,34 @@ export function layout(engine) {
 // Function definitions
 function updateRows(val) {
     _rowsRef = Math.floor(val);
-    if (_layoutObj) _layoutObj.attr("row", _rowsRef);
+    if (_layoutObj) {
+        _layoutObj.attr("row", _rowsRef);
+        applyAxisRotation();
+    }
 }
 
 function updateCurve(val) {
     _curveRef = val;
-    if (_layoutObj) _layoutObj.attr("radius", _curveRef);
+    if (_layoutObj) {
+        _layoutObj.attr("radius", _curveRef);
+        applyAxisRotation();
+    }
 }
 
 function updateMarginX(val) {
     _marginRef.x = val;
-    if (_layoutObj) _layoutObj.attr("margin", _marginRef);
+    if (_layoutObj) {
+        _layoutObj.attr("margin", _marginRef);
+        applyAxisRotation();
+    }
 }
 
 function updateMarginY(val) {
     _marginRef.y = val;
-    if (_layoutObj) _layoutObj.attr("margin", _marginRef);
+    if (_layoutObj) {
+        _layoutObj.attr("margin", _marginRef);
+        applyAxisRotation();
+    }
 }
 
 // Export update functions at the top level
@@ -115,6 +148,7 @@ export function setLayout(val) {
                 _layoutObj.sphereLayout();
                 break;
         }
+        applyAxisRotation();
     }
 }
 
@@ -144,6 +178,7 @@ export function addChart(scene, chartType = "2d") {
             _allChartsInstance.push(chart);
             _layoutObj.options.selection = anu.selectTag("chart", scene);
             _layoutObj.update();
+            applyAxisRotation();
         }
     }
 }
@@ -154,7 +189,16 @@ export function removeChart(scene) {
         _allChartsInstance.pop();
         _layoutObj.options.selection = anu.selectTag("chart", scene);
         _layoutObj.update();
+        applyAxisRotation();
     }
+}
+
+export function updateAxis(axisKey) {
+    if (typeof axisKey !== "string") return;
+    const normalized = axisKey.toLowerCase();
+    if (!Object.prototype.hasOwnProperty.call(AXIS_ROTATIONS, normalized)) return;
+    _axisRef = normalized;
+    applyAxisRotation();
 }
 
 //Code for line chart
