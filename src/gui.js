@@ -57,11 +57,11 @@ export async function setupWebXR(scene) {
     };
 
     // --- Panel Mesh (floating 2D panel in 3D) ---
-    const panelWidth = 3;
-    const panelHeight = 3.5;
-    const panelMesh = BABYLON.MeshBuilder.CreatePlane(
+    const basePanelWidth = 3.2;
+    const basePanelHeight = 6.5; // Larger base height to accommodate dropdown
+    let panelMesh = BABYLON.MeshBuilder.CreatePlane(
         "authoringPanelMesh",
-        { width: panelWidth, height: panelHeight },
+        { width: basePanelWidth, height: basePanelHeight },
         scene
     );
 
@@ -72,24 +72,54 @@ export async function setupWebXR(scene) {
     // Position for debugging
     // panelMesh.position = new BABYLON.Vector3(0, 1.5, 4);
 
-    const advancedTexture = GUI.AdvancedDynamicTexture.CreateForMesh(panelMesh, 3000, 3500, true);
+    const TEX_PX_PER_UNIT = 1000; // texture pixels per mesh unit
+    let advancedTexture = GUI.AdvancedDynamicTexture.CreateForMesh(
+        panelMesh,
+        Math.round(basePanelWidth * TEX_PX_PER_UNIT),
+        Math.round(basePanelHeight * TEX_PX_PER_UNIT),
+        true
+    );
 
     // Panel container
     const authoringPanel = new GUI.Rectangle("authoringPanel");
     authoringPanel.width = 1;
-    authoringPanel.height = 1;
+    authoringPanel.height = "auto";
+    authoringPanel.adaptHeightToChildren = true;
     authoringPanel.cornerRadius = 150;
     authoringPanel.thickness = 6;
     authoringPanel.color = THEME.panelStroke;
     authoringPanel.background = THEME.panelBg;
+    authoringPanel.paddingTop = "120px";
+    authoringPanel.paddingBottom = "160px";
+    authoringPanel.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+    authoringPanel.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+    authoringPanel.paddingLeft = "60px";
+    authoringPanel.paddingRight = "60px";
     advancedTexture.addControl(authoringPanel);
 
-    const requestPanelResize = () => {};
+    const requestPanelResize = () => {
+        // Measure content and resize mesh/texture to fit
+        const BASE_TEX_W = Math.round(basePanelWidth * TEX_PX_PER_UNIT);
+        const BASE_TEX_H = Math.round(basePanelHeight * TEX_PX_PER_UNIT);
+        const EXTRA_MARGIN_PX = 360; // space to avoid clipping top/bottom
+        // Defer to next microtask to ensure layout is computed
+        setTimeout(() => {
+            const contentH = Math.ceil((authoringPanel.heightInPixels || 0) + EXTRA_MARGIN_PX);
+            // Allow shrinking below base and growing above as needed
+            const targetTexH = Math.max(BASE_TEX_H, contentH);
+            // Update texture and mesh only if significantly different
+            if (Math.abs(targetTexH - advancedTexture.getSize().height) > 5) {
+                advancedTexture.scaleTo(BASE_TEX_W, targetTexH);
+                // Scale mesh vertically proportionally to texture height
+                panelMesh.scaling.y = targetTexH / BASE_TEX_H;
+            }
+        }, 0);
+    };
 
     // Stack layout
     const authoringStack = new GUI.StackPanel("authoringStack");
     authoringStack.isVertical = true;
-    authoringStack.paddingTop = `84px`;
+    authoringStack.paddingTop = `100px`;
     authoringStack.paddingLeft = `84px`;
     authoringStack.paddingRight = `84px`;
     authoringStack.width = 1;
@@ -206,160 +236,7 @@ export async function setupWebXR(scene) {
     addSliderRow(slidersStack, "Margin X", 0, 10, DEFAULT_MARGIN.x, updateMarginX);
     addSliderRow(slidersStack, "Margin Y", 0, 10, DEFAULT_MARGIN.y, updateMarginY);
 
-    // --- Axis Orientation Dropdown ---
-    const axisSection = makeSection();
-    authoringStack.addControl(axisSection);
-
-    const axisStack = new GUI.StackPanel();
-    axisStack.isVertical = true;
-    axisStack.width = 1;
-    axisStack.spacing = 24;
-    axisStack.paddingTop = "50px";
-    axisStack.paddingBottom = "50px";
-    axisSection.addControl(axisStack);
-
-    const axisTitle = new GUI.TextBlock();
-    axisTitle.text = "Axis Orientation";
-    axisTitle.height = `150px`;
-    axisTitle.color = THEME.text;
-    axisTitle.fontSize = 110;
-    axisTitle.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-    axisTitle.textVerticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-    axisTitle.paddingLeft = "150px";
-    axisStack.addControl(axisTitle);
-
-    const axisOptions = [
-        { label: "Align to X Axis", value: "x" },
-        { label: "Align to Y Axis", value: "y" },
-        { label: "Align to Z Axis", value: "z" },
-    ];
-    let selectedAxis = DEFAULT_AXIS;
-
-    const axisDropdownContainer = new GUI.StackPanel();
-    axisDropdownContainer.isVertical = true;
-    axisDropdownContainer.width = 1;
-    axisDropdownContainer.spacing = 12;
-    axisDropdownContainer.paddingLeft = "150px";
-    axisDropdownContainer.paddingRight = "150px";
-    axisDropdownContainer.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-    axisStack.addControl(axisDropdownContainer);
-
-    const dropdownRect = new GUI.Rectangle();
-    dropdownRect.width = "2200px";
-    dropdownRect.height = `180px`;
-    dropdownRect.thickness = 0;
-    dropdownRect.cornerRadius = 60;
-    dropdownRect.background = "#111827";
-    dropdownRect.isPointerBlocker = true;
-    dropdownRect.zIndex = 10;
-    axisDropdownContainer.addControl(dropdownRect);
-
-    const dropdownContent = new GUI.StackPanel();
-    dropdownContent.isVertical = false;
-    dropdownContent.width = 1;
-    dropdownContent.height = 1;
-    dropdownContent.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-    dropdownContent.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-    dropdownContent.paddingLeft = "60px";
-    dropdownContent.paddingRight = "60px";
-    dropdownRect.addControl(dropdownContent);
-
-    const selectedAxisText = new GUI.TextBlock();
-    selectedAxisText.text =
-        axisOptions.find((opt) => opt.value === selectedAxis)?.label ?? axisOptions[0].label;
-    selectedAxisText.color = THEME.text;
-    selectedAxisText.fontSize = 90;
-    selectedAxisText.height = 1;
-    selectedAxisText.width = "1800px";
-    selectedAxisText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-    selectedAxisText.textVerticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-    dropdownContent.addControl(selectedAxisText);
-
-    const dropdownArrowText = new GUI.TextBlock();
-    dropdownArrowText.text = "v";
-    dropdownArrowText.color = THEME.subText;
-    dropdownArrowText.fontSize = 90;
-    dropdownArrowText.height = 1;
-    dropdownArrowText.width = "200px";
-    dropdownArrowText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
-    dropdownArrowText.textVerticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-    dropdownContent.addControl(dropdownArrowText);
-
-    const listRect = new GUI.Rectangle();
-    listRect.width = "2200px";
-    listRect.thickness = 0;
-    listRect.cornerRadius = 60;
-    listRect.background = "#1f2937";
-    listRect.adaptHeightToChildren = true;
-    listRect.isPointerBlocker = true;
-    listRect.isVisible = false;
-    listRect.zIndex = 9;
-    axisDropdownContainer.addControl(listRect);
-
-    const optionsPanel = new GUI.StackPanel();
-    optionsPanel.isVertical = true;
-    optionsPanel.width = 1;
-    optionsPanel.spacing = 12;
-    optionsPanel.paddingTop = "24px";
-    optionsPanel.paddingBottom = "24px";
-    optionsPanel.paddingLeft = "24px";
-    optionsPanel.paddingRight = "24px";
-    listRect.addControl(optionsPanel);
-
-    let axisDropdownOpen = false;
-    const optionButtons = [];
-
-    function setAxisDropdownOpen(open) {
-        axisDropdownOpen = open;
-        listRect.isVisible = open;
-        dropdownArrowText.text = open ? "^" : "v";
-        requestPanelResize();
-    }
-
-    function updateAxisButtonStyles() {
-        optionButtons.forEach(({ value, button }) => {
-            const isActive = value === selectedAxis;
-            button.background = isActive ? THEME.sliderFill : THEME.sliderBar;
-        });
-    }
-
-    dropdownRect.onPointerUpObservable.add(function () {
-        setAxisDropdownOpen(!axisDropdownOpen);
-    });
-
-    axisOptions.forEach(function (axis) {
-        const optionBtn = GUI.Button.CreateSimpleButton("axisOption_" + axis.value, axis.label);
-        optionBtn.height = `160px`;
-        optionBtn.fontSize = 84;
-        optionBtn.color = THEME.text;
-        optionBtn.paddingLeft = "24px";
-        optionBtn.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_STRETCH;
-        optionBtn.cornerRadius = 48;
-        optionBtn.thickness = 0;
-        optionBtn.background = axis.value === selectedAxis ? THEME.sliderFill : THEME.sliderBar;
-        optionBtn.onPointerEnterObservable.add(function () {
-            if (axis.value !== selectedAxis) optionBtn.background = THEME.sliderFill;
-        });
-        optionBtn.onPointerOutObservable.add(function () {
-            if (axis.value !== selectedAxis) optionBtn.background = THEME.sliderBar;
-        });
-        optionBtn.onPointerUpObservable.add(function () {
-            if (selectedAxis === axis.value) {
-                setAxisDropdownOpen(false);
-                return;
-            }
-            selectedAxis = axis.value;
-            selectedAxisText.text = axis.label;
-            updateAxis(selectedAxis);
-            updateAxisButtonStyles();
-            setAxisDropdownOpen(false);
-        });
-        optionButtons.push({ value: axis.value, button: optionBtn });
-        optionsPanel.addControl(optionBtn);
-    });
-    requestPanelResize();
-
-    // --- Chart Type Dropdown ---
+    // --- Chart Type Dropdown (in place of Axis Orientation) ---
     const chartTypeSection = makeSection();
     authoringStack.addControl(chartTypeSection);
 
@@ -371,14 +248,15 @@ export async function setupWebXR(scene) {
     chartTypeStack.paddingBottom = "50px";
     chartTypeSection.addControl(chartTypeStack);
 
-    const chartTypeLabel = new GUI.TextBlock();
-    chartTypeLabel.text = "Chart Type";
-    chartTypeLabel.color = THEME.text;
-    chartTypeLabel.fontSize = 96;
-    chartTypeLabel.paddingLeft = "150px";
-    chartTypeLabel.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-    chartTypeLabel.textVerticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-    chartTypeStack.addControl(chartTypeLabel);
+    const chartTypeTitle = new GUI.TextBlock();
+    chartTypeTitle.text = "Chart Type";
+    chartTypeTitle.height = `150px`;
+    chartTypeTitle.color = THEME.text;
+    chartTypeTitle.fontSize = 110;
+    chartTypeTitle.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+    chartTypeTitle.textVerticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+    chartTypeTitle.paddingLeft = "150px";
+    chartTypeStack.addControl(chartTypeTitle);
 
     const chartTypes = [
         { label: "2D Bar Chart", value: "2d" },
@@ -391,7 +269,7 @@ export async function setupWebXR(scene) {
     const chartDropdownContainer = new GUI.StackPanel();
     chartDropdownContainer.isVertical = true;
     chartDropdownContainer.width = 1;
-    chartDropdownContainer.spacing = 16;
+    chartDropdownContainer.spacing = 12;
     chartDropdownContainer.paddingLeft = "150px";
     chartDropdownContainer.paddingRight = "150px";
     chartDropdownContainer.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
@@ -399,27 +277,28 @@ export async function setupWebXR(scene) {
 
     const chartDropdownRect = new GUI.Rectangle();
     chartDropdownRect.width = "2200px";
-    chartDropdownRect.height = `200px`;
+    chartDropdownRect.height = `180px`;
     chartDropdownRect.thickness = 0;
-    chartDropdownRect.cornerRadius = 96;
-    chartDropdownRect.background = THEME.grayBtn;
+    chartDropdownRect.cornerRadius = 60;
+    chartDropdownRect.background = "#111827";
     chartDropdownRect.isPointerBlocker = true;
+    chartDropdownRect.zIndex = 10;
     chartDropdownContainer.addControl(chartDropdownRect);
 
     const chartDropdownContent = new GUI.StackPanel();
     chartDropdownContent.isVertical = false;
     chartDropdownContent.width = 1;
     chartDropdownContent.height = 1;
-    chartDropdownContent.paddingLeft = "72px";
-    chartDropdownContent.paddingRight = "72px";
     chartDropdownContent.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
     chartDropdownContent.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+    chartDropdownContent.paddingLeft = "60px";
+    chartDropdownContent.paddingRight = "60px";
     chartDropdownRect.addControl(chartDropdownContent);
 
     const selectedChartText = new GUI.TextBlock();
     selectedChartText.text = chartTypes[0].label;
-    selectedChartText.color = THEME.grayBtnTxt;
-    selectedChartText.fontSize = 96;
+    selectedChartText.color = THEME.text;
+    selectedChartText.fontSize = 90;
     selectedChartText.height = 1;
     selectedChartText.width = "1800px";
     selectedChartText.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
@@ -429,7 +308,7 @@ export async function setupWebXR(scene) {
     const chartDropdownArrow = new GUI.TextBlock();
     chartDropdownArrow.text = "v";
     chartDropdownArrow.color = THEME.subText;
-    chartDropdownArrow.fontSize = 96;
+    chartDropdownArrow.fontSize = 90;
     chartDropdownArrow.height = 1;
     chartDropdownArrow.width = "200px";
     chartDropdownArrow.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
@@ -437,26 +316,29 @@ export async function setupWebXR(scene) {
     chartDropdownContent.addControl(chartDropdownArrow);
 
     const chartDropdownListRect = new GUI.Rectangle();
-    chartDropdownListRect.width = chartDropdownRect.width;
+    chartDropdownListRect.width = "2200px";
     chartDropdownListRect.thickness = 0;
-    chartDropdownListRect.cornerRadius = 72;
-    chartDropdownListRect.background = THEME.panelBg;
+    chartDropdownListRect.cornerRadius = 60;
+    chartDropdownListRect.background = "#1f2937";
     chartDropdownListRect.adaptHeightToChildren = true;
-    chartDropdownListRect.isVisible = false;
     chartDropdownListRect.isPointerBlocker = true;
-    chartDropdownListRect.paddingTop = "18px";
-    chartDropdownListRect.paddingBottom = "18px";
-    chartDropdownListRect.paddingLeft = "24px";
-    chartDropdownListRect.paddingRight = "24px";
+    chartDropdownListRect.isVisible = false;
+    chartDropdownListRect.zIndex = 9;
     chartDropdownContainer.addControl(chartDropdownListRect);
 
     const chartDropdownList = new GUI.StackPanel();
     chartDropdownList.isVertical = true;
     chartDropdownList.width = 1;
     chartDropdownList.spacing = 12;
+    chartDropdownList.paddingTop = "24px";
+    chartDropdownList.paddingBottom = "24px";
+    chartDropdownList.paddingLeft = "24px";
+    chartDropdownList.paddingRight = "24px";
     chartDropdownListRect.addControl(chartDropdownList);
 
     let chartDropdownOpen = false;
+    const chartOptionButtons = [];
+
     function setChartDropdownOpen(open) {
         chartDropdownOpen = open;
         chartDropdownListRect.isVisible = open;
@@ -464,36 +346,50 @@ export async function setupWebXR(scene) {
         requestPanelResize();
     }
 
+    function updateChartButtonStyles() {
+        chartOptionButtons.forEach(({ value, button }) => {
+            const isActive = value === selectedChartType;
+            button.background = isActive ? THEME.sliderFill : THEME.sliderBar;
+        });
+    }
+
     chartDropdownRect.onPointerUpObservable.add(function () {
         setChartDropdownOpen(!chartDropdownOpen);
     });
 
     chartTypes.forEach(function (type) {
-        const optionBtn = GUI.Button.CreateSimpleButton(`chartTypeOption-${type.value}`, type.label);
-        optionBtn.height = `180px`;
-        optionBtn.fontSize = 90;
-        optionBtn.color = THEME.valueBoxTx;
+        const optionBtn = GUI.Button.CreateSimpleButton(
+            `chartTypeOption-${type.value}`,
+            type.label
+        );
+        optionBtn.height = `160px`;
+        optionBtn.fontSize = 84;
+        optionBtn.color = THEME.text;
+        optionBtn.paddingLeft = "24px";
         optionBtn.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_STRETCH;
-        optionBtn.cornerRadius = 72;
+        optionBtn.cornerRadius = 48;
         optionBtn.thickness = 0;
-        optionBtn.background = THEME.valueBoxBg;
-        optionBtn.textBlock.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        optionBtn.textBlock.paddingLeft = "48px";
+        optionBtn.background =
+            type.value === selectedChartType ? THEME.sliderFill : THEME.sliderBar;
         optionBtn.onPointerEnterObservable.add(function () {
-            optionBtn.background = THEME.grayBtn;
+            if (type.value !== selectedChartType) optionBtn.background = THEME.sliderFill;
         });
         optionBtn.onPointerOutObservable.add(function () {
-            optionBtn.background = THEME.valueBoxBg;
+            if (type.value !== selectedChartType) optionBtn.background = THEME.sliderBar;
         });
         optionBtn.onPointerUpObservable.add(function () {
+            if (selectedChartType === type.value) {
+                setChartDropdownOpen(false);
+                return;
+            }
             selectedChartType = type.value;
             selectedChartText.text = type.label;
+            updateChartButtonStyles();
             setChartDropdownOpen(false);
-            optionBtn.background = THEME.valueBoxBg;
         });
+        chartOptionButtons.push({ value: type.value, button: optionBtn });
         chartDropdownList.addControl(optionBtn);
     });
-
     requestPanelResize();
 
     const spacer1 = new GUI.Rectangle();
@@ -569,7 +465,7 @@ export async function setupWebXR(scene) {
     const layoutRow = new GUI.StackPanel();
     layoutRow.isVertical = false;
     layoutRow.height = `240px`;
-    layoutRow.width = 1;
+    layoutRow.paddingBottom = `100px`;
     layoutRow.spacing = 72;
     layoutRow.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
     layoutRow.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
