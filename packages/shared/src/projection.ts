@@ -1,4 +1,17 @@
 import { Vector3 } from '@babylonjs/core'
+import { PCA } from 'ml-pca'
+import { Matrix } from 'ml-matrix'
+import { Matrix2D } from '@babylonjs/gui'
+
+export type ProjectionType = 'equirectangular' | 'pca'
+let _projectionType: ProjectionType = 'equirectangular'
+
+export function getProjectionType(): ProjectionType {
+  return _projectionType
+}
+export function setProjectionType(newType: ProjectionType) {
+  _projectionType = newType
+}
 
 export const maxLat = 89 * Math.PI / 180 // radians
 export const maxY = Math.log(Math.tan(Math.PI / 4 + maxLat / 2))
@@ -29,17 +42,16 @@ export function inverseMercatorNormalizedXY(nx: number, ny: number) {
 // lon maps linearly: -PI..PI -> -1..1
 // lat maps linearly: -PI/2..PI/2 -> -1..1 (clamped to maxLat)
 export function equirectangularNormalizedXY(latRad: number, lonRad: number) {
-    const lat = clamp(latRad, -maxLat, maxLat)
-  // flip sign so longitude increases map to +x on the 2D plane consistently
-  const nx = -lonRad / Math.PI
+  const lat = clamp(latRad, -maxLat, maxLat)
+  const nx = lonRad / Math.PI
     const ny = lat / (Math.PI / 2)
     return { nx, ny }
 }
 
 // Inverse Equirectangular: normalized XY [-1,1] -> lat/lon (radians)
 export function inverseEquirectangularNormalizedXY(nx: number, ny: number) {
-  // inverse of the flipped equirectangular mapping
-  const lon = -nx * Math.PI
+  // inverse of the equirectangular mapping
+  const lon = nx * Math.PI
     const lat = clamp(ny, -1, 1) * (Math.PI / 2)
     return { lat, lon }
 }
@@ -69,34 +81,75 @@ export function vec3ToLatLon(v: Vector3) {
     return { lat, lon, radius: r }
 }
 
-// Projection mode: spherical (equirectangular/mercator mapping) or planar (orthographic onto plane)
-export enum ProjectionMode {
-  Spherical = 'spherical',
-  Planar = 'planar',
-}
 
-let _currentProjectionMode: ProjectionMode = ProjectionMode.Spherical
-type ModeListener = (mode: ProjectionMode) => void
-const _modeListeners: ModeListener[] = []
+// PCA
+let _pcaAvailable = false // whether PCA computation has been done
+let _pcaInstance: PCA | null = null // cached PCA instance
 
-export function getProjectionMode() {
-  return _currentProjectionMode
-}
-
-export function setProjectionMode(mode: ProjectionMode) {
-  if (_currentProjectionMode === mode) return
-  _currentProjectionMode = mode
-  for (const l of _modeListeners) l(mode)
-}
-
-export function toggleProjectionMode() {
-  setProjectionMode(_currentProjectionMode === ProjectionMode.Spherical ? ProjectionMode.Planar : ProjectionMode.Spherical)
-}
-
-export function onProjectionModeChange(fn: ModeListener) {
-  _modeListeners.push(fn)
-  return () => {
-    const idx = _modeListeners.indexOf(fn)
-    if (idx >= 0) _modeListeners.splice(idx, 1)
+export function updatePCAPlane(points: Vector3[] | number[][]) {
+  if (!points || points.length === 0) {
+    console.warn('updatePCAPlane: no points provided')
+    _pcaAvailable = false
+    _pcaInstance = null
+    return
   }
+
+  // construct the matrix
+  const mat: number[][] = []
+  for (const p of points) {
+    if (p instanceof Vector3) {
+      mat.push([p.x, p.y, p.z])
+    } else if (Array.isArray(p) && p.length === 3) {
+      mat.push(p)
+    } else {
+      console.warn('updatePCAPlane: invalid point format:', p)
+    }
+  }
+
+  if (mat.length === 0) {
+    console.warn('updatePCAPlane: no valid points after processing')
+    _pcaAvailable = false
+    _pcaInstance = null
+    return
+  }
+
+  // compute PCA
+  _pcaInstance = new PCA(mat, { center: true, scale: false })
+  _pcaAvailable = true
+}
+
+export function projectPCA(point: Vector3): [number, number] {
+  if (!_pcaAvailable || !_pcaInstance) {
+    console.error('projectPCA: PCA not available, call updatePCAPlane first')
+  }
+
+  const projected = _pcaInstance?.predict([[point.x, point.y, point.z]])
+  if (!projected || projected.rows === 0) {
+    throw new Error('projectPCA: PCA projection failed')
+  }
+
+  const coords = projected.getRow(0)
+  if (coords.length < 2) {
+    throw new Error('projectPCA: PCA projection returned insufficient dimensions')
+  }
+
+  return [coords[0], coords[1]]
+}
+
+export function inverseProjectPCA(x: number, y: number): Vector3 {
+  if (!_pcaAvailable || !_pcaInstance) {
+    console.error('inverseProjectPCA: PCA not available, call updatePCAPlane first')
+  }
+
+  const reconstructed = _pcaInstance?.invert(new Matrix([[x, y]]))
+  if (!reconstructed || reconstructed.rows === 0) {
+    throw new Error('inverseProjectPCA: PCA inverse projection failed')
+  }
+  
+  const coords = reconstructed.getRow(0)
+  if (coords.length < 3) {
+    throw new Error('inverseProjectPCA: PCA inverse projection returned insufficient dimensions')
+  }
+
+  return new Vector3(coords[0], coords[1], coords[2])
 }

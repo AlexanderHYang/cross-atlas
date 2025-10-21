@@ -11,14 +11,14 @@ export class Point2D implements IPoint {
   radius = 8
   onLocalChange?: () => void
   ignoreRemote = false
-
+  
   constructor(id?: string, nx = 0, ny = 0, color = '#ff0000') {
     this.id = id ?? `pt2d_${Math.random().toString(36).slice(2,8)}`
     this.nx = nx
     this.ny = ny
     this.color = color
   }
-
+  
   // Called by SyncManager to read canonical payload
   getLocalData(): PointSyncData {
     // convert normalized equirectangular (nx,ny) to normalized 3D vector
@@ -27,7 +27,7 @@ export class Point2D implements IPoint {
     const pos: Vector3SyncData = { x: v.x, y: v.y, z: v.z }
     return { id: this.id, position: pos }
   }
-
+  
   // Called by SyncManager to apply remote payload
   applyRemoteData(data: PointSyncData) {
     if (!data || !data.position) return
@@ -42,7 +42,7 @@ export class Point2D implements IPoint {
     this.nx = nx
     this.ny = ny
   }
-
+  
   // draw on a canvas context (cx,cy are pixel coords)
   draw(ctx: CanvasRenderingContext2D, width: number, height: number) {
     const x = ((this.nx + 1) / 2) * width
@@ -52,7 +52,7 @@ export class Point2D implements IPoint {
     ctx.arc(x, y, this.radius, 0, Math.PI * 2)
     ctx.fill()
   }
-
+  
   // hit test pixel coords
   hitTest(px: number, py: number, width: number, height: number) {
     const x = ((this.nx + 1) / 2) * width
@@ -61,7 +61,7 @@ export class Point2D implements IPoint {
     const dy = py - y
     return dx * dx + dy * dy <= this.radius * this.radius
   }
-
+  
   // set normalized coords from pixel coords
   setFromPixel(px: number, py: number, width: number, height: number, skipSync = false) {
     const nx = (px / width) * 2 - 1
