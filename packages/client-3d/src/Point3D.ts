@@ -1,6 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
 import { IPoint } from "../../shared/src/IPoint";
-import { PointSyncData, SyncManager, Vector3SyncData } from "../../shared/src/SyncManager";
+import { PointSyncData } from "../../shared/src/SyncManager";
 
 const BIG_RADIUS = 1.5; // TODO: get from env
 
