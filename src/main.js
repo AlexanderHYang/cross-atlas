@@ -3,8 +3,8 @@ import * as BABYLON from "@babylonjs/core";
 import * as anu from "@jpmorganchase/anu";
 import * as GUI from "@babylonjs/gui";
 import * as d3 from "d3";
-import { layout } from "./src/vis-layout.js";
-import { setupWebXR } from "./src/gui.js";
+import { layout } from "./core/layout-manager.js";
+import { setupWebXR } from "./ui/setup.js";
 
 const app = document.querySelector("#app");
 const canvas = document.createElement("canvas");
