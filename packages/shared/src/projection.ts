@@ -94,17 +94,32 @@ export function updatePCAPlane(points: Vector3[] | number[][], syncManager: Sync
     return
   }
 
+  const means = [0,0,0]
+  let validPointCount = 0
+
   // construct the matrix
   const mat: number[][] = []
   for (const p of points) {
     if (p instanceof Vector3) {
       mat.push([p.x, p.y, p.z])
+      means[0] += p.x
+      means[1] += p.y
+      means[2] += p.z
+      validPointCount++
     } else if (Array.isArray(p) && p.length === 3) {
       mat.push(p)
+      means[0] += p[0]
+      means[1] += p[1]
+      means[2] += p[2]
+      validPointCount++
     } else {
       console.warn('updatePCAPlane: invalid point format:', p)
     }
   }
+
+  means[0] /= validPointCount
+  means[1] /= validPointCount
+  means[2] /= validPointCount
 
   if (mat.length === 0) {
     console.warn('updatePCAPlane: no valid points after processing')
@@ -127,12 +142,13 @@ export function updatePCAPlane(points: Vector3[] | number[][], syncManager: Sync
     console.warn('updatePCAPlane: PCA returned insufficient components')
     return
   }
-  const normal = components.getColumn(2) // third principal component
+  const normal = components.getColumn(2)
+  const normalVec = new Vector3(normal[0], normal[1], normal[2]).normalize()
 
   syncManager.syncedMetadataMap.set('metadata', {
-    pcaPlaneNormal: { x: normal[0], y: normal[1], z: normal[2] }
+    pcaPlaneNormal: { x: normalVec.x, y: normalVec.y, z: normalVec.z },
+    pcaPlaneMean: { x: means[0], y: means[1], z: means[2] },
   })
-
 }
 
 export function projectPCA(point: Vector3): [number, number] {

@@ -1,5 +1,6 @@
+import { Vector3 } from '@babylonjs/core'
 import type { IPoint } from '../../shared/src/IPoint'
-import type { PointSyncData, Vector3SyncData } from '../../shared/src/SyncManager'
+import type { MetadataSyncData, PointSyncData, Vector3SyncData } from '../../shared/src/SyncManager'
 import { inverseEquirectangularNormalizedXY, equirectangularNormalizedXY, latLonToVec3, getProjectionType, inverseProjectPCA, projectOntoSphere, projectPCA, projectAlongNormalToSphere } from '../../shared/src/projection'
 
 export class Point2D implements IPoint {
@@ -20,16 +21,23 @@ export class Point2D implements IPoint {
   }
   
   // Called by SyncManager to read canonical payload
-  getLocalData(): PointSyncData {
+  getLocalData(existing: PointSyncData, metadata: MetadataSyncData): PointSyncData {
 
     if (getProjectionType() === 'pca') {
       try {
-        const recon = inverseProjectPCA(this.nx, this.ny)
-        if (recon) {
-          const v = projectAlongNormalToSphere(recon, 1)
-          const pos: Vector3SyncData = { x: v.x, y: v.y, z: v.z }
-          return { id: this.id, position: pos }
-        }
+        const planePoint = inverseProjectPCA(this.nx, this.ny)
+
+        const mean = new Vector3(metadata.pcaPlaneMean.x, metadata.pcaPlaneMean.y, metadata.pcaPlaneMean.z)
+        const normal = new Vector3(metadata.pcaPlaneNormal.x, metadata.pcaPlaneNormal.y, metadata.pcaPlaneNormal.z).normalize()
+        const existingVec = new Vector3(existing.position.x, existing.position.y, existing.position.z)
+
+        const signedDist = Vector3.Dot(existingVec.subtract(mean), normal)
+
+        // shift plane reconstruction along normal by same signed distance
+        const shifted = planePoint.add(normal.scale(signedDist))
+
+        const pos: Vector3SyncData = { x: shifted.x, y: shifted.y, z: shifted.z }
+        return { id: this.id, position: pos }
       } catch (err) {
         console.warn('Point2D.getLocalData: PCA inverse failed, falling back to equirectangular', err)
       }

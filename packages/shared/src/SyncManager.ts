@@ -10,7 +10,8 @@ export type PointSyncData = {
     position: Vector3SyncData,
 }
 export type MetadataSyncData = {
-    pcaPlaneNormal?: Vector3SyncData,
+    pcaPlaneNormal: Vector3SyncData,
+    pcaPlaneMean: Vector3SyncData,
 }
 
 export class SyncManager {
@@ -51,16 +52,17 @@ export class SyncManager {
             p.ignoreRemote = false
         } else {
             // first writer writes initial state
+            const existing = this.syncedPointDataMap.get(p.id)!
             this.ydoc.transact(() => {
-                this.syncedPointDataMap.set(p.id, p.getLocalData())
+                this.syncedPointDataMap.set(p.id, p.getLocalData(existing, this.getMetadata()!))
             }, p)
         }
         
         // subscribe local->remote
         p.onLocalChange = () => {
             if (p.ignoreRemote) return
-            // console.log('Local change on', p.id)
-            const localData = p.getLocalData();
+            const existing = this.syncedPointDataMap.get(p.id)!
+            const localData = p.getLocalData(existing, this.getMetadata()!);
             // write with origin so the observer can ignore this local change
             this.ydoc.transact(() => {
                 this.syncedPointDataMap.set(p.id, localData)
@@ -71,9 +73,14 @@ export class SyncManager {
     getLocalPointDataArray(): PointSyncData[] {
         const arr: PointSyncData[] = []
         for (const p of this.localPointsById.values()) {
-            arr.push(p.getLocalData())
+            const existing = this.syncedPointDataMap.get(p.id)!
+            arr.push(p.getLocalData(existing, this.getMetadata()!))
         }
         return arr
+    }
+
+    getMetadata(): MetadataSyncData | undefined {
+        return this.syncedMetadataMap.get('metadata')
     }
 
     setMetadata(data: MetadataSyncData) {

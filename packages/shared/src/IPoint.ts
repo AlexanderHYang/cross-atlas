@@ -1,11 +1,11 @@
-import { PointSyncData } from "./SyncManager";
+import { MetadataSyncData, PointSyncData } from "./SyncManager";
 
 export interface IPoint {
     id: string
 
     // Return the canonical payload that SyncManager should store/send.
     // Use PointSyncData so the payload can grow (position, color, rotation, ...).
-    getLocalData(): PointSyncData
+    getLocalData(existing: PointSyncData, metadata: MetadataSyncData): PointSyncData
 
     // Apply a canonical payload received from the network.
     applyRemoteData(data: PointSyncData): void

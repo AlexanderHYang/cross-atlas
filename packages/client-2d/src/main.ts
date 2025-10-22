@@ -1,7 +1,6 @@
 import { getProjectionType, setProjectionType, updatePCAPlane } from '../../shared/src/projection'
 import { SyncManager } from '../../shared/src/SyncManager'
 import { Point2D } from './Point2D'
-import * as Y from 'yjs'
 
 // create canvas
 const canvas = document.createElement('canvas')
@@ -67,7 +66,10 @@ canvas.addEventListener('pointermove', (ev: PointerEvent) => {
   const y = ev.clientY - rect.top
   dragging.setFromPixel(x, y, canvas.width, canvas.height)
 })
-canvas.addEventListener('pointerup', () => { dragging = null })
+
+canvas.addEventListener('pointerup', () => {
+  dragging = null 
+})
 
 window.addEventListener('resize', () => {
   canvas.width = window.innerWidth
@@ -77,9 +79,7 @@ window.addEventListener('resize', () => {
 window.addEventListener('keydown', (ev) => {
   if (ev.key === 'p') {
     if (getProjectionType() === 'equirectangular') {
-      updatePCAPlane(sync.getLocalPointDataArray().map(p => {
-        return [p.position.x, p.position.y, p.position.z]
-      }), sync)
+      updatePCAPlane(sync.getLocalPointDataArray().map(p => [p.position.x, p.position.y, p.position.z]), sync)
       setProjectionType('pca')
       console.log('Switched to PCA projection')
     } else {

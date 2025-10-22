@@ -1,8 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
 import { IPoint } from "../../shared/src/IPoint";
-import { PointSyncData } from "../../shared/src/SyncManager";
-
-const BIG_RADIUS = 1.5; // TODO: get from env
+import { MetadataSyncData, PointSyncData } from "../../shared/src/SyncManager";
 
 export class Point3D implements IPoint {
     id: string
@@ -20,14 +18,13 @@ export class Point3D implements IPoint {
         
         const dragBehavior = new BABYLON.SixDofDragBehavior()
         dragBehavior.onPositionChangedObservable.add((eventData) => {
-            this.mesh.position.scaleInPlace(BIG_RADIUS / this.mesh.position.length())
             this.onLocalChange?.()
         })
         this.mesh.addBehavior(dragBehavior)
     }
 
-    getLocalData(): PointSyncData {
-        const pos = this.mesh.position.normalize()
+    getLocalData(existing: PointSyncData, metadata: MetadataSyncData): PointSyncData {
+        const pos = this.mesh.position
         return {
             id: this.id,
             position: { x: pos.x, y: pos.y, z: pos.z },
@@ -35,7 +32,7 @@ export class Point3D implements IPoint {
     }
 
     applyRemoteData(data: PointSyncData) {
-        const pos = new BABYLON.Vector3(BIG_RADIUS * data.position.x, BIG_RADIUS * data.position.y, BIG_RADIUS * data.position.z)
+        const pos = new BABYLON.Vector3(data.position.x, data.position.y, data.position.z)
         this.mesh.position = pos
     }
 }

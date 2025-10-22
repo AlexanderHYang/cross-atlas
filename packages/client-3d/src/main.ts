@@ -22,20 +22,26 @@ const p2 = new Point3D(scene)
 p2.mesh.position = new Vector3(1, 0, 0).scale(bigRadius)
 syncManager.registerPoint(p2)
 
-syncManager.syncedMetadataMap.observe((event) => {
-  console.log('Metadata changed:', event)
-  for (const key of event.keysChanged) {
-    const metadata = syncManager.syncedMetadataMap.get(key)
-    if (metadata?.pcaPlaneNormal) {
-      const normalData = metadata.pcaPlaneNormal
-      const normalVec = new Vector3(normalData.x, normalData.y, normalData.z)
-      plane.setDirection(normalVec)
-      plane.position = Vector3.Zero()
-      console.log('Updated PCA plane normal to', normalVec)
-    }
-  }
-})
+function observeMetadataChanges() {
+  syncManager.syncedMetadataMap.observe((event) => {
+    console.log('Metadata changed:', event)
+    for (const key of event.keysChanged) {
+      const metadata = syncManager.syncedMetadataMap.get(key)
+      if (metadata?.pcaPlaneNormal && metadata?.pcaPlaneMean) {
+        const normalData = metadata.pcaPlaneNormal
+        const normalVec = new Vector3(normalData.x, normalData.y, normalData.z)
+        plane.setDirection(normalVec)
 
+        const meanData = metadata.pcaPlaneMean
+        const meanVec = new Vector3(meanData.x, meanData.y, meanData.z)
+        plane.position = meanVec
+
+        console.log('Updated projection plane to normal', normalVec, 'and mean', meanVec)
+      }
+    }
+  })
+}
+observeMetadataChanges()
 
 
 sceneManager.getEngine().runRenderLoop(() => {
