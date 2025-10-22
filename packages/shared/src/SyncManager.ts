@@ -25,8 +25,9 @@ export class SyncManager {
                 const remoteData = this.syncedPointDataMap.get(key)
                 const p = this.localPointsById.get(key)
                 if (!p) continue
-                // console.log('Remote change on', key, v, 'origin:', transaction.origin)
-                // avoid applying if origin is us: use transaction.origin when you pass origin in transact
+                // console.log('Remote change on', key, remoteData, 'origin:', transaction.origin)
+                // skip changes originated from this local point update
+                if (transaction.origin === p) continue
                 p.ignoreRemote = true
                 p.applyRemoteData(remoteData!)
                 p.ignoreRemote = false
@@ -46,7 +47,9 @@ export class SyncManager {
             p.ignoreRemote = false
         } else {
             // first writer writes initial state
-            this.syncedPointDataMap.set(p.id, p.getLocalData())
+            this.ydoc.transact(() => {
+                this.syncedPointDataMap.set(p.id, p.getLocalData())
+            }, p)
         }
         
         // subscribe local->remote
@@ -54,8 +57,19 @@ export class SyncManager {
             if (p.ignoreRemote) return
             // console.log('Local change on', p.id)
             const localData = p.getLocalData();
-            this.syncedPointDataMap.set(p.id, localData)
+            // write with origin so the observer can ignore this local change
+            this.ydoc.transact(() => {
+                this.syncedPointDataMap.set(p.id, localData)
+            }, p)
         }
+    }
+
+    getLocalPointDataArray(): PointSyncData[] {
+        const arr: PointSyncData[] = []
+        for (const p of this.localPointsById.values()) {
+            arr.push(p.getLocalData())
+        }
+        return arr
     }
     
 }
