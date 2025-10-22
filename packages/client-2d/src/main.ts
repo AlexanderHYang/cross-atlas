@@ -76,15 +76,26 @@ window.addEventListener('resize', () => {
   canvas.height = window.innerHeight
 })
 
+function toggleProjectionMode() {
+  if (getProjectionType() === 'equirectangular') {
+    updatePCAPlane(sync.getLocalPointDataArray().map(p => [p.position.x, p.position.y, p.position.z]), sync)
+    setProjectionType('pca')
+    console.log('Switched to PCA projection')
+  } else {
+    setProjectionType('equirectangular')
+    console.log('Switched to equirectangular projection')
+  }
+
+  // update 2d positions of all points based on new projection
+  for (const p of sync.localPointsById.values()) {
+    if (p instanceof Point2D) {
+      p.applyRemoteData(sync.syncedPointDataMap.get(p.id)!, sync.getMetadata()!)
+    }
+  }
+}
+
 window.addEventListener('keydown', (ev) => {
   if (ev.key === 'p') {
-    if (getProjectionType() === 'equirectangular') {
-      updatePCAPlane(sync.getLocalPointDataArray().map(p => [p.position.x, p.position.y, p.position.z]), sync)
-      setProjectionType('pca')
-      console.log('Switched to PCA projection')
-    } else {
-      setProjectionType('equirectangular')
-      console.log('Switched to equirectangular projection')
-    }
+    toggleProjectionMode()
   }
 })

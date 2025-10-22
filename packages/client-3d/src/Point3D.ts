@@ -31,7 +31,7 @@ export class Point3D implements IPoint {
         }
     }
 
-    applyRemoteData(data: PointSyncData) {
+    applyRemoteData(data: PointSyncData, metadata: MetadataSyncData) {
         const pos = new BABYLON.Vector3(data.position.x, data.position.y, data.position.z)
         this.mesh.position = pos
     }

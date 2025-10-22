@@ -8,7 +8,7 @@ export interface IPoint {
     getLocalData(existing: PointSyncData, metadata: MetadataSyncData): PointSyncData
 
     // Apply a canonical payload received from the network.
-    applyRemoteData(data: PointSyncData): void
+    applyRemoteData(data: PointSyncData, metadata: MetadataSyncData): void
 
     // Hook for sync manager to call on local changes
     onLocalChange?: () => void

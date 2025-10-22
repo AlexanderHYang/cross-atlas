@@ -25,11 +25,11 @@ export class Point2D implements IPoint {
 
     if (getProjectionType() === 'pca') {
       try {
-        const planePoint = inverseProjectPCA(this.nx, this.ny)
-
         const mean = new Vector3(metadata.pcaPlaneMean.x, metadata.pcaPlaneMean.y, metadata.pcaPlaneMean.z)
         const normal = new Vector3(metadata.pcaPlaneNormal.x, metadata.pcaPlaneNormal.y, metadata.pcaPlaneNormal.z).normalize()
         const existingVec = new Vector3(existing.position.x, existing.position.y, existing.position.z)
+
+        const planePoint = inverseProjectPCA(this.nx, this.ny).add(mean)
 
         const signedDist = Vector3.Dot(existingVec.subtract(mean), normal)
 
@@ -47,19 +47,22 @@ export class Point2D implements IPoint {
     // convert normalized equirectangular (nx,ny) to normalized 3D vector
     const { lat, lon } = inverseEquirectangularNormalizedXY(this.nx, this.ny)
     const v = latLonToVec3(lat, lon, 1)
+    const existingVec = new Vector3(existing.position.x, existing.position.y, existing.position.z)
+    v.scaleInPlace(existingVec.length())
     const pos: Vector3SyncData = { x: v.x, y: v.y, z: v.z }
     return { id: this.id, position: pos }
   }
   
   // Called by SyncManager to apply remote payload
-  applyRemoteData(data: PointSyncData) {
+  applyRemoteData(data: PointSyncData, metadata: MetadataSyncData) {
     console.log("applying remote")
     if (!data || !data.position) return
 
     if (getProjectionType() === 'pca') {
       try {
-        const v = { x: data.position.x, y: data.position.y, z: data.position.z }
-        const coords = projectPCA({ x: v.x as any, y: v.y as any, z: v.z as any } as any as import('@babylonjs/core').Vector3)
+        const v = new Vector3(data.position.x, data.position.y, data.position.z)
+        const pcaMeanVec = new Vector3(metadata.pcaPlaneMean.x, metadata.pcaPlaneMean.y, metadata.pcaPlaneMean.z)
+        const coords = projectPCA(v.subtract(pcaMeanVec))
         if (coords && coords.length >= 2) {
           this.nx = coords[0]
           this.ny = coords[1]

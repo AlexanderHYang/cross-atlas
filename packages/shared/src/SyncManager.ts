@@ -34,7 +34,7 @@ export class SyncManager {
                 // skip changes originated from this local point update
                 if (transaction.origin === p) continue
                 p.ignoreRemote = true
-                p.applyRemoteData(remoteData!)
+                p.applyRemoteData(remoteData!, this.getMetadata()!)
                 p.ignoreRemote = false
             }
         })
@@ -48,7 +48,7 @@ export class SyncManager {
         const remote = this.syncedPointDataMap.get(p.id)
         if (remote) {
             p.ignoreRemote = true
-            p.applyRemoteData(remote)
+            p.applyRemoteData(remote, this.getMetadata()!)
             p.ignoreRemote = false
         } else {
             // first writer writes initial state
