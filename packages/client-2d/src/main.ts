@@ -1,6 +1,7 @@
 import { getProjectionType, setProjectionType, updatePCAPlane } from '../../shared/src/projection'
 import { SyncManager } from '../../shared/src/SyncManager'
 import { Point2D } from './Point2D'
+import * as Y from 'yjs'
 
 // create canvas
 const canvas = document.createElement('canvas')
@@ -15,15 +16,25 @@ const ctx = canvas.getContext('2d')!
 // sync manager
 const sync = new SyncManager()
 
-// create two demo points and register
-const a = new Point2D('point1', 0, 0, '#ff0000')
-sync.registerPoint(a)
+// initialize sync from remote
+function initializeSyncFromRemote() {
+  sync.provider.once('sync', () => {
+    console.log("initializing sync from remote")
+    console.log("syncedPointDataMap length", sync.syncedPointDataMap.size)
+    for (const p of sync.syncedPointDataMap.values()) {
+      const point = new Point2D(p.id, 0, 0, '#ff0000')
+      console.log("initializing point from remote:", p)
+      sync.registerPoint(point)
+    }
+  })
+}
+initializeSyncFromRemote()
 
 // draw loop
-const points: Point2D[] = [a]
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height)
-  for (const p of points) {
+  for (const p of sync.localPointsById.values()) {
+    if (!(p instanceof Point2D)) continue
     p.draw(ctx, canvas.width, canvas.height)
   }
   requestAnimationFrame(draw)
@@ -36,8 +47,19 @@ canvas.addEventListener('pointerdown', (ev: PointerEvent) => {
   const rect = canvas.getBoundingClientRect()
   const x = ev.clientX - rect.left
   const y = ev.clientY - rect.top
-  if (a.hitTest(x, y, canvas.width, canvas.height)) dragging = a
+
+  // find topmost Point2D under cursor (iterate newest-first)
+  const pts = Array.from(sync.localPointsById.values()).filter(p => p instanceof Point2D) as Point2D[]
+  for (const p of pts.reverse()) {
+    if (p.hitTest(x, y, canvas.width, canvas.height)) {
+      dragging = p
+      // capture pointer so we keep getting moves even if cursor leaves canvas
+      try { canvas.setPointerCapture(ev.pointerId) } catch { /* ignore if not supported */ }
+      break
+    }
+  }
 })
+
 canvas.addEventListener('pointermove', (ev: PointerEvent) => {
   if (!dragging) return
   const rect = canvas.getBoundingClientRect()

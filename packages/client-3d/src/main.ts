@@ -16,9 +16,11 @@ const { bigSphere, bigRadius, ground, plane, planeWidth, planeHeight } = env
 const syncManager = new SyncManager()
 
 // create a 3d point and add it to sync manager
-const point3D = new Point3D(scene)
-// point3D.setPosition({ x: bigRadius, y: 0, z: 0 }) // start at "north pole"
-syncManager.registerPoint(point3D)
+const p1 = new Point3D(scene)
+syncManager.registerPoint(p1)
+const p2 = new Point3D(scene)
+p2.mesh.position = new Vector3(1, 0, 0).scale(bigRadius)
+syncManager.registerPoint(p2)
 
 syncManager.syncedMetadataMap.observe((event) => {
   console.log('Metadata changed:', event)
