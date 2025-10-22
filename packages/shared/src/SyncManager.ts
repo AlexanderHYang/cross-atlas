@@ -9,11 +9,15 @@ export type PointSyncData = {
     id: string,
     position: Vector3SyncData,
 }
+export type MetadataSyncData = {
+    pcaPlaneNormal?: Vector3SyncData,
+}
 
 export class SyncManager {
     ydoc = new Y.Doc()
     provider: WebsocketProvider
     syncedPointDataMap = this.ydoc.getMap('points') as Y.Map<PointSyncData>
+    syncedMetadataMap = this.ydoc.getMap('metadata') as Y.Map<MetadataSyncData>
     localPointsById = new Map<string, IPoint>()
     
     constructor(wsUrl = 'ws://localhost:1234', room = 'proj-room') {
@@ -70,6 +74,10 @@ export class SyncManager {
             arr.push(p.getLocalData())
         }
         return arr
+    }
+
+    setMetadata(data: MetadataSyncData) {
+        this.ydoc.getMap('metadata').set('metadata', data)
     }
     
 }

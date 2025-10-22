@@ -1,6 +1,6 @@
 import type { IPoint } from '../../shared/src/IPoint'
 import type { PointSyncData, Vector3SyncData } from '../../shared/src/SyncManager'
-import { inverseEquirectangularNormalizedXY, equirectangularNormalizedXY, latLonToVec3, getProjectionType, inverseProjectPCA, projectOntoSphere, projectPCA } from '../../shared/src/projection'
+import { inverseEquirectangularNormalizedXY, equirectangularNormalizedXY, latLonToVec3, getProjectionType, inverseProjectPCA, projectOntoSphere, projectPCA, projectAlongNormalToSphere } from '../../shared/src/projection'
 
 export class Point2D implements IPoint {
   id: string
@@ -25,9 +25,8 @@ export class Point2D implements IPoint {
     if (getProjectionType() === 'pca') {
       try {
         const recon = inverseProjectPCA(this.nx, this.ny)
-        console.log(recon);
         if (recon) {
-          const v = projectOntoSphere(recon, 1)
+          const v = projectAlongNormalToSphere(recon, 1)
           const pos: Vector3SyncData = { x: v.x, y: v.y, z: v.z }
           return { id: this.id, position: pos }
         }

@@ -57,7 +57,7 @@ window.addEventListener('keydown', (ev) => {
     if (getProjectionType() === 'equirectangular') {
       updatePCAPlane(sync.getLocalPointDataArray().map(p => {
         return [p.position.x, p.position.y, p.position.z]
-      }))
+      }), sync)
       setProjectionType('pca')
       console.log('Switched to PCA projection')
     } else {

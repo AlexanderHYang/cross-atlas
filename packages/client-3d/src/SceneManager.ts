@@ -58,11 +58,14 @@ export class SceneManager {
         const planeHeight = 4 * bigRadius
         const planeX = 4 * bigRadius
         const plane = MeshBuilder.CreatePlane('mercPlane', { width: planeWidth, height: planeHeight }, scene)
-        plane.position = new Vector3(planeX, 0, 0)
-        plane.rotation = new Vector3(0, Math.PI / 2, 0)
         const planeMat = new GridMaterial('planeMat', scene)
         planeMat.mainColor = new Color3(0.3, 0.3, 0.3)
         plane.material = planeMat
+
+        plane.position = new Vector3(0, 0, 0)
+        plane.rotation = new Vector3(0, 0, 0)
+        plane.isPickable = false
+        plane.isVisible = false
         
         return { bigSphere, bigRadius, ground, plane, planeWidth, planeHeight }
     }
