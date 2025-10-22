@@ -1,7 +1,6 @@
 import { Vector3 } from '@babylonjs/core'
 import { PCA } from 'ml-pca'
 import { Matrix } from 'ml-matrix'
-import { Matrix2D } from '@babylonjs/gui'
 
 export type ProjectionType = 'equirectangular' | 'pca'
 let _projectionType: ProjectionType = 'equirectangular'
@@ -111,6 +110,10 @@ export function updatePCAPlane(points: Vector3[] | number[][]) {
     _pcaAvailable = false
     _pcaInstance = null
     return
+  }
+
+  while (mat.length < 3) {
+    mat.push([0, 0, 0])
   }
 
   // compute PCA

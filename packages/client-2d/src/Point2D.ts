@@ -1,6 +1,6 @@
 import type { IPoint } from '../../shared/src/IPoint'
 import type { PointSyncData, Vector3SyncData } from '../../shared/src/SyncManager'
-import { inverseEquirectangularNormalizedXY, equirectangularNormalizedXY, latLonToVec3 } from '../../shared/src/projection'
+import { inverseEquirectangularNormalizedXY, equirectangularNormalizedXY, latLonToVec3, getProjectionType, inverseProjectPCA, projectOntoSphere, projectPCA } from '../../shared/src/projection'
 
 export class Point2D implements IPoint {
   id: string
@@ -21,6 +21,22 @@ export class Point2D implements IPoint {
   
   // Called by SyncManager to read canonical payload
   getLocalData(): PointSyncData {
+
+    if (getProjectionType() === 'pca') {
+      try {
+        const recon = inverseProjectPCA(this.nx, this.ny)
+        console.log(recon);
+        if (recon) {
+          const v = projectOntoSphere(recon, 1)
+          const pos: Vector3SyncData = { x: v.x, y: v.y, z: v.z }
+          return { id: this.id, position: pos }
+        }
+      } catch (err) {
+        console.warn('Point2D.getLocalData: PCA inverse failed, falling back to equirectangular', err)
+      }
+      // fallthrough to equirectangular fallback
+    }
+    
     // convert normalized equirectangular (nx,ny) to normalized 3D vector
     const { lat, lon } = inverseEquirectangularNormalizedXY(this.nx, this.ny)
     const v = latLonToVec3(lat, lon, 1)
@@ -30,7 +46,24 @@ export class Point2D implements IPoint {
   
   // Called by SyncManager to apply remote payload
   applyRemoteData(data: PointSyncData) {
+    console.log("applying remote")
     if (!data || !data.position) return
+
+    if (getProjectionType() === 'pca') {
+      try {
+        const v = { x: data.position.x, y: data.position.y, z: data.position.z }
+        const coords = projectPCA({ x: v.x as any, y: v.y as any, z: v.z as any } as any as import('@babylonjs/core').Vector3)
+        if (coords && coords.length >= 2) {
+          this.nx = coords[0]
+          this.ny = coords[1]
+          return
+        }
+      } catch (err) {
+        console.warn('Point2D.applyRemoteData: PCA project failed, falling back to equirectangular', err)
+      }
+      // fallthrough to equirectangular fallback
+    }
+    
     // convert normalized 3D -> equirectangular nx,ny
     const x = data.position.x
     const y = data.position.y

@@ -1,4 +1,4 @@
-import { getProjectionType, setProjectionType, updatePCAPlane } from '@shared/src/projection'
+import { getProjectionType, setProjectionType, updatePCAPlane } from '../../shared/src/projection'
 import { SyncManager } from '../../shared/src/SyncManager'
 import { Point2D } from './Point2D'
 
@@ -55,9 +55,8 @@ window.addEventListener('resize', () => {
 window.addEventListener('keydown', (ev) => {
   if (ev.key === 'p') {
     if (getProjectionType() === 'equirectangular') {
-      updatePCAPlane(Array.from(sync.localPointsById.values()).map(p => {
-        const data = p.getLocalData()
-        return [data.position.x, data.position.y, data.position.z]
+      updatePCAPlane(sync.getLocalPointDataArray().map(p => {
+        return [p.position.x, p.position.y, p.position.z]
       }))
       setProjectionType('pca')
       console.log('Switched to PCA projection')
