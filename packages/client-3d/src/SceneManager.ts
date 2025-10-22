@@ -51,15 +51,20 @@ export class SceneManager {
         const ground = MeshBuilder.CreateGround('ground', { width: 30, height: 30 }, scene)
         ground.position.y = -1.5
         const groundMat = new GridMaterial('groundMat', scene)
+        groundMat.mainColor = new Color3(0.5, 0.5, 0.5)
+        groundMat.lineColor = new Color3(0.5, 0.5, 0.5)
         groundMat.opacity = 0.8
+        groundMat.backFaceCulling = false
         ground.material = groundMat
         
         const planeWidth = 4 * bigRadius
         const planeHeight = 4 * bigRadius
-        const planeX = 4 * bigRadius
         const plane = MeshBuilder.CreatePlane('mercPlane', { width: planeWidth, height: planeHeight }, scene)
         const planeMat = new GridMaterial('planeMat', scene)
-        planeMat.mainColor = new Color3(0.3, 0.3, 0.3)
+        planeMat.lineColor = new Color3(0.6, 0.6, 0.8)
+        planeMat.mainColor = new Color3(0.4, 0.4, 0.6)
+        planeMat.opacity = 0.8
+        planeMat.backFaceCulling = false
         plane.material = planeMat
 
         plane.position = new Vector3(0, 0, 0)
