@@ -13,7 +13,7 @@ export class SyncManager3D {
 
     private scene: Scene;
 
-    constructor(scene: Scene) {
+    private constructor(scene: Scene) {
         // 1) connect to websocket provider
         this.ydoc = new Y.Doc();
         this.provider = new WebsocketProvider("ws://localhost:1234", "chart-room", this.ydoc);
@@ -26,20 +26,30 @@ export class SyncManager3D {
         this.scene = scene;
 
         // 4) initialize existing remote charts
-        this.provider.once("sync", () => {
-            console.log("initializing charts from remote");
-            for (const c of this.syncedChartDataMap.values()) {
-                if (this.localChartsById.has(c.id)) {
-                    continue;
-                }
-                const randomChart = new Chart('line', this.scene);
-                const chart3d = new Chart3D(c.id, randomChart, this);
-                console.log("initializing chart from remote:", c);
-                this.localChartsById.set(chart3d.id, chart3d);
-            }
-        });
+        // this.provider.once("sync", () => {
+        //     console.log("initializing charts from remote");
+        //     for (const c of this.syncedChartDataMap.values()) {
+        //         if (this.localChartsById.has(c.id)) {
+        //             continue;
+        //         }
+        //         const randomChart = new Chart('line', this.scene);
+        //         const chart3d = new Chart3D(c.id, randomChart, this);
+        //         console.log("initializing chart from remote:", c);
+        //         this.localChartsById.set(chart3d.id, chart3d);
+        //     }
+        // });
 
-        // 5) observe remote changes and apply
+    }
+
+    private waitForInitialSync(): Promise<void> {
+        return new Promise((resolve) => {
+            this.provider.once("sync", () => {
+                resolve();
+            });
+        });
+    }
+
+    private initializeRemoteObserver() {
         this.syncedChartDataMap.observe((event, transaction) => {
             for (const key of event.keysChanged) {
                 const remoteData = this.syncedChartDataMap.get(key)!;
@@ -56,7 +66,15 @@ export class SyncManager3D {
         });
     }
 
+    public static async create(scene: Scene): Promise<SyncManager3D> {
+        const manager = new SyncManager3D(scene);
+        await manager.waitForInitialSync();
+        manager.initializeRemoteObserver();
+        return manager;
+    }
+
     public transactChartUpdate(chart: Chart3D) {
+        console.log("transacting chart update for", chart.id);
         this.ydoc.transact(() => {
             const existing = this.syncedChartDataMap.get(chart.id);
             this.syncedChartDataMap.set(chart.id, chart.getLocalData(existing!));
@@ -75,9 +93,11 @@ export class SyncManager3D {
         // if remote exists, apply it without re-emitting
         const remote = this.syncedChartDataMap.get(chart.id);
         if (remote) {
+            console.log("applying existing remote data to newly registered chart", chart.id);
             chart.applyRemoteData(remote);
         } else {
             // first writer writes initial state
+            console.log("no existing remote data for chart", chart.id);
             this.transactChartUpdate(chart);
         }
     }

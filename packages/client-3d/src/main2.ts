@@ -14,7 +14,7 @@ const { bigSphere, bigRadius, ground, plane, planeWidth, planeHeight } = env
 
 
 // create SyncManager
-const syncManager3D = new SyncManager3D(scene)
+const syncManager3D = await SyncManager3D.create(scene)
 
 // create a 3d chart and add it to sync manager
 const chart1 = new Chart3D("chart1", new Chart('line', scene), syncManager3D)

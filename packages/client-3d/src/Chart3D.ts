@@ -14,6 +14,11 @@ export class Chart3D {
         this.onLocalChange = () => {
             syncManager.transactChartUpdate(this);
         };
+
+        // listen to chart drag events
+        this.chart._positionBehavior.onPositionChangedObservable.add(() => {
+            this.onLocalChange();
+        });
     }
 
     public applyRemoteData(remoteData: ChartSyncData) {

@@ -1,13 +1,12 @@
 import { Vector3 } from "@babylonjs/core";
 import { Chart, ChartSyncData } from "../../shared/src/Chart";
-import { randomUUID } from "crypto";
-import { SyncManager, Vector3SyncData } from "@shared/src/SyncManager";
+import { SyncManager, Vector3SyncData } from "../../shared/src/SyncManager";
 import { SyncManager2D } from "./SyncManager2D";
-import { equirectangularNormalizedXY, inverseEquirectangularNormalizedXY, latLonToVec3 } from "@shared/src/projection";
+import { equirectangularNormalizedXY, inverseEquirectangularNormalizedXY, latLonToVec3 } from "../../shared/src/projection";
 
 export class Chart2D {
     id: string;
-    chart: Chart
+    // chart: Chart // TODO: remove this until actually used
     onLocalChange: () => void;
 
     // 2d specific stuff
@@ -15,9 +14,9 @@ export class Chart2D {
     ny: number = 0
 
 
-    constructor(chart: Chart, syncManager: SyncManager2D) {
-        this.id = randomUUID();
-        this.chart = chart;
+    constructor(id: string, syncManager: SyncManager2D) { // TODO: "add chart: Chart here" when ready
+        this.id = id;
+        // this.chart = chart; // TODO: remove this until actually used
         this.onLocalChange = () => {
             syncManager.transactChartUpdate(this);
         };
@@ -46,6 +45,33 @@ export class Chart2D {
         v.scaleInPlace(existingVec.length())
 
         const pos: Vector3SyncData = { x: v.x, y: v.y, z: v.z }
+        console.log("getting local data for chart", this.id, pos);
         return { id: this.id, position: pos }
+    }
+
+    // draw a simple point on canvas
+    draw(ctx: CanvasRenderingContext2D, width: number, height: number) {
+        const x = ((this.nx + 1) / 2) * width
+        const y = ((1 - (this.ny + 1) / 2)) * height
+        ctx.beginPath()
+        ctx.fillStyle = "red"
+        const radius = 8
+        ctx.arc(x, y, radius, 0, Math.PI * 2)
+        ctx.fill()
+    }
+
+    hitTest(px: number, py: number, width: number, height: number) {
+        const x = ((this.nx + 1) / 2) * width
+        const y = ((1 - (this.ny + 1) / 2)) * height
+        const dx = px - x
+        const dy = py - y
+        const radius = 8
+        return dx * dx + dy * dy <= radius * radius
+    }
+
+    setFromPixel(px: number, py: number, width: number, height: number) {
+        this.nx = (px / width) * 2 - 1
+        this.ny = ((height - py) / height) * 2 - 1
+        this.onLocalChange()
     }
 }
