@@ -3,6 +3,13 @@ import * as BABYLON from "@babylonjs/core";
 import * as d3 from "d3";
 import carData from "../data/cars.json" assert { type: "json" };
 import penguinData from "../data/penguins.json" assert { type: "json" };
+import type { Vector3SyncData } from "../../shared/src/SyncManager";
+
+// Export shared sync data types
+export type ChartSyncData = {
+    id: string,
+    position: Vector3SyncData,
+}
 
 // Centralized layout defaults
 export const CHART_SCALE_FACTOR = 0.8;
