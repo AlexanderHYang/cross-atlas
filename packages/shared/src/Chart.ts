@@ -61,6 +61,7 @@ export class Chart {
         this._positionBehavior = positionUiOptions.behavior;
         this._positionBehavior.faceCameraOnDragStart = true;
         this._positionBehavior.rotateAroundYOnly = true;
+        this._positionBehavior.dragDeltaRatio = 1.0;
 
         const rotateUiOptions = {
             name: id + "rotateUI",
