@@ -1,7 +1,6 @@
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 import { IPoint } from './IPoint'
-import { IPointManager } from './IPointManager'
 
 export type Vector3SyncData = { x: number, y: number, z: number }
 
