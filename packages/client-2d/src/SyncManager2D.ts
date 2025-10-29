@@ -31,8 +31,8 @@ export class SyncManager2D {
             this.provider.once("sync", () => {
                 console.log("initializing charts from remote");
                 for (const c of this.syncedChartDataMap.values()) {
-                    // const randomChart = new Chart('line', this.scene);
                     const chart2d = new Chart2D(c.id, this);
+                    chart2d.applyRemoteData(c);
                     console.log("initializing chart from remote:", c);
                     this.localChartsById.set(chart2d.id, chart2d);
                 }

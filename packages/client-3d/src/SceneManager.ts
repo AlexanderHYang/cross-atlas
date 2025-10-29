@@ -10,8 +10,6 @@ export class SceneManager {
     init(canvas: HTMLCanvasElement) {
         this.engine = new Engine(canvas, true)
         this.scene = new Scene(this.engine)
-
-        this.scene.clearColor = new BABYLON.Color4(0, 0, 0, 0)
         
         this.camera = new ArcRotateCamera('cam', Math.PI / 2, Math.PI / 3, 10, Vector3.Zero(), this.scene)
         this.camera.attachControl(canvas, true)

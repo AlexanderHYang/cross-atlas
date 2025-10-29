@@ -6,8 +6,6 @@ import { Chart } from '../../shared/src/Chart'
 
 // initialize scene
 const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement
-// canvas.style.backgroundColor = 'transparent'
-canvas.style.backgroundColor = 'orange'
 sceneManager.init(canvas)
 const scene = sceneManager.getScene()
 
