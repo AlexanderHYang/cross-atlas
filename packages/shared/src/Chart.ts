@@ -57,7 +57,7 @@ export class Chart {
         const positionUiOptions = {
             name: id + "positionUI",
             visibility: 0.6,
-            width: 0.5,
+            width: 1.0,
             radius: 0.03,
             position: new BABYLON.Vector3(0, yOffset, 0),
             behavior: new BABYLON.SixDofDragBehavior(),
@@ -71,7 +71,7 @@ export class Chart {
         const rotateUiOptions = {
             name: id + "rotateUI",
             visibility: 0.6,
-            diameter: 0.08,
+            diameter: 0.16,
             position: new BABYLON.Vector3(0, yOffset, 0),
         }
         this.selection.rotateUI(rotateUiOptions);
@@ -79,7 +79,7 @@ export class Chart {
         const scaleUiOptions = {
             name: id + "scaleUI",
             visibility: 0.6,
-            diameter: 0.08,
+            diameter: 0.16,
             minimum: 0.5,
             maximum: 2,
             position: new BABYLON.Vector3(0, yOffset + 0.025, 0),

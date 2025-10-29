@@ -27,9 +27,8 @@ style.textContent = `
 `
 document.head.appendChild(style)
 
-// Sync manager (no shared Babylon scene needed here)
-// @ts-ignore passing null scene intentionally
-const syncManager: SyncManager2D = await SyncManager2D.create(null)
+// Sync manager
+const syncManager: SyncManager2D = await SyncManager2D.create()
 
 // Helper to map Chart2D normalized to pixel coords (full window as reference)
 const viewportWidth = () => window.innerWidth

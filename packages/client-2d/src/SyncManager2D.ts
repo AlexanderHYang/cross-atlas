@@ -11,9 +11,7 @@ export class SyncManager2D {
     private localChartsById: Map<string, Chart2D>;
     private syncedChartDataMap: Y.Map<ChartSyncData>;
 
-    private scene: Scene;
-
-    private constructor(scene: Scene) {
+    private constructor() {
         // 1) connect to websocket provider
         this.ydoc = new Y.Doc();
         this.provider = new WebsocketProvider("ws://localhost:1234", "chart-room", this.ydoc);
@@ -21,9 +19,6 @@ export class SyncManager2D {
         // 2) create local state maps
         this.localChartsById = new Map<string, Chart2D>();
         this.syncedChartDataMap = this.ydoc.getMap("charts") as Y.Map<ChartSyncData>;
-
-        // 3) store relevant scene data
-        this.scene = scene;
     }
 
     private waitForInitialSync(): Promise<void> {
@@ -58,8 +53,8 @@ export class SyncManager2D {
         });
     }
 
-    public static async create(scene: Scene): Promise<SyncManager2D> {
-        const manager = new SyncManager2D(scene);
+    public static async create(): Promise<SyncManager2D> {
+        const manager = new SyncManager2D();
         await manager.waitForInitialSync();
         manager.initializeRemoteObserver();
         return manager;
