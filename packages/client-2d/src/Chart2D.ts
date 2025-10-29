@@ -5,7 +5,7 @@ import { equirectangularNormalizedXY, inverseEquirectangularNormalizedXY, latLon
 
 export class Chart2D {
     id: string;
-    // chart: Chart // TODO: remove this until actually used
+    chart?: Chart;
     onLocalChange: () => void;
 
     // 2d specific stuff
@@ -13,12 +13,16 @@ export class Chart2D {
     ny: number = 0
 
 
-    constructor(id: string, syncManager: SyncManager2D) { // TODO: "add chart: Chart here" when ready
+    constructor(id: string, syncManager: SyncManager2D, chart?: Chart) { // chart is optional; main2.ts can attach later
         this.id = id;
-        // this.chart = chart; // TODO: remove this until actually used
+        this.chart = chart;
         this.onLocalChange = () => {
             syncManager.transactChartUpdate(this);
         };
+    }
+
+    public setChart(chart: Chart) {
+        this.chart = chart;
     }
 
     public applyRemoteData(remoteData: ChartSyncData) {
