@@ -1,7 +1,7 @@
 import { Vector3 } from "@babylonjs/core";
 import { Chart, ChartSyncData, Vector3SyncData } from "../../shared/src/Chart";
 import { SyncManager2D } from "./SyncManager2D";
-import { equirectangularNormalizedXY, inverseEquirectangularNormalizedXY, latLonToVec3 } from "../../shared/src/projection";
+import { equirectangularNormalizedXY, inverseEquirectangularNormalizedXY, latLonToVec3, vec3ToLatLon } from "../../shared/src/projection";
 
 export class Chart2D {
     id: string;
@@ -27,8 +27,7 @@ export class Chart2D {
         const x = remoteData.position.x
         const y = remoteData.position.y
         const z = remoteData.position.z
-        const lat = Math.asin(Math.max(-1, Math.min(1, y)))
-        const lon = Math.atan2(z, x)
+        const { lat, lon, radius } = vec3ToLatLon(new Vector3(x, y, z))
         const { nx, ny } = equirectangularNormalizedXY(lat, lon)
         this.nx = nx
         this.ny = ny
