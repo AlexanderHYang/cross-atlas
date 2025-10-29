@@ -1,5 +1,6 @@
 import { Engine, Scene, ArcRotateCamera, Vector3, HemisphericLight, MeshBuilder, StandardMaterial, Color3 } from '@babylonjs/core'
 import { GridMaterial } from '@babylonjs/materials'
+import * as BABYLON from '@babylonjs/core'
 
 export class SceneManager {
     public engine!: Engine
@@ -9,6 +10,8 @@ export class SceneManager {
     init(canvas: HTMLCanvasElement) {
         this.engine = new Engine(canvas, true)
         this.scene = new Scene(this.engine)
+
+        this.scene.clearColor = new BABYLON.Color4(0, 0, 0, 0)
         
         this.camera = new ArcRotateCamera('cam', Math.PI / 2, Math.PI / 3, 10, Vector3.Zero(), this.scene)
         this.camera.attachControl(canvas, true)

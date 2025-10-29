@@ -3,7 +3,12 @@ import * as BABYLON from "@babylonjs/core";
 import * as d3 from "d3";
 import carData from "../data/cars.json" assert { type: "json" };
 import penguinData from "../data/penguins.json" assert { type: "json" };
-import type { Vector3SyncData } from "../../shared/src/SyncManager";
+
+export type Vector3SyncData = {
+    x: number,
+    y: number,
+    z: number,
+}
 
 // Export shared sync data types
 export type ChartSyncData = {

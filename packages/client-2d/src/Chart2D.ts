@@ -1,6 +1,5 @@
 import { Vector3 } from "@babylonjs/core";
-import { Chart, ChartSyncData } from "../../shared/src/Chart";
-import { SyncManager, Vector3SyncData } from "../../shared/src/SyncManager";
+import { Chart, ChartSyncData, Vector3SyncData } from "../../shared/src/Chart";
 import { SyncManager2D } from "./SyncManager2D";
 import { equirectangularNormalizedXY, inverseEquirectangularNormalizedXY, latLonToVec3 } from "../../shared/src/projection";
 

@@ -1,6 +1,5 @@
 import { Vector3 } from "@babylonjs/core";
-import { Chart, ChartSyncData } from "../../shared/src/Chart";
-import { Vector3SyncData } from "@shared/src/SyncManager";
+import { Chart, ChartSyncData, Vector3SyncData } from "../../shared/src/Chart";
 import { SyncManager3D } from "./SyncManager3D";
 
 export class Chart3D {
