@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "dev:2d": "vite --config packages/client-2d/vite.config.ts",
-    "dev:3d": "vite --config packages/client-3d/vite.config.ts"
+    "dev:3d": "vite --config packages/client-3d/vite.config.ts",
+    "dev:yjs": "HOST=localhost PORT=1234 npx y-websocket"
   },
   "dependencies": {
     "@babylonjs/core": "8.26.0",

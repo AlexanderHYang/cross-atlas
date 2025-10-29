@@ -1,0 +1,31 @@
+{
+  "hash": "b2f7dea0",
+  "configHash": "a5d24b01",
+  "lockfileHash": "23fbca9d",
+  "browserHash": "8bc7268e",
+  "optimized": {
+    "d3": {
+      "src": "../../../node_modules/d3/src/index.js",
+      "file": "d3.js",
+      "fileHash": "522a4eea",
+      "needsInterop": false
+    },
+    "y-websocket": {
+      "src": "../../../node_modules/y-websocket/src/y-websocket.js",
+      "file": "y-websocket.js",
+      "fileHash": "ddcef3ce",
+      "needsInterop": false
+    },
+    "yjs": {
+      "src": "../../../node_modules/yjs/dist/yjs.mjs",
+      "file": "yjs.js",
+      "fileHash": "4bba34bf",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-JJSZ4EWL": {
+      "file": "chunk-JJSZ4EWL.js"
+    }
+  }
+}
