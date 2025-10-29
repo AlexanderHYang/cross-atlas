@@ -15,12 +15,15 @@
     "@y/websocket-server": "^0.1.1",
     "d3": "^7.9.0",
     "ml-pca": "^4.1.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "y-websocket": "^3.0.0",
     "yjs": "^13.6.27"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
     "@types/node": "^24.7.2",
+    "@types/react": "^19.2.2",
     "typescript": "^5.1.6",
     "vite": "^5.0.0",
     "vite-tsconfig-paths": "^5.1.4"
