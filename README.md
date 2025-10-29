@@ -11,7 +11,7 @@
 2. Run the yjs server:
 
 >```bash
->HOST=localhost PORT=1234 npx y-websocket 
+>npm run dev:yjs
 >```
 
 3. Run the 3D client:
