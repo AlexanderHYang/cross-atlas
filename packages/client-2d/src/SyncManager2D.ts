@@ -14,7 +14,21 @@ export class SyncManager2D {
     private constructor() {
         // 1) connect to websocket provider
         this.ydoc = new Y.Doc();
-        this.provider = new WebsocketProvider("ws://localhost:1234", "chart-room", this.ydoc);
+        const defaultProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const protocol =
+            (import.meta.env.VITE_YJS_PROTOCOL as string | undefined) ??
+            (import.meta.env.VITE_Y_WEBSOCKET_PROTOCOL as string | undefined) ??
+            defaultProtocol;
+        const hostname = window.location.hostname || "127.0.0.1";
+        const normalizedHost =
+            hostname.includes(":") && !hostname.startsWith("[") ? `[${hostname}]` : hostname;
+        const port =
+            Number.parseInt(import.meta.env.VITE_YJS_PORT ?? "", 10) ||
+            Number.parseInt(import.meta.env.VITE_Y_WEBSOCKET_PORT ?? "", 10) ||
+            1234;
+        const websocketUrl = `${protocol}://${normalizedHost}:${port}`;
+
+        this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc);
 
         // 2) create local state maps
         this.localChartsById = new Map<string, Chart2D>();

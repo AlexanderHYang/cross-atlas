@@ -3,11 +3,14 @@ import { SyncManager3D } from './SyncManager3D'
 import { Chart3D } from './Chart3D'
 import { Vector3 } from '@babylonjs/core'
 import { Chart } from '../../shared/src/Chart'
+import { initWebXR } from './xr/webxrExperience'
 
 // initialize scene
 const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement
 sceneManager.init(canvas)
 const scene = sceneManager.getScene()
+
+void initWebXR(scene)
 
 const env = sceneManager.createEnvironment({ bigRadius: 3.0 })
 const { bigSphere, bigRadius, ground, plane, planeWidth, planeHeight } = env
