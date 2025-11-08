@@ -1,6 +1,6 @@
 import * as Y from "yjs";
-import { Chart, ChartSyncData } from "../../shared/src/Chart";
-import { Chart2D } from "./Chart2D";
+import { ChartSyncData } from "../../shared/src/Chart";
+import { Point2D } from "./Point2D";
 import { WebsocketProvider } from "y-websocket";
 import { Scene } from "@babylonjs/core";
 
@@ -8,7 +8,7 @@ export class SyncManager2D {
     private ydoc: Y.Doc;
     private provider: WebsocketProvider;
 
-    private localChartsById: Map<string, Chart2D>;
+    private localChartsById: Map<string, Point2D>;
     private syncedChartDataMap: Y.Map<ChartSyncData>;
 
     private constructor() {
@@ -31,7 +31,7 @@ export class SyncManager2D {
         this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc);
 
         // 2) create local state maps
-        this.localChartsById = new Map<string, Chart2D>();
+    this.localChartsById = new Map<string, Point2D>();
         this.syncedChartDataMap = this.ydoc.getMap("charts") as Y.Map<ChartSyncData>;
     }
 
@@ -40,10 +40,10 @@ export class SyncManager2D {
             this.provider.once("sync", () => {
                 console.log("initializing charts from remote");
                 for (const c of this.syncedChartDataMap.values()) {
-                    const chart2d = new Chart2D(c.id, this);
-                    chart2d.applyRemoteData(c);
-                    console.log("initializing chart from remote:", c);
-                    this.localChartsById.set(chart2d.id, chart2d);
+                    const p = new Point2D(c.id, this);
+                    p.applyRemoteData(c);
+                    console.log("initializing point from remote:", c);
+                    this.localChartsById.set(p.id, p);
                 }
                 resolve();
             });
@@ -74,7 +74,7 @@ export class SyncManager2D {
         return manager;
     }
 
-    public transactChartUpdate(chart: Chart2D) {
+    public transactChartUpdate(chart: Point2D) {
         console.log("transacting chart update for chart", chart.id);
         this.ydoc.transact(() => {
             const existing = this.syncedChartDataMap.get(chart.id);
@@ -82,14 +82,14 @@ export class SyncManager2D {
         }, chart);
     }
 
-    public registerChart(chart: Chart2D) {
+    public registerChart(chart: Point2D) {
         console.log("registering chart", chart.id);
 
         if (this.localChartsById.has(chart.id)) {
             console.warn("Chart with id", chart.id, "is already registered.");
             return;
         }
-        this.localChartsById.set(chart.id, chart);
+    this.localChartsById.set(chart.id, chart);
 
         // if remote exists, apply it without re-emitting
         const remote = this.syncedChartDataMap.get(chart.id);
@@ -103,7 +103,7 @@ export class SyncManager2D {
         }
     }
 
-    public getLocalCharts(): Chart2D[] {
+    public getLocalCharts(): Point2D[] {
         return Array.from(this.localChartsById.values());
     }
 }

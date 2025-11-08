@@ -1,6 +1,6 @@
 import * as Y from "yjs";
-import { Chart, ChartSyncData } from "../../shared/src/Chart";
-import { Chart3D } from "./Chart3D";
+import { ChartSyncData } from "../../shared/src/Chart";
+import { Point3D } from "./Point3D";
 import { WebsocketProvider } from "y-websocket";
 import { Scene } from "@babylonjs/core";
 
@@ -8,7 +8,7 @@ export class SyncManager3D {
     private ydoc: Y.Doc;
     private provider: WebsocketProvider;
 
-    private localChartsById: Map<string, Chart3D>;
+    private localChartsById: Map<string, Point3D>;
     private syncedChartDataMap: Y.Map<ChartSyncData>;
 
     private scene: Scene;
@@ -32,7 +32,7 @@ export class SyncManager3D {
         this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc);
 
         // 2) create local state maps
-        this.localChartsById = new Map<string, Chart3D>();
+    this.localChartsById = new Map<string, Point3D>();
         this.syncedChartDataMap = this.ydoc.getMap("charts") as Y.Map<ChartSyncData>;
 
         // 3) store relevant scene data
@@ -86,7 +86,7 @@ export class SyncManager3D {
         return manager;
     }
 
-    public transactChartUpdate(chart: Chart3D) {
+    public transactChartUpdate(chart: Point3D) {
         console.log("transacting chart update for", chart.id);
         this.ydoc.transact(() => {
             const existing = this.syncedChartDataMap.get(chart.id);
@@ -94,7 +94,7 @@ export class SyncManager3D {
         }, chart);
     }
 
-    public registerChart(chart: Chart3D) {
+    public registerChart(chart: Point3D) {
         console.log("registering chart", chart.id);
 
         if (this.localChartsById.has(chart.id)) {

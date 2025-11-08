@@ -1,4 +1,4 @@
-import { Chart2D } from './Chart2D'
+import { Point2D } from './Point2D'
 import { SyncManager2D } from './SyncManager2D'
 import { Chart } from '../../shared/src/Chart'
 // Babylon imports handled inside Chart2D; main stays UI-only
@@ -42,8 +42,8 @@ function normToPixel(nx: number, ny: number) {
 
 // Build windows for current charts; if none, create one
 if (syncManager.getLocalCharts().length === 0) {
-	const c = new Chart2D('chart1', syncManager as any)
-	syncManager.registerChart(c)
+	const c = new Point2D('point1', syncManager as any)
+	syncManager.registerChart(c as any)
 }
 
 // Mount a window for each chart; Chart2D owns its DOM and Babylon scene

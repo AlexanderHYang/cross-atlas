@@ -1,25 +1,25 @@
 {
-  "hash": "24ee2037",
-  "configHash": "1b4f1675",
+  "hash": "1aa026c8",
+  "configHash": "606cbac9",
   "lockfileHash": "c3b7924f",
-  "browserHash": "b49fdcf2",
+  "browserHash": "5cee5a93",
   "optimized": {
     "d3": {
       "src": "../../../node_modules/d3/src/index.js",
       "file": "d3.js",
-      "fileHash": "45569977",
+      "fileHash": "361a1b25",
       "needsInterop": false
     },
     "y-websocket": {
       "src": "../../../node_modules/y-websocket/src/y-websocket.js",
       "file": "y-websocket.js",
-      "fileHash": "ca916f1a",
+      "fileHash": "1df10319",
       "needsInterop": false
     },
     "yjs": {
       "src": "../../../node_modules/yjs/dist/yjs.mjs",
       "file": "yjs.js",
-      "fileHash": "56afadf4",
+      "fileHash": "bae29a37",
       "needsInterop": false
     }
   },

@@ -1,8 +1,7 @@
 import { sceneManager } from './SceneManager'
 import { SyncManager3D } from './SyncManager3D'
-import { Chart3D } from './Chart3D'
+import { Point3D } from './Point3D'
 import { Vector3 } from '@babylonjs/core'
-import { Chart } from '../../shared/src/Chart'
 import { initWebXR } from './xr/webxrExperience'
 
 // initialize scene
@@ -20,18 +19,15 @@ console.log(bigRadius)
 // create SyncManager
 const syncManager3D = await SyncManager3D.create(scene)
 
-// create a 3d chart and add it to sync manager
-const chart1 = new Chart3D("chart1", new Chart('line', scene), syncManager3D)
-chart1.chart.setPosition(new Vector3(0, bigRadius, 0))
-syncManager3D.registerChart(chart1)
+// create simple 3D points and add them to sync manager
+const p1 = new Point3D("point1", scene, syncManager3D, new Vector3(0, bigRadius, 0))
+syncManager3D.registerChart(p1 as any)
 
-const chart2 = new Chart3D("chart2", new Chart('line', scene), syncManager3D)
-chart2.chart.setPosition(new Vector3(0, -bigRadius, 0))
-syncManager3D.registerChart(chart2)
+const p2 = new Point3D("point2", scene, syncManager3D, new Vector3(0, -bigRadius, 0))
+syncManager3D.registerChart(p2 as any)
 
-const chart3 = new Chart3D("chart3", new Chart('line', scene), syncManager3D)
-chart3.chart.setPosition(new Vector3(bigRadius, 0, 0))
-syncManager3D.registerChart(chart3)
+const p3 = new Point3D("point3", scene, syncManager3D, new Vector3(bigRadius, 0, 0))
+syncManager3D.registerChart(p3 as any)
 
 
 sceneManager.getEngine().runRenderLoop(() => {
