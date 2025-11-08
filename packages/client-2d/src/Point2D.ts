@@ -1,4 +1,4 @@
-import { ChartSyncData, Vector3SyncData } from "../../shared/src/Chart";
+import { PointSyncData, Vector3SyncData } from "../../shared/src/sync";
 import { Vector3 } from '@babylonjs/core'
 import { SyncManager2D } from "./SyncManager2D";
 import { equirectangularNormalizedXY, inverseEquirectangularNormalizedXY, latLonToVec3, vec3ToLatLon } from "../../shared/src/projection";
@@ -120,7 +120,7 @@ export class Point2D {
         this.element.style.top = `${top}px`;
     }
 
-    public applyRemoteData(remoteData: ChartSyncData) {
+    public applyRemoteData(remoteData: PointSyncData) {
     const x = remoteData.position.x;
     const y = remoteData.position.y;
     const z = remoteData.position.z;
@@ -131,7 +131,7 @@ export class Point2D {
         this.updateWindowPositionFromNxNy();
     }
 
-    public getLocalData(existing: ChartSyncData): ChartSyncData {
+    public getLocalData(existing: PointSyncData): PointSyncData {
         const { lat, lon } = inverseEquirectangularNormalizedXY(this.nx, this.ny);
         const v = latLonToVec3(lat, lon, 1);
     const existingVec = new Vector3(existing.position.x, existing.position.y, existing.position.z)
@@ -139,7 +139,7 @@ export class Point2D {
     const len = existingVec.length()
         v.x *= len; v.y *= len; v.z *= len;
         const pos: Vector3SyncData = { x: v.x, y: v.y, z: v.z };
-        return { id: this.id, position: pos };
+        return { id: this.id, position: pos, color: existing.color };
     }
 
     // draw a simple point on canvas

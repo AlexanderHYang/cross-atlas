@@ -42,6 +42,7 @@ export default defineConfig({
   plugins: [basicSsl()],
   server: {
     host,
+    // @ts-ignore
     https: true,
   },
 })

@@ -1,5 +1,5 @@
 import * as Y from "yjs";
-import { ChartSyncData } from "../../shared/src/Chart";
+import { PointSyncData } from "../../shared/src/sync";
 import { Point3D } from "./Point3D";
 import { WebsocketProvider } from "y-websocket";
 import { Scene } from "@babylonjs/core";
@@ -9,9 +9,7 @@ export class SyncManager3D {
     private provider: WebsocketProvider;
 
     private localChartsById: Map<string, Point3D>;
-    private syncedChartDataMap: Y.Map<ChartSyncData>;
-
-    private scene: Scene;
+    private syncedChartDataMap: Y.Map<PointSyncData>;
 
     private constructor(scene: Scene) {
         // 1) connect to websocket provider
@@ -32,13 +30,11 @@ export class SyncManager3D {
         this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc);
 
         // 2) create local state maps
-    this.localChartsById = new Map<string, Point3D>();
-        this.syncedChartDataMap = this.ydoc.getMap("charts") as Y.Map<ChartSyncData>;
+        this.localChartsById = new Map<string, Point3D>();
+        this.syncedChartDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
 
-        // 3) store relevant scene data
-        this.scene = scene;
-
-        // 4) initialize existing remote charts
+        // this might be unneeded?
+        // 3) initialize existing remote charts
         // this.provider.once("sync", () => {
         //     console.log("initializing charts from remote");
         //     for (const c of this.syncedChartDataMap.values()) {

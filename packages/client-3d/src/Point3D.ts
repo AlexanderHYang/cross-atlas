@@ -1,5 +1,5 @@
 import { Scene, Mesh, MeshBuilder, StandardMaterial, Color3, Vector3, SixDofDragBehavior } from "@babylonjs/core";
-import { ChartSyncData, Vector3SyncData } from "../../shared/src/Chart";
+import { Vector3SyncData, PointSyncData } from "../../shared/src/sync";
 import { SyncManager3D } from "./SyncManager3D";
 
 export class Point3D {
@@ -40,14 +40,14 @@ export class Point3D {
         });
     }
 
-    public applyRemoteData(remoteData: ChartSyncData) {
+    public applyRemoteData(remoteData: PointSyncData) {
         const pos = new Vector3(remoteData.position.x, remoteData.position.y, remoteData.position.z);
         this.mesh.position.copyFrom(pos);
     }
 
-    public getLocalData(existing: ChartSyncData): ChartSyncData {
+    public getLocalData(existing: PointSyncData): PointSyncData {
         const pos = this.mesh.position;
         const vectorData: Vector3SyncData = { x: pos.x, y: pos.y, z: pos.z };
-        return { id: this.id, position: vectorData };
+        return { id: this.id, position: vectorData, color: existing.color};
     }
 }

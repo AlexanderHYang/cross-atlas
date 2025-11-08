@@ -1,6 +1,5 @@
 import { Point2D } from './Point2D'
 import { SyncManager2D } from './SyncManager2D'
-import { Chart } from '../../shared/src/Chart'
 // Babylon imports handled inside Chart2D; main stays UI-only
 
 // Dashboard containers
