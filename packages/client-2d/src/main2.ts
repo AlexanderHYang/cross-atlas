@@ -1,18 +1,20 @@
 import { Point2D } from './Point2D'
 import { SyncManager2D } from './SyncManager2D'
 
-// Create a single canvas UI for all points
+// Create a single canvas UI for all points (centered, not full screen)
 const canvas = document.createElement('canvas')
 canvas.id = 'points-canvas'
-canvas.style.position = 'fixed'
-canvas.style.left = '0'
-canvas.style.top = '0'
-canvas.style.width = '100%'
-canvas.style.height = '100%'
+canvas.style.position = 'absolute'
+canvas.style.left = '50%'
+canvas.style.top = '50%'
+canvas.style.transform = 'translate(-50%, -50%)'
 canvas.style.display = 'block'
-canvas.style.background = '#f5f5f5' // light grey background
+canvas.style.background = '#ffffff' // white interior for the canvas
 canvas.style.touchAction = 'none'
+canvas.style.border = '4px solid #333' // visible border
+canvas.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)'
 document.body.style.margin = '0'
+document.body.style.background = '#f5f5f5'
 document.body.appendChild(canvas)
 
 const style = document.createElement('style')
@@ -32,8 +34,11 @@ if (syncManager.getLocalCharts().length === 0) {
 let width = 0, height = 0
 function resize() {
 	const dpr = window.devicePixelRatio || 1
-	width = Math.floor(window.innerWidth)
-	height = Math.floor(window.innerHeight)
+	// Make canvas a large but not full-screen area, centered with margins
+	const maxW = Math.max(400, Math.min(window.innerWidth - 120, 1200))
+	const maxH = Math.max(300, Math.min(window.innerHeight - 120, 800))
+	width = Math.floor(maxW)
+	height = Math.floor(maxH)
 	canvas.width = Math.floor(width * dpr)
 	canvas.height = Math.floor(height * dpr)
 	canvas.style.width = `${width}px`
@@ -45,7 +50,7 @@ resize()
 
 // Define draggable rectangle (10% padding)
 function getBounds() {
-	const pad = 0.1
+	const pad = 0.0
 	return {
 		x: width * pad,
 		y: height * pad,
