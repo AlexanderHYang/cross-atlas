@@ -11,7 +11,7 @@ export class SyncManager2D {
     private localPointsById: Map<string, Point2D>;
     private syncedPointDataMap: Y.Map<PointSyncData>;
 
-    private pcaManager = new PCAManager();
+    private pcaManager = new PCAManager(3);
 
     private constructor() {
         // 1) connect to websocket provider

@@ -52,17 +52,17 @@ window.addEventListener('keydown', (ev) => {
 					syncManager.getRemotePoints()
 					.map(d => new Vector3(d.position.x, d.position.y, d.position.z))
 				)
-			for (const p of syncManager.getLocalPoints()) {
-				// re-apply local data to update nx,ny based on new PCA
-				const remoteData = syncManager.getRemotePointById(p.id)
-				if (remoteData) {
-					p.applyRemoteData(remoteData, syncManager.getPCAManager())
-				}
-			}
 			console.log('Switched to PCA projection mode')
 		} else {
 			setProjectionMode('equirectangular')
 			console.log('Switched to Equirectangular projection mode')
+		}
+		for (const p of syncManager.getLocalPoints()) {
+			// re-apply local data to update nx,ny based on new PCA
+			const remoteData = syncManager.getRemotePointById(p.id)
+			if (remoteData) {
+				p.applyRemoteData(remoteData, syncManager.getPCAManager())
+			}
 		}
 	}
 });
