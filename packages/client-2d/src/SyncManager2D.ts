@@ -2,7 +2,6 @@ import * as Y from "yjs";
 import { PointSyncData } from "../../shared/src/sync";
 import { Point2D } from "./Point2D";
 import { WebsocketProvider } from "y-websocket";
-import { Scene } from "@babylonjs/core";
 
 export class SyncManager2D {
     private ydoc: Y.Doc;
@@ -78,7 +77,7 @@ export class SyncManager2D {
         console.log("transacting chart update for chart", chart.id);
         this.ydoc.transact(() => {
             const existing = this.syncedChartDataMap.get(chart.id);
-            this.syncedChartDataMap.set(chart.id, chart.getLocalData(existing!));
+            this.syncedChartDataMap.set(chart.id, chart.getLocalData(existing || undefined));
         }, chart);
     }
 

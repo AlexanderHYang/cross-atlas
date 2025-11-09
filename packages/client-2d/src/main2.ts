@@ -1,55 +1,126 @@
 import { Point2D } from './Point2D'
 import { SyncManager2D } from './SyncManager2D'
-// Babylon imports handled inside Chart2D; main stays UI-only
 
-// Dashboard containers
-const stage = document.createElement('div')
-stage.id = 'stage'
-const board = document.createElement('div')
-board.id = 'charts-board'
-const grid = document.createElement('div')
-grid.id = 'charts-grid'
-document.body.appendChild(stage)
-stage.appendChild(board)
-board.appendChild(grid)
+// Create a single canvas UI for all points
+const canvas = document.createElement('canvas')
+canvas.id = 'points-canvas'
+canvas.style.position = 'fixed'
+canvas.style.left = '0'
+canvas.style.top = '0'
+canvas.style.width = '100%'
+canvas.style.height = '100%'
+canvas.style.display = 'block'
+canvas.style.background = '#f5f5f5' // light grey background
+canvas.style.touchAction = 'none'
+document.body.style.margin = '0'
+document.body.appendChild(canvas)
 
-// Styles for windows and layout
 const style = document.createElement('style')
-style.textContent = `
-	html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#0d0e12; color:#d6d8e1; }
-	#stage { position:fixed; inset:0; }
-	#charts-board { position:absolute; inset:0; }
-	#charts-grid { position:absolute; left:50%; top:50%; transform: translate(-50%, -50%); }
-	.chart-window { position:absolute; transform: translate(-50%, -50%); border:1px solid #27314a; border-radius:10px; box-shadow: 0 12px 30px rgba(0,0,0,0.45); }
-	.chart-header { height:36px; line-height:36px; padding:0 10px; border-bottom:1px solid #27314a; cursor:grab; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; font-size:13px; color:#b9c0d4; background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0)); border-top-left-radius:10px; border-top-right-radius:10px; user-select:none; }
-	.chart-canvas { display:block; width:480px; height:320px; border-bottom-left-radius:10px; border-bottom-right-radius:10px; }
-`
+style.textContent = `html, body { height:100%; background: #f5f5f5; } #points-canvas { display:block; }`
 document.head.appendChild(style)
 
-// Sync manager
+const ctx = canvas.getContext('2d')!
+
 const syncManager: SyncManager2D = await SyncManager2D.create()
 
-// Helper to map Chart2D normalized to pixel coords (full window as reference)
-const viewportWidth = () => window.innerWidth
-const viewportHeight = () => window.innerHeight
-function normToPixel(nx: number, ny: number) {
-	const w = viewportWidth(), h = viewportHeight()
-	const x = ((nx + 1) / 2) * w
-	const y = ((1 - (ny + 1) / 2)) * h
-	return { x, y }
-}
-
-// Build windows for current charts; if none, create one
+// If no points exist, create a default one
 if (syncManager.getLocalCharts().length === 0) {
 	const c = new Point2D('point1', syncManager as any)
 	syncManager.registerChart(c as any)
 }
 
-// Mount a window for each chart; Chart2D owns its DOM and Babylon scene
-Array.from(syncManager.getLocalCharts()).forEach((c) => c.mount(grid))
+let width = 0, height = 0
+function resize() {
+	const dpr = window.devicePixelRatio || 1
+	width = Math.floor(window.innerWidth)
+	height = Math.floor(window.innerHeight)
+	canvas.width = Math.floor(width * dpr)
+	canvas.height = Math.floor(height * dpr)
+	canvas.style.width = `${width}px`
+	canvas.style.height = `${height}px`
+	ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+}
+window.addEventListener('resize', resize)
+resize()
 
-window.addEventListener('resize', () => {
-	// on resize, ask each card to reposition based on nx/ny
-	for (const c of syncManager.getLocalCharts()) c.updateWindowPositionFromNxNy()
+// Define draggable rectangle (10% padding)
+function getBounds() {
+	const pad = 0.1
+	return {
+		x: width * pad,
+		y: height * pad,
+		w: width * (1 - pad * 2),
+		h: height * (1 - pad * 2)
+	}
+}
+
+// Draw loop
+function drawAll() {
+	// clear
+	ctx.clearRect(0, 0, width, height)
+	// background fill
+	ctx.fillStyle = '#f5f5f5'
+	ctx.fillRect(0, 0, width, height)
+
+	// draw bounds
+	const b = getBounds()
+	ctx.strokeStyle = '#999'
+	ctx.lineWidth = 2
+	ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1)
+
+	// draw points
+	const points = syncManager.getLocalCharts()
+	for (const p of points) {
+		p.draw(ctx, width, height)
+	}
+}
+
+let dragging: Point2D | null = null
+function clampToBounds(px: number, py: number) {
+	const b = getBounds()
+	const clampedX = Math.min(b.x + b.w, Math.max(b.x, px))
+	const clampedY = Math.min(b.y + b.h, Math.max(b.y, py))
+	return { x: clampedX, y: clampedY }
+}
+
+canvas.addEventListener('pointerdown', (ev) => {
+	const rect = canvas.getBoundingClientRect()
+	const px = ev.clientX - rect.left
+	const py = ev.clientY - rect.top
+	const points = syncManager.getLocalCharts()
+	// hit test reverse order so last drawn (if ordering matters) is on top
+	for (let i = points.length - 1; i >= 0; i--) {
+		const p = points[i]
+		if (p.hitTest(px, py, width, height)) {
+			dragging = p
+			try { canvas.setPointerCapture(ev.pointerId) } catch {}
+			break
+		}
+	}
 })
+
+canvas.addEventListener('pointermove', (ev) => {
+	if (!dragging) return
+	const rect = canvas.getBoundingClientRect()
+	let px = ev.clientX - rect.left
+	let py = ev.clientY - rect.top
+	const c = clampToBounds(px, py)
+	px = c.x
+	py = c.y
+	dragging.setFromPixel(px, py, width, height)
+	drawAll()
+})
+
+canvas.addEventListener('pointerup', (ev) => {
+	if (!dragging) return
+	try { canvas.releasePointerCapture(ev.pointerId) } catch {}
+	dragging = null
+})
+
+// animate
+function loop() {
+	drawAll()
+	requestAnimationFrame(loop)
+}
+loop()
 

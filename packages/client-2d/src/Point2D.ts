@@ -6,6 +6,7 @@ import { equirectangularNormalizedXY, inverseEquirectangularNormalizedXY, latLon
 export class Point2D {
     id: string;
     onLocalChange: () => void;
+    color: Vector3 = new Vector3(1, 0, 0)
 
     // 2d specific state
     nx: number = 0;
@@ -120,26 +121,34 @@ export class Point2D {
         this.element.style.top = `${top}px`;
     }
 
-    public applyRemoteData(remoteData: PointSyncData) {
-    const x = remoteData.position.x;
-    const y = remoteData.position.y;
-    const z = remoteData.position.z;
-    const { lat, lon, radius } = vec3ToLatLon(new Vector3(x, y, z));
+    public applyRemoteData(remoteData: PointSyncData | any) {
+        const x = remoteData.position.x;
+        const y = remoteData.position.y;
+        const z = remoteData.position.z;
+        const { lat, lon, radius } = vec3ToLatLon(new Vector3(x, y, z));
         const { nx, ny } = equirectangularNormalizedXY(lat, lon);
         this.nx = nx;
         this.ny = ny;
-        this.updateWindowPositionFromNxNy();
+        // update color if provided
+        if ((remoteData as PointSyncData).color) {
+            const c = (remoteData as PointSyncData).color;
+            this.color = new Vector3(c.x, c.y, c.z);
+        }
     }
 
-    public getLocalData(existing: PointSyncData): PointSyncData {
+    public getLocalData(existing?: PointSyncData | any): PointSyncData {
         const { lat, lon } = inverseEquirectangularNormalizedXY(this.nx, this.ny);
         const v = latLonToVec3(lat, lon, 1);
-    const existingVec = new Vector3(existing.position.x, existing.position.y, existing.position.z)
-    // use existing vector length (from origin)
-    const len = existingVec.length()
+        let len = 1;
+        if (existing && (existing as any).position) {
+            const ex = (existing as any).position;
+            const existingVec = new Vector3(ex.x, ex.y, ex.z);
+            len = existingVec.length() || 1;
+        }
         v.x *= len; v.y *= len; v.z *= len;
         const pos: Vector3SyncData = { x: v.x, y: v.y, z: v.z };
-        return { id: this.id, position: pos, color: existing.color };
+        const color = { x: this.color.x, y: this.color.y, z: this.color.z };
+        return { id: this.id, position: pos, color };
     }
 
     // draw a simple point on canvas
@@ -147,7 +156,11 @@ export class Point2D {
         const x = ((this.nx + 1) / 2) * width;
         const y = ((1 - (this.ny + 1) / 2)) * height;
         ctx.beginPath();
-        ctx.fillStyle = "red";
+        // color stored in this.color as Vector3 (r,g,b) in 0..1
+        const r = Math.round(Math.min(1, Math.max(0, this.color.x)) * 255);
+        const g = Math.round(Math.min(1, Math.max(0, this.color.y)) * 255);
+        const b = Math.round(Math.min(1, Math.max(0, this.color.z)) * 255);
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         const radius = 8;
         ctx.arc(x, y, radius, 0, Math.PI * 2);
         ctx.fill();
