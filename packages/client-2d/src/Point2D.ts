@@ -12,113 +12,11 @@ export class Point2D {
     nx: number = 0;
     ny: number = 0;
 
-    // DOM state
-    private element?: HTMLDivElement;
-    private header?: HTMLDivElement;
-    private canvas?: HTMLCanvasElement;
-    private dragging: boolean = false;
-    private dragState?: { sx: number; sy: number; left: number; top: number };
-
     constructor(id: string, syncManager: SyncManager2D) {
         this.id = id;
         this.onLocalChange = () => {
             syncManager.transactPointUpdate(this);
         };
-    }
-
-    // Create the window under a parent container
-    public mount(parent: HTMLElement) {
-        if (this.element) return; // already mounted
-
-        const win = document.createElement('div');
-        win.className = 'chart-window';
-        win.dataset.chartId = this.id;
-        this.element = win;
-
-        const header = document.createElement('div');
-        header.className = 'chart-header';
-        header.textContent = `Point — ${this.id}`;
-        win.appendChild(header);
-        this.header = header;
-
-        const canvas = document.createElement('canvas');
-        canvas.className = 'chart-canvas';
-        const css = getComputedStyle(canvas);
-        const w = parseInt(css.width) || 480;
-        const h = parseInt(css.height) || 320;
-        canvas.width = w;
-        canvas.height = h;
-        canvas.style.background = 'transparent';
-        canvas.style.backgroundColor = 'transparent';
-        win.appendChild(canvas);
-        this.canvas = canvas;
-
-        // initial positioning from nx/ny (convert viewport px -> board-centered px)
-        const p = this.normToPixel(this.nx, this.ny);
-        const leftBoard = p.x - window.innerWidth / 2;
-        const topBoard = p.y - window.innerHeight / 2;
-        this.applyWindowPosition(leftBoard, topBoard);
-
-        // Drag handlers on header
-        header.addEventListener('pointerdown', (e) => {
-            this.dragging = true;
-            try { header.setPointerCapture(e.pointerId); } catch {}
-            header.style.cursor = 'grabbing';
-            const rect = win.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            const startLeftBoard = centerX - window.innerWidth / 2;
-            const startTopBoard = centerY - window.innerHeight / 2;
-            this.dragState = { sx: e.clientX, sy: e.clientY, left: startLeftBoard, top: startTopBoard };
-        });
-        header.addEventListener('pointermove', (e) => {
-            if (!this.dragging || !this.dragState) return;
-            const dx = e.clientX - this.dragState.sx;
-            const dy = e.clientY - this.dragState.sy;
-            const newLeftBoard = this.dragState.left + dx;
-            const newTopBoard = this.dragState.top + dy;
-            this.applyWindowPosition(newLeftBoard, newTopBoard);
-            const px = newLeftBoard + window.innerWidth / 2;
-            const py = newTopBoard + window.innerHeight / 2;
-            this.setFromPixel(px, py, window.innerWidth, window.innerHeight);
-        });
-        header.addEventListener('pointerup', (e) => {
-            try { header.releasePointerCapture(e.pointerId); } catch {}
-            header.style.cursor = 'grab';
-            this.dragging = false;
-            this.dragState = undefined;
-        });
-
-        parent.appendChild(win);
-    }
-
-    public unmount() {
-        if (this.element?.parentElement) this.element.parentElement.removeChild(this.element);
-        this.element = undefined;
-        this.header = undefined;
-        this.canvas = undefined;
-        this.dragging = false;
-        this.dragState = undefined;
-    }
-
-    public updateWindowPositionFromNxNy() {
-        if (!this.element) return;
-        const p = this.normToPixel(this.nx, this.ny);
-        const leftBoard = p.x - window.innerWidth / 2;
-        const topBoard = p.y - window.innerHeight / 2;
-        this.applyWindowPosition(leftBoard, topBoard);
-    }
-
-    private normToPixel(nx: number, ny: number) {
-        const w = window.innerWidth, h = window.innerHeight;
-        const x = ((nx + 1) / 2) * w;
-        const y = ((1 - (ny + 1) / 2)) * h;
-        return { x, y };
-    }
-    private applyWindowPosition(left:number, top:number) {
-        if (!this.element) return;
-        this.element.style.left = `${left}px`;
-        this.element.style.top = `${top}px`;
     }
 
     public applyRemoteData(remoteData: PointSyncData) {
@@ -130,10 +28,8 @@ export class Point2D {
         this.nx = nx;
         this.ny = ny;
         // update color if provided
-        if ((remoteData as PointSyncData).color) {
-            const c = (remoteData as PointSyncData).color;
-            this.color = new Vector3(c.x, c.y, c.z);
-        }
+        const c = remoteData.color;
+        this.color = new Vector3(c.x, c.y, c.z);
     }
 
     public getLocalData(existing: PointSyncData): PointSyncData {
