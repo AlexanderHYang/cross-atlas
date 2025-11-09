@@ -7,8 +7,8 @@ export class SyncManager2D {
     private ydoc: Y.Doc;
     private provider: WebsocketProvider;
 
-    private localChartsById: Map<string, Point2D>;
-    private syncedChartDataMap: Y.Map<PointSyncData>;
+    private localPointsById: Map<string, Point2D>;
+    private syncedPointDataMap: Y.Map<PointSyncData>;
 
     private constructor() {
         // 1) connect to websocket provider
@@ -30,19 +30,19 @@ export class SyncManager2D {
         this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc);
 
         // 2) create local state maps
-        this.localChartsById = new Map<string, Point2D>();
-        this.syncedChartDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
+    this.localPointsById = new Map<string, Point2D>();
+    this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
     }
 
     private waitForInitialSync(): Promise<void> {
         return new Promise((resolve) => {
-            this.provider.once("sync", () => {
-                console.log("initializing charts from remote");
-                for (const c of this.syncedChartDataMap.values()) {
+        this.provider.once("sync", () => {
+            console.log("initializing points from remote");
+                for (const c of this.syncedPointDataMap.values()) {
                     const p = new Point2D(c.id, this);
                     p.applyRemoteData(c);
                     console.log("initializing point from remote:", c);
-                    this.localChartsById.set(p.id, p);
+                    this.localPointsById.set(p.id, p);
                 }
                 resolve();
             });
@@ -50,18 +50,17 @@ export class SyncManager2D {
     }
 
     private initializeRemoteObserver() {
-        this.syncedChartDataMap.observe((event, transaction) => {
+        this.syncedPointDataMap.observe((event, transaction) => {
             for (const key of event.keysChanged) {
-                const remoteData = this.syncedChartDataMap.get(key)!;
-                const chart = this.localChartsById.get(key)!;
-
-                // skip changes originated from this local chart update
-                if (transaction.origin === chart) {
+                const remoteData = this.syncedPointDataMap.get(key)!;
+                const point = this.localPointsById.get(key)!;
+                // skip changes originated from this local point update
+                if (transaction.origin === point) {
                     continue;
                 }
 
-                // apply remote data to local chart
-                chart.applyRemoteData(remoteData);
+                // apply remote data to local point
+                point.applyRemoteData(remoteData);
             }
         });
     }
@@ -73,36 +72,36 @@ export class SyncManager2D {
         return manager;
     }
 
-    public transactChartUpdate(chart: Point2D) {
-        console.log("transacting chart update for chart", chart.id);
+    public transactPointUpdate(point: Point2D) {
+        console.log("transacting point update for", point.id);
         this.ydoc.transact(() => {
-            const existing = this.syncedChartDataMap.get(chart.id);
-            this.syncedChartDataMap.set(chart.id, chart.getLocalData(existing || undefined));
-        }, chart);
+            const existing = this.syncedPointDataMap.get(point.id);
+            this.syncedPointDataMap.set(point.id, point.getLocalData(existing!));
+        }, point);
     }
 
-    public registerChart(chart: Point2D) {
-        console.log("registering chart", chart.id);
+    public registerPoint(point: Point2D) {
+        console.log("registering point", point.id);
 
-        if (this.localChartsById.has(chart.id)) {
-            console.warn("Chart with id", chart.id, "is already registered.");
+        if (this.localPointsById.has(point.id)) {
+            console.warn("Point with id", point.id, "is already registered.");
             return;
         }
-    this.localChartsById.set(chart.id, chart);
+        this.localPointsById.set(point.id, point);
 
         // if remote exists, apply it without re-emitting
-        const remote = this.syncedChartDataMap.get(chart.id);
+        const remote = this.syncedPointDataMap.get(point.id);
         if (remote) {
-            console.log("applying existing remote data to newly registered chart", chart.id);
-            chart.applyRemoteData(remote);
+            console.log("applying existing remote data to newly registered point", point.id);
+            point.applyRemoteData(remote);
         } else {
             // first writer writes initial state
-            console.log("no existing remote data for chart", chart.id);
-            this.transactChartUpdate(chart);
+            console.log("no existing remote data for point", point.id);
+            this.transactPointUpdate(point);
         }
     }
 
-    public getLocalCharts(): Point2D[] {
-        return Array.from(this.localChartsById.values());
+    public getLocalPoints(): Point2D[] {
+        return Array.from(this.localPointsById.values());
     }
 }

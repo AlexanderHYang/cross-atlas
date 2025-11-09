@@ -22,7 +22,7 @@ export class Point2D {
     constructor(id: string, syncManager: SyncManager2D) {
         this.id = id;
         this.onLocalChange = () => {
-            syncManager.transactChartUpdate(this as any);
+            syncManager.transactPointUpdate(this);
         };
     }
 
@@ -121,7 +121,7 @@ export class Point2D {
         this.element.style.top = `${top}px`;
     }
 
-    public applyRemoteData(remoteData: PointSyncData | any) {
+    public applyRemoteData(remoteData: PointSyncData) {
         const x = remoteData.position.x;
         const y = remoteData.position.y;
         const z = remoteData.position.z;
@@ -136,15 +136,13 @@ export class Point2D {
         }
     }
 
-    public getLocalData(existing?: PointSyncData | any): PointSyncData {
+    public getLocalData(existing: PointSyncData): PointSyncData {
         const { lat, lon } = inverseEquirectangularNormalizedXY(this.nx, this.ny);
         const v = latLonToVec3(lat, lon, 1);
         let len = 1;
-        if (existing && (existing as any).position) {
-            const ex = (existing as any).position;
-            const existingVec = new Vector3(ex.x, ex.y, ex.z);
-            len = existingVec.length() || 1;
-        }
+        const ex = existing.position;
+        const existingVec = new Vector3(ex.x, ex.y, ex.z);
+        len = existingVec.length() || 1;
         v.x *= len; v.y *= len; v.z *= len;
         const pos: Vector3SyncData = { x: v.x, y: v.y, z: v.z };
         const color = { x: this.color.x, y: this.color.y, z: this.color.z };

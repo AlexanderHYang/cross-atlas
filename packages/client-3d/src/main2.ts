@@ -17,17 +17,17 @@ console.log(bigRadius)
 
 
 // create SyncManager
-const syncManager3D = await SyncManager3D.create(scene)
+const syncManager3D = await SyncManager3D.create()
 
 // create simple 3D points and add them to sync manager
 const p1 = new Point3D("point1", scene, syncManager3D, new Vector3(0, bigRadius, 0))
-syncManager3D.registerChart(p1 as any)
+syncManager3D.registerPoint(p1)
 
 const p2 = new Point3D("point2", scene, syncManager3D, new Vector3(0, -bigRadius, 0))
-syncManager3D.registerChart(p2 as any)
+syncManager3D.registerPoint(p2)
 
 const p3 = new Point3D("point3", scene, syncManager3D, new Vector3(bigRadius, 0, 0))
-syncManager3D.registerChart(p3 as any)
+syncManager3D.registerPoint(p3)
 
 
 sceneManager.getEngine().runRenderLoop(() => {

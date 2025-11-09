@@ -26,9 +26,9 @@ const ctx = canvas.getContext('2d')!
 const syncManager: SyncManager2D = await SyncManager2D.create()
 
 // If no points exist, create a default one
-if (syncManager.getLocalCharts().length === 0) {
-	const c = new Point2D('point1', syncManager as any)
-	syncManager.registerChart(c as any)
+if (syncManager.getLocalPoints().length === 0) {
+	const c = new Point2D('point1', syncManager)
+	syncManager.registerPoint(c)
 }
 
 let width = 0, height = 0
@@ -74,7 +74,7 @@ function drawAll() {
 	ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1)
 
 	// draw points
-	const points = syncManager.getLocalCharts()
+	const points = syncManager.getLocalPoints()
 	for (const p of points) {
 		p.draw(ctx, width, height)
 	}
@@ -92,7 +92,7 @@ canvas.addEventListener('pointerdown', (ev) => {
 	const rect = canvas.getBoundingClientRect()
 	const px = ev.clientX - rect.left
 	const py = ev.clientY - rect.top
-	const points = syncManager.getLocalCharts()
+	const points = syncManager.getLocalPoints()
 	// hit test reverse order so last drawn (if ordering matters) is on top
 	for (let i = points.length - 1; i >= 0; i--) {
 		const p = points[i]

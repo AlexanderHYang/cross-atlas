@@ -2,16 +2,15 @@ import * as Y from "yjs";
 import { PointSyncData } from "../../shared/src/sync";
 import { Point3D } from "./Point3D";
 import { WebsocketProvider } from "y-websocket";
-import { Scene } from "@babylonjs/core";
 
 export class SyncManager3D {
     private ydoc: Y.Doc;
     private provider: WebsocketProvider;
 
-    private localChartsById: Map<string, Point3D>;
-    private syncedChartDataMap: Y.Map<PointSyncData>;
+    private localPointsById: Map<string, Point3D>;
+    private syncedPointDataMap: Y.Map<PointSyncData>;
 
-    private constructor(scene: Scene) {
+    private constructor() {
         // 1) connect to websocket provider
         this.ydoc = new Y.Doc();
         const defaultProtocol = window.location.protocol === "https:" ? "wss" : "ws";
@@ -29,9 +28,9 @@ export class SyncManager3D {
         const websocketUrl = `${protocol}://${normalizedHost}:${port}`;
         this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc);
 
-        // 2) create local state maps
-        this.localChartsById = new Map<string, Point3D>();
-        this.syncedChartDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
+    // 2) create local state maps
+    this.localPointsById = new Map<string, Point3D>();
+    this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
 
         // this might be unneeded?
         // 3) initialize existing remote charts
@@ -59,55 +58,55 @@ export class SyncManager3D {
     }
 
     private initializeRemoteObserver() {
-        this.syncedChartDataMap.observe((event, transaction) => {
+        this.syncedPointDataMap.observe((event, transaction) => {
             for (const key of event.keysChanged) {
-                const remoteData = this.syncedChartDataMap.get(key)!;
-                const chart = this.localChartsById.get(key)!;
+                const remoteData = this.syncedPointDataMap.get(key)!;
+                const point = this.localPointsById.get(key)!;
 
-                // skip changes originated from this local chart update
-                if (transaction.origin === chart) {
+                // skip changes originated from this local point update
+                if (transaction.origin === point) {
                     continue;
                 }
 
-                // apply remote data to local chart
-                chart.applyRemoteData(remoteData);
+                // apply remote data to local point
+                point.applyRemoteData(remoteData);
             }
         });
     }
 
-    public static async create(scene: Scene): Promise<SyncManager3D> {
-        const manager = new SyncManager3D(scene);
+    public static async create(): Promise<SyncManager3D> {
+        const manager = new SyncManager3D();
         await manager.waitForInitialSync();
         manager.initializeRemoteObserver();
         return manager;
     }
 
-    public transactChartUpdate(chart: Point3D) {
-        console.log("transacting chart update for", chart.id);
+    public transactPointUpdate(point: Point3D) {
+        console.log("transacting point update for", point.id);
         this.ydoc.transact(() => {
-            const existing = this.syncedChartDataMap.get(chart.id);
-            this.syncedChartDataMap.set(chart.id, chart.getLocalData(existing!));
-        }, chart);
+            const existing = this.syncedPointDataMap.get(point.id);
+            this.syncedPointDataMap.set(point.id, point.getLocalData(existing!));
+        }, point);
     }
 
-    public registerChart(chart: Point3D) {
-        console.log("registering chart", chart.id);
+    public registerPoint(point: Point3D) {
+        console.log("registering point", point.id);
 
-        if (this.localChartsById.has(chart.id)) {
-            console.warn("Chart with id", chart.id, "is already registered.");
+        if (this.localPointsById.has(point.id)) {
+            console.warn("Point with id", point.id, "is already registered.");
             return;
         }
-        this.localChartsById.set(chart.id, chart);
+        this.localPointsById.set(point.id, point);
 
         // if remote exists, apply it without re-emitting
-        const remote = this.syncedChartDataMap.get(chart.id);
+        const remote = this.syncedPointDataMap.get(point.id);
         if (remote) {
-            console.log("applying existing remote data to newly registered chart", chart.id);
-            chart.applyRemoteData(remote);
+            console.log("applying existing remote data to newly registered point", point.id);
+            point.applyRemoteData(remote);
         } else {
             // first writer writes initial state
-            console.log("no existing remote data for chart", chart.id);
-            this.transactChartUpdate(chart);
+            console.log("no existing remote data for point", point.id);
+            this.transactPointUpdate(point);
         }
     }
 }
