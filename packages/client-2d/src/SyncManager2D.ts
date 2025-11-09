@@ -2,6 +2,7 @@ import * as Y from "yjs";
 import { PointSyncData } from "../../shared/src/sync";
 import { Point2D } from "./Point2D";
 import { WebsocketProvider } from "y-websocket";
+import { PCAManager } from "./PCAManager";
 
 export class SyncManager2D {
     private ydoc: Y.Doc;
@@ -9,6 +10,8 @@ export class SyncManager2D {
 
     private localPointsById: Map<string, Point2D>;
     private syncedPointDataMap: Y.Map<PointSyncData>;
+
+    private pcaManager = new PCAManager();
 
     private constructor() {
         // 1) connect to websocket provider
@@ -30,17 +33,17 @@ export class SyncManager2D {
         this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc);
 
         // 2) create local state maps
-    this.localPointsById = new Map<string, Point2D>();
-    this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
+        this.localPointsById = new Map<string, Point2D>();
+        this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
     }
 
     private waitForInitialSync(): Promise<void> {
         return new Promise((resolve) => {
-        this.provider.once("sync", () => {
-            console.log("initializing points from remote");
+            this.provider.once("sync", () => {
+                console.log("initializing points from remote");
                 for (const c of this.syncedPointDataMap.values()) {
                     const p = new Point2D(c.id, this);
-                    p.applyRemoteData(c);
+                    p.applyRemoteData(c, this.pcaManager);
                     console.log("initializing point from remote:", c);
                     this.localPointsById.set(p.id, p);
                 }
@@ -60,7 +63,7 @@ export class SyncManager2D {
                 }
 
                 // apply remote data to local point
-                point.applyRemoteData(remoteData);
+                point.applyRemoteData(remoteData, this.pcaManager);
             }
         });
     }
@@ -76,7 +79,7 @@ export class SyncManager2D {
         console.log("transacting point update for", point.id);
         this.ydoc.transact(() => {
             const existing = this.syncedPointDataMap.get(point.id);
-            this.syncedPointDataMap.set(point.id, point.getLocalData(existing!));
+            this.syncedPointDataMap.set(point.id, point.getLocalData(existing!, this.pcaManager));
         }, point);
     }
 
@@ -93,7 +96,7 @@ export class SyncManager2D {
         const remote = this.syncedPointDataMap.get(point.id);
         if (remote) {
             console.log("applying existing remote data to newly registered point", point.id);
-            point.applyRemoteData(remote);
+            point.applyRemoteData(remote, this.pcaManager);
         } else {
             // first writer writes initial state
             console.log("no existing remote data for point", point.id);
@@ -103,5 +106,14 @@ export class SyncManager2D {
 
     public getLocalPoints(): Point2D[] {
         return Array.from(this.localPointsById.values());
+    }
+    public getRemotePoints(): PointSyncData[] {
+        return Array.from(this.syncedPointDataMap.values());
+    }
+    public getRemotePointById(id: string): PointSyncData | undefined {
+        return this.syncedPointDataMap.get(id);
+    }
+    public getPCAManager(): PCAManager {
+        return this.pcaManager;
     }
 }

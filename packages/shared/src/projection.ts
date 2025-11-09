@@ -15,7 +15,7 @@ export function setProjectionType(newType: ProjectionType) {
 export const maxLat = 89 * Math.PI / 180 // radians
 export const maxY = Math.log(Math.tan(Math.PI / 4 + maxLat / 2))
 
-function clamp(v: number, a: number, b: number) {
+export function clamp(v: number, a: number, b: number) {
     return Math.max(a, Math.min(b, v))
 }
 
@@ -85,7 +85,7 @@ export function vec3ToLatLon(v: Vector3) {
 // let _pcaAvailable = false // whether PCA computation has been done
 // let _pcaInstance: PCA | null = null // cached PCA instance
 
-// export function updatePCAPlane(points: Vector3[] | number[][], syncManager: SyncManager) {
+// export function updatedPCAData(points: Vector3[] | number[][]) {
 //   if (!points || points.length === 0) {
 //     console.warn('updatePCAPlane: no points provided')
 //     _pcaAvailable = false
@@ -144,10 +144,7 @@ export function vec3ToLatLon(v: Vector3) {
 //   const normal = components.getColumn(2)
 //   const normalVec = new Vector3(normal[0], normal[1], normal[2]).normalize()
 
-//   syncManager.syncedMetadataMap.set('metadata', {
-//     pcaPlaneNormal: { x: normalVec.x, y: normalVec.y, z: normalVec.z },
-//     pcaPlaneMean: { x: means[0], y: means[1], z: means[2] },
-//   })
+//   // this hsould update local state somehow, not implemented yet
 // }
 
 // export function projectPCA(point: Vector3): [number, number] {

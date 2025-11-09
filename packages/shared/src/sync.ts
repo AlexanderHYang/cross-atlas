@@ -7,4 +7,4 @@ export type PointSyncData = {
     id: string;
     position: Vector3SyncData;
     color: Vector3SyncData;
-}
+};

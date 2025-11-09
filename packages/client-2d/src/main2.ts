@@ -1,3 +1,4 @@
+import { Vector2, Vector3 } from '@babylonjs/core'
 import { Point2D } from './Point2D'
 import { SyncManager2D } from './SyncManager2D'
 
@@ -23,6 +24,18 @@ document.head.appendChild(style)
 
 const ctx = canvas.getContext('2d')!
 
+
+// define projection mode
+let projectionMode: 'equirectangular' | 'pca' = 'equirectangular'
+export function getProjectionMode() {
+	return projectionMode
+}
+export function setProjectionMode(mode: 'equirectangular' | 'pca') {
+	projectionMode = mode
+}
+
+
+// create SyncManager
 const syncManager: SyncManager2D = await SyncManager2D.create()
 
 // If no points exist, create a default one
@@ -30,6 +43,29 @@ if (syncManager.getLocalPoints().length === 0) {
 	const c = new Point2D('point1', syncManager)
 	syncManager.registerPoint(c)
 }
+
+window.addEventListener('keydown', (ev) => {
+	if (ev.key === 'p' || ev.key === 'P') {
+		if (projectionMode === 'equirectangular') {
+			setProjectionMode('pca')
+			syncManager.getPCAManager().update(
+					syncManager.getRemotePoints()
+					.map(d => new Vector3(d.position.x, d.position.y, d.position.z))
+				)
+			for (const p of syncManager.getLocalPoints()) {
+				// re-apply local data to update nx,ny based on new PCA
+				const remoteData = syncManager.getRemotePointById(p.id)
+				if (remoteData) {
+					p.applyRemoteData(remoteData, syncManager.getPCAManager())
+				}
+			}
+			console.log('Switched to PCA projection mode')
+		} else {
+			setProjectionMode('equirectangular')
+			console.log('Switched to Equirectangular projection mode')
+		}
+	}
+});
 
 let width = 0, height = 0
 function resize() {
