@@ -12,8 +12,7 @@ const scene = sceneManager.getScene()
 void initWebXR(scene)
 
 const env = sceneManager.createEnvironment({ bigRadius: 3.0 })
-const { bigSphere, bigRadius, ground, plane, planeWidth, planeHeight } = env
-console.log(bigRadius)
+const { bigRadius, ground, plane, planeWidth, planeHeight } = env
 
 
 // create SyncManager
