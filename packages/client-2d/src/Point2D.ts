@@ -13,6 +13,7 @@ export class Point2D {
     // 2d specific state
     nx: number = 0;
     ny: number = 0;
+    private radiusHint: number = 1;
 
     constructor(id: string, syncManager: SyncManager2D) {
         this.id = id;
@@ -21,15 +22,25 @@ export class Point2D {
         };
     }
 
+    public setRadiusHint(radius: number) {
+        if (Number.isFinite(radius) && radius > 0) {
+            this.radiusHint = radius;
+        }
+    }
+
     public applyRemoteData(remoteData: PointSyncData, pcaManager: PCAManager) {
         const x = remoteData.position.x;
         const y = remoteData.position.y;
         const z = remoteData.position.z;
+        const remoteVec = new Vector3(x, y, z);
+        const remoteLen = remoteVec.length();
+        if (remoteLen > 0) {
+            this.radiusHint = remoteLen;
+        }
 
         if (getProjectionMode() === 'pca') {
             try {
-                const v = new Vector3(x, y, z)
-                const [ nx, ny ] = pcaManager.project(v);
+                const [ nx, ny ] = pcaManager.project(remoteVec);
                 this.nx = clamp(nx, -1, 1);
                 this.ny = clamp(ny, -1, 1);
                 // update color if provided
@@ -42,7 +53,7 @@ export class Point2D {
         } 
 
         // equirectangular projection
-        const { lat, lon, radius } = vec3ToLatLon(new Vector3(x, y, z));
+        const { lat, lon } = vec3ToLatLon(remoteVec);
         const { nx, ny } = equirectangularNormalizedXY(lat, lon);
         this.nx = nx;
         this.ny = ny;
@@ -51,10 +62,13 @@ export class Point2D {
         this.color = new Vector3(c.x, c.y, c.z);
     }
 
-    public getLocalData(existing: PointSyncData, pcaManager: PCAManager): PointSyncData {
-        if (getProjectionMode() === 'pca') {
+    public getLocalData(existing: PointSyncData | undefined, pcaManager: PCAManager): PointSyncData {
+        const existingVec = existing
+            ? new Vector3(existing.position.x, existing.position.y, existing.position.z)
+            : undefined;
+
+        if (getProjectionMode() === 'pca' && existingVec) {
             try {
-                const existingVec = new Vector3(existing.position.x, existing.position.y, existing.position.z)
                 const v = pcaManager.inverseWithSignedDistance(this.nx, this.ny, existingVec)
                 return {
                     id: this.id,
@@ -68,13 +82,14 @@ export class Point2D {
 
         // equirectangular projection
         const { lat, lon } = inverseEquirectangularNormalizedXY(this.nx, this.ny);
-        const v = latLonToVec3(lat, lon, 1);
-
-        let len = 1;
-        const ex = existing.position;
-        const existingVec = new Vector3(ex.x, ex.y, ex.z);
-        len = existingVec.length() || 1;
-        v.scaleInPlace(len)
+        let len = this.radiusHint || 1;
+        if (existingVec) {
+            const existingLen = existingVec.length();
+            if (existingLen > 0) {
+                len = existingLen;
+            }
+        }
+        const v = latLonToVec3(lat, lon, len);
 
         const pos: Vector3SyncData = { x: v.x, y: v.y, z: v.z };
         const color = { x: this.color.x, y: this.color.y, z: this.color.z };

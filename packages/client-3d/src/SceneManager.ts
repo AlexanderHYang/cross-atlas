@@ -1,4 +1,4 @@
-import { Engine, Scene, ArcRotateCamera, Vector3, HemisphericLight, MeshBuilder, StandardMaterial, Color3 } from '@babylonjs/core'
+import { Engine, Scene, ArcRotateCamera, Vector3, HemisphericLight, MeshBuilder, Color3 } from '@babylonjs/core'
 import { GridMaterial } from '@babylonjs/materials'
 import * as BABYLON from '@babylonjs/core'
 
@@ -40,24 +40,7 @@ export class SceneManager {
     createEnvironment(opts: { bigRadius?: number } = {}) {
         const scene = this.getScene()
         const bigRadius = opts.bigRadius ?? 1.5
-        
-        const bigSphere = MeshBuilder.CreateSphere('big', { diameter: bigRadius * 2, segments: 32 }, scene)
-        const bigMat = new StandardMaterial('bigMat', scene)
-        bigMat.diffuseColor = new Color3(0.6, 0.7, 1)
-        bigMat.alpha = 0.25
-        bigMat.specularColor = new Color3(0.3, 0.3, 0.4)
-        bigSphere.material = bigMat
-        bigSphere.isPickable = false
-        
-        const ground = MeshBuilder.CreateGround('ground', { width: 30, height: 30 }, scene)
-        ground.position.y = -1.5
-        const groundMat = new GridMaterial('groundMat', scene)
-        groundMat.mainColor = new Color3(0.5, 0.5, 0.5)
-        groundMat.lineColor = new Color3(0.5, 0.5, 0.5)
-        groundMat.opacity = 0.8
-        groundMat.backFaceCulling = false
-        ground.material = groundMat
-        
+
         const planeWidth = 4 * bigRadius
         const planeHeight = 4 * bigRadius
         const plane = MeshBuilder.CreatePlane('mercPlane', { width: planeWidth, height: planeHeight }, scene)
@@ -73,7 +56,7 @@ export class SceneManager {
         plane.isPickable = false
         plane.isVisible = false
         
-        return { bigSphere, bigRadius, ground, plane, planeWidth, planeHeight }
+        return { bigRadius, plane, planeWidth, planeHeight }
     }
 }
 

@@ -1,6 +1,8 @@
 import { Vector2, Vector3 } from '@babylonjs/core'
 import { Point2D } from './Point2D'
 import { SyncManager2D } from './SyncManager2D'
+import { equirectangularNormalizedXY, vec3ToLatLon } from '../../shared/src/projection'
+import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from '../../shared/src/defaultPoints'
 
 // Create a single canvas UI for all points (centered, not full screen)
 const canvas = document.createElement('canvas')
@@ -38,10 +40,22 @@ export function setProjectionMode(mode: 'equirectangular' | 'pca') {
 // create SyncManager
 const syncManager: SyncManager2D = await SyncManager2D.create()
 
-// If no points exist, create a default one
+// If no points exist, create defaults that match the 3D scene
 if (syncManager.getLocalPoints().length === 0) {
-	const c = new Point2D('point1', syncManager)
-	syncManager.registerPoint(c)
+	for (const cfg of DEFAULT_POINT_CONFIGS) {
+		const point = new Point2D(cfg.id, syncManager)
+		point.setRadiusHint(DEFAULT_SPHERE_RADIUS)
+		const direction = new Vector3(cfg.direction.x, cfg.direction.y, cfg.direction.z)
+		if (direction.lengthSquared() === 0) {
+			continue
+		}
+		const normalized = direction.normalize()
+		const { lat, lon } = vec3ToLatLon(normalized)
+		const { nx, ny } = equirectangularNormalizedXY(lat, lon)
+		point.nx = nx
+		point.ny = ny
+		syncManager.registerPoint(point)
+	}
 }
 
 window.addEventListener('keydown', (ev) => {
@@ -164,4 +178,3 @@ function loop() {
 	requestAnimationFrame(loop)
 }
 loop()
-

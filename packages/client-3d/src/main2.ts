@@ -3,6 +3,7 @@ import { SyncManager3D } from './SyncManager3D'
 import { Point3D } from './Point3D'
 import { Vector3 } from '@babylonjs/core'
 import { initWebXR } from './xr/webxrExperience'
+import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from '../../shared/src/defaultPoints'
 
 // initialize scene
 const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement
@@ -11,22 +12,26 @@ const scene = sceneManager.getScene()
 
 void initWebXR(scene)
 
-const env = sceneManager.createEnvironment({ bigRadius: 3.0 })
-const { bigRadius, ground, plane, planeWidth, planeHeight } = env
+const env = sceneManager.createEnvironment({ bigRadius: DEFAULT_SPHERE_RADIUS })
+const { bigRadius, plane } = env
+
+const liftOffset = 0.5
+const sphereCenter = new Vector3(0, liftOffset, 0)
 
 
 // create SyncManager
 const syncManager3D = await SyncManager3D.create()
 
 // create simple 3D points and add them to sync manager
-const p1 = new Point3D("point1", scene, syncManager3D, new Vector3(0, bigRadius, 0))
-syncManager3D.registerPoint(p1)
-
-const p2 = new Point3D("point2", scene, syncManager3D, new Vector3(0, -bigRadius, 0))
-syncManager3D.registerPoint(p2)
-
-const p3 = new Point3D("point3", scene, syncManager3D, new Vector3(bigRadius, 0, 0))
-syncManager3D.registerPoint(p3)
+for (const cfg of DEFAULT_POINT_CONFIGS) {
+  const direction = new Vector3(cfg.direction.x, cfg.direction.y, cfg.direction.z)
+  if (direction.lengthSquared() === 0) {
+    continue
+  }
+  const initialPosition = direction.normalize().scale(bigRadius).add(sphereCenter)
+  const point = new Point3D(cfg.id, scene, syncManager3D, initialPosition)
+  syncManager3D.registerPoint(point)
+}
 
 
 sceneManager.getEngine().runRenderLoop(() => {

@@ -79,7 +79,7 @@ export class SyncManager2D {
         console.log("transacting point update for", point.id);
         this.ydoc.transact(() => {
             const existing = this.syncedPointDataMap.get(point.id);
-            this.syncedPointDataMap.set(point.id, point.getLocalData(existing!, this.pcaManager));
+            this.syncedPointDataMap.set(point.id, point.getLocalData(existing, this.pcaManager));
         }, point);
     }
 
