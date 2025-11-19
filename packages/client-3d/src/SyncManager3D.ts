@@ -81,12 +81,12 @@ export class SyncManager3D {
             // currently only one PCA entry expected with key "pca"
             for (const key of event.keysChanged) {
                 const pcaData = this.syncedPCADataMap.get(key)!;
-                console.log("Received updated PCA data from remote:", pcaData);
 
                 plane.position.set(pcaData.mean.x, pcaData.mean.y, pcaData.mean.z);
-
                 const normalVec = new BABYLON.Vector3(pcaData.normal.x, pcaData.normal.y, pcaData.normal.z).normalize();
                 plane.setDirection(normalVec);
+
+                console.log("Received updated PCA data from remote:", pcaData);
             }
         });
     }
