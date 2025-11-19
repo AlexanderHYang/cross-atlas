@@ -17,7 +17,7 @@ console.log(bigRadius)
 
 
 // create SyncManager
-const syncManager3D = await SyncManager3D.create()
+const syncManager3D = await SyncManager3D.create(plane)
 
 // create simple 3D points and add them to sync manager
 const p1 = new Point3D("point1", scene, syncManager3D, new Vector3(0, bigRadius, 0))

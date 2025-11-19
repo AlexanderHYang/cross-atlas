@@ -48,10 +48,11 @@ window.addEventListener('keydown', (ev) => {
 	if (ev.key === 'p' || ev.key === 'P') {
 		if (projectionMode === 'equirectangular') {
 			setProjectionMode('pca')
-			syncManager.getPCAManager().update(
-					syncManager.getRemotePoints()
-					.map(d => new Vector3(d.position.x, d.position.y, d.position.z))
-				)
+			// syncManager.getPCAManager().update(
+			// 		syncManager.getRemotePoints()
+			// 		.map(d => new Vector3(d.position.x, d.position.y, d.position.z))
+			// 	)
+			syncManager.updatePCA()
 			console.log('Switched to PCA projection mode')
 		} else {
 			setProjectionMode('equirectangular')
