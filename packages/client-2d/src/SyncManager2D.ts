@@ -1,15 +1,18 @@
 import * as Y from "yjs";
-import { PointSyncData } from "../../shared/src/sync";
+import { PCASyncData, PointSyncData } from "../../shared/src/sync";
 import { Point2D } from "./Point2D";
 import { WebsocketProvider } from "y-websocket";
 import { PCAManager } from "./PCAManager";
+import { Vector3 } from "@babylonjs/core";
 
 export class SyncManager2D {
     private ydoc: Y.Doc;
     private provider: WebsocketProvider;
 
     private localPointsById: Map<string, Point2D>;
+
     private syncedPointDataMap: Y.Map<PointSyncData>;
+    private syncedPCADataMap: Y.Map<PCASyncData>;
 
     private pcaManager = new PCAManager(3);
 
@@ -35,6 +38,7 @@ export class SyncManager2D {
         // 2) create local state maps
         this.localPointsById = new Map<string, Point2D>();
         this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
+        this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PCASyncData>;
     }
 
     private waitForInitialSync(): Promise<void> {
@@ -102,6 +106,25 @@ export class SyncManager2D {
             console.log("no existing remote data for point", point.id);
             this.transactPointUpdate(point);
         }
+    }
+
+    public updatePCA() {
+        // first update PCA based on all remote points
+        this.pcaManager.update(
+            this.getRemotePoints().map(
+                (d) => new Vector3(d.position.x, d.position.y, d.position.z)
+            )
+        );
+
+        // then transact PCA data
+        const mean = this.pcaManager.getMean();
+        const normal = this.pcaManager.getNormal();
+        this.ydoc.transact(() => {
+            this.syncedPCADataMap.set("pca", {
+                mean: { x: mean.x, y: mean.y, z: mean.z },
+                normal: { x: normal.x, y: normal.y, z: normal.z }
+            });
+        }, this);
     }
 
     public getLocalPoints(): Point2D[] {
