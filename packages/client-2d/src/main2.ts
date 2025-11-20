@@ -1,8 +1,10 @@
-import { Vector2, Vector3 } from '@babylonjs/core'
+import { Vector3 } from '@babylonjs/core'
 import { Point2D } from './Point2D'
 import { SyncManager2D } from './SyncManager2D'
 import { equirectangularNormalizedXY, vec3ToLatLon } from '../../shared/src/projection'
 import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from '../../shared/src/defaultPoints'
+
+const DASHBOARD_BG = '#828485ff'
 
 // Create a single canvas UI for all points (centered, not full screen)
 const canvas = document.createElement('canvas')
@@ -12,16 +14,16 @@ canvas.style.left = '50%'
 canvas.style.top = '50%'
 canvas.style.transform = 'translate(-50%, -50%)'
 canvas.style.display = 'block'
-canvas.style.background = '#ffffff' // white interior for the canvas
+canvas.style.background = DASHBOARD_BG
 canvas.style.touchAction = 'none'
 canvas.style.border = '4px solid #333' // visible border
 canvas.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)'
 document.body.style.margin = '0'
-document.body.style.background = '#f5f5f5'
+document.body.style.background = DASHBOARD_BG
 document.body.appendChild(canvas)
 
 const style = document.createElement('style')
-style.textContent = `html, body { height:100%; background: #f5f5f5; } #points-canvas { display:block; }`
+style.textContent = `html, body { height:100%; background: ${DASHBOARD_BG}; } #points-canvas { display:block; }`
 document.head.appendChild(style)
 
 const ctx = canvas.getContext('2d')!
@@ -45,6 +47,7 @@ if (syncManager.getLocalPoints().length === 0) {
 	for (const cfg of DEFAULT_POINT_CONFIGS) {
 		const point = new Point2D(cfg.id, syncManager)
 		point.setRadiusHint(DEFAULT_SPHERE_RADIUS)
+		point.applyDefaultConfig(cfg)
 		const direction = new Vector3(cfg.direction.x, cfg.direction.y, cfg.direction.z)
 		if (direction.lengthSquared() === 0) {
 			continue
@@ -57,6 +60,8 @@ if (syncManager.getLocalPoints().length === 0) {
 		syncManager.registerPoint(point)
 	}
 }
+
+syncManager.ensureTaskTarget()
 
 window.addEventListener('keydown', (ev) => {
 	if (ev.key === 'p' || ev.key === 'P') {
@@ -114,7 +119,7 @@ function drawAll() {
 	// clear
 	ctx.clearRect(0, 0, width, height)
 	// background fill
-	ctx.fillStyle = '#f5f5f5'
+	ctx.fillStyle = DASHBOARD_BG
 	ctx.fillRect(0, 0, width, height)
 
 	// draw bounds
@@ -125,9 +130,17 @@ function drawAll() {
 
 	// draw points
 	const points = syncManager.getLocalPoints()
+	const taskState = syncManager.getCurrentTask()
 	for (const p of points) {
-		p.draw(ctx, width, height)
+		const isTarget = !!taskState && taskState.targetPointId === p.id
+		const isCompleted = !!taskState?.completed
+		p.draw(ctx, width, height, isTarget, isCompleted)
 	}
+
+	ctx.fillStyle = '#222'
+	ctx.font = '16px sans-serif'
+	const status = taskState?.completed ? '✅ Completed! Waiting for next trial.' : 'Task 1: Click the matching sphere in 3D when the green circle is selected.'
+	ctx.fillText(status, b.x + 8, b.y + b.h + 24)
 }
 
 let dragging: Point2D | null = null

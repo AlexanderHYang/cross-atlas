@@ -2,6 +2,7 @@ import * as Y from "yjs";
 import { PointSyncData } from "../../shared/src/sync";
 import { Point3D } from "./Point3D";
 import { WebsocketProvider } from "y-websocket";
+import { TaskState, TASK_COLLECTION, TASK1_ID } from "../../shared/src/task";
 
 export class SyncManager3D {
     private ydoc: Y.Doc;
@@ -9,7 +10,9 @@ export class SyncManager3D {
 
     private localPointsById: Map<string, Point3D>;
     private syncedPointDataMap: Y.Map<PointSyncData>;
-
+    private taskMap: Y.Map<TaskState>;
+    private currentTask: TaskState | null = null;
+    private taskListeners: Set<(task: TaskState | null) => void> = new Set();
     private constructor() {
         // 1) connect to websocket provider
         this.ydoc = new Y.Doc();
@@ -29,8 +32,9 @@ export class SyncManager3D {
         this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc);
 
     // 2) create local state maps
-    this.localPointsById = new Map<string, Point3D>();
-    this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
+        this.localPointsById = new Map<string, Point3D>();
+        this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
+        this.taskMap = this.ydoc.getMap(TASK_COLLECTION) as Y.Map<TaskState>;
 
         // this might be unneeded?
         // 3) initialize existing remote charts
@@ -72,12 +76,19 @@ export class SyncManager3D {
                 point.applyRemoteData(remoteData);
             }
         });
+
+        this.taskMap.observe(() => {
+            this.currentTask = this.taskMap.get(TASK1_ID) ?? null;
+            this.notifyTaskListeners();
+        });
     }
 
     public static async create(): Promise<SyncManager3D> {
         const manager = new SyncManager3D();
         await manager.waitForInitialSync();
         manager.initializeRemoteObserver();
+        manager.currentTask = manager.taskMap.get(TASK1_ID) ?? null;
+        manager.notifyTaskListeners();
         return manager;
     }
 
@@ -103,10 +114,36 @@ export class SyncManager3D {
         if (remote) {
             console.log("applying existing remote data to newly registered point", point.id);
             point.applyRemoteData(remote);
+            this.transactPointUpdate(point);
         } else {
             // first writer writes initial state
             console.log("no existing remote data for point", point.id);
             this.transactPointUpdate(point);
         }
+    }
+
+    private notifyTaskListeners() {
+        for (const listener of this.taskListeners) {
+            listener(this.currentTask);
+        }
+    }
+
+    public onTaskStateChange(listener: (task: TaskState | null) => void) {
+        this.taskListeners.add(listener);
+        listener(this.currentTask);
+        return () => {
+            this.taskListeners.delete(listener);
+        };
+    }
+
+    public getCurrentTask(): TaskState | null {
+        return this.currentTask;
+    }
+
+    public completeTask(taskId: string = TASK1_ID) {
+        const existing = this.taskMap.get(taskId);
+        if (!existing) return;
+        if (existing.completed) return;
+        this.taskMap.set(taskId, { ...existing, completed: true });
     }
 }

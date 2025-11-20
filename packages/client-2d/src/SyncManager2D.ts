@@ -3,6 +3,8 @@ import { PointSyncData } from "../../shared/src/sync";
 import { Point2D } from "./Point2D";
 import { WebsocketProvider } from "y-websocket";
 import { PCAManager } from "./PCAManager";
+import { TaskState, TASK_COLLECTION, TASK1_ID, createTaskState } from "../../shared/src/task";
+import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
 
 export class SyncManager2D {
     private ydoc: Y.Doc;
@@ -10,8 +12,11 @@ export class SyncManager2D {
 
     private localPointsById: Map<string, Point2D>;
     private syncedPointDataMap: Y.Map<PointSyncData>;
+    private taskMap: Y.Map<TaskState>;
 
     private pcaManager = new PCAManager(3);
+    private currentTask: TaskState | null = null;
+    private taskListeners: Set<(task: TaskState | null) => void> = new Set();
 
     private constructor() {
         // 1) connect to websocket provider
@@ -35,6 +40,7 @@ export class SyncManager2D {
         // 2) create local state maps
         this.localPointsById = new Map<string, Point2D>();
         this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
+        this.taskMap = this.ydoc.getMap(TASK_COLLECTION) as Y.Map<TaskState>;
     }
 
     private waitForInitialSync(): Promise<void> {
@@ -43,8 +49,12 @@ export class SyncManager2D {
                 console.log("initializing points from remote");
                 for (const c of this.syncedPointDataMap.values()) {
                     const p = new Point2D(c.id, this);
+                    p.applyDefaultConfig();
                     p.applyRemoteData(c, this.pcaManager);
                     console.log("initializing point from remote:", c);
+                    if (p.hasLockedColor() || p.hasPositionLock()) {
+                        this.transactPointUpdate(p);
+                    }
                     this.localPointsById.set(p.id, p);
                 }
                 resolve();
@@ -64,7 +74,15 @@ export class SyncManager2D {
 
                 // apply remote data to local point
                 point.applyRemoteData(remoteData, this.pcaManager);
+                if (point.hasLockedColor() || point.hasPositionLock()) {
+                    this.transactPointUpdate(point);
+                }
             }
+        });
+
+        this.taskMap.observe(() => {
+            this.currentTask = this.taskMap.get(TASK1_ID) ?? null;
+            this.notifyTaskListeners();
         });
     }
 
@@ -72,6 +90,8 @@ export class SyncManager2D {
         const manager = new SyncManager2D();
         await manager.waitForInitialSync();
         manager.initializeRemoteObserver();
+        manager.currentTask = manager.taskMap.get(TASK1_ID) ?? null;
+        manager.notifyTaskListeners();
         return manager;
     }
 
@@ -91,12 +111,16 @@ export class SyncManager2D {
             return;
         }
         this.localPointsById.set(point.id, point);
+        point.applyDefaultConfig();
 
         // if remote exists, apply it without re-emitting
         const remote = this.syncedPointDataMap.get(point.id);
         if (remote) {
             console.log("applying existing remote data to newly registered point", point.id);
             point.applyRemoteData(remote, this.pcaManager);
+            if (point.hasLockedColor() || point.hasPositionLock()) {
+                this.transactPointUpdate(point);
+            }
         } else {
             // first writer writes initial state
             console.log("no existing remote data for point", point.id);
@@ -115,5 +139,53 @@ export class SyncManager2D {
     }
     public getPCAManager(): PCAManager {
         return this.pcaManager;
+    }
+
+    public ensureTaskTarget(taskId: string = TASK1_ID) {
+        const existing = this.taskMap.get(taskId);
+        if (existing && existing.targetPointId) {
+            this.currentTask = existing;
+            this.notifyTaskListeners();
+            return existing;
+        }
+
+        const candidateIds = Array.from(this.localPointsById.values())
+            .filter((pt) => {
+                const cfg = getDefaultPointConfig(pt.id);
+                if (cfg && cfg.draggable === false) {
+                    return false;
+                }
+                return true;
+            })
+            .map((pt) => pt.id);
+
+        if (candidateIds.length === 0) {
+            return null;
+        }
+
+        const randomId = candidateIds[Math.floor(Math.random() * candidateIds.length)];
+        const taskState = createTaskState(taskId, randomId);
+        this.taskMap.set(taskId, taskState);
+        this.currentTask = taskState;
+        this.notifyTaskListeners();
+        return taskState;
+    }
+
+    private notifyTaskListeners() {
+        for (const listener of this.taskListeners) {
+            listener(this.currentTask);
+        }
+    }
+
+    public onTaskStateChange(listener: (task: TaskState | null) => void) {
+        this.taskListeners.add(listener);
+        listener(this.currentTask);
+        return () => {
+            this.taskListeners.delete(listener);
+        };
+    }
+
+    public getCurrentTask(): TaskState | null {
+        return this.currentTask;
     }
 }
