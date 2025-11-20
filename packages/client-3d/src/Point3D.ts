@@ -72,7 +72,7 @@ export class Point3D {
         }
     }
 
-    public getLocalData(existing: PointSyncData): PointSyncData {
+    public getLocalData(existing?: PointSyncData): PointSyncData {
         const pos = this.mesh.position;
         const vectorData: Vector3SyncData = { x: pos.x, y: pos.y, z: pos.z };
         const color = { x: this.material.diffuseColor.r, y: this.material.diffuseColor.g, z: this.material.diffuseColor.b };

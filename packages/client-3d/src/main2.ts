@@ -21,8 +21,8 @@ const sphereCenter = new Vector3(0, liftOffset, 0)
 
 
 // create SyncManager
-const syncManager3D = await SyncManager3D.create()
 const pointsByMeshId = new Map<string, Point3D>()
+const syncManager3D = await SyncManager3D.create(plane)
 
 // create simple 3D points and add them to sync manager
 for (const cfg of DEFAULT_POINT_CONFIGS) {

@@ -1,5 +1,6 @@
+import * as BABYLON from "@babylonjs/core";
 import * as Y from "yjs";
-import { PointSyncData } from "../../shared/src/sync";
+import { PCASyncData, PointSyncData } from "../../shared/src/sync";
 import { Point3D } from "./Point3D";
 import { WebsocketProvider } from "y-websocket";
 import { TaskState, TASK_COLLECTION, TASK1_ID } from "../../shared/src/task";
@@ -13,6 +14,8 @@ export class SyncManager3D {
     private taskMap: Y.Map<TaskState>;
     private currentTask: TaskState | null = null;
     private taskListeners: Set<(task: TaskState | null) => void> = new Set();
+    private syncedPCADataMap: Y.Map<PCASyncData>;
+
     private constructor() {
         // 1) connect to websocket provider
         this.ydoc = new Y.Doc();
@@ -31,10 +34,11 @@ export class SyncManager3D {
         const websocketUrl = `${protocol}://${normalizedHost}:${port}`;
         this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc);
 
-    // 2) create local state maps
+        // 2) create local state maps
         this.localPointsById = new Map<string, Point3D>();
         this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
         this.taskMap = this.ydoc.getMap(TASK_COLLECTION) as Y.Map<TaskState>;
+        this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PCASyncData>;
 
         // this might be unneeded?
         // 3) initialize existing remote charts
@@ -61,11 +65,17 @@ export class SyncManager3D {
         });
     }
 
-    private initializeRemoteObserver() {
+    private initializeRemoteObserver(plane: BABYLON.Mesh) {
         this.syncedPointDataMap.observe((event, transaction) => {
             for (const key of event.keysChanged) {
-                const remoteData = this.syncedPointDataMap.get(key)!;
-                const point = this.localPointsById.get(key)!;
+                const remoteData = this.syncedPointDataMap.get(key);
+                if (!remoteData) {
+                    continue;
+                }
+                const point = this.localPointsById.get(key);
+                if (!point) {
+                    continue;
+                }
 
                 // skip changes originated from this local point update
                 if (transaction.origin === point) {
@@ -81,12 +91,21 @@ export class SyncManager3D {
             this.currentTask = this.taskMap.get(TASK1_ID) ?? null;
             this.notifyTaskListeners();
         });
+        
+        this.syncedPCADataMap.observe((event) => {
+            // currently only one PCA entry expected with key "pca"
+            for (const key of event.keysChanged) {
+                const pcaData = this.syncedPCADataMap.get(key);
+                this.applyPCADataToPlane(plane, pcaData);
+            }
+        });
     }
 
-    public static async create(): Promise<SyncManager3D> {
+    public static async create(plane: BABYLON.Mesh): Promise<SyncManager3D> {
         const manager = new SyncManager3D();
         await manager.waitForInitialSync();
-        manager.initializeRemoteObserver();
+        manager.applyPlaneFromExistingPCAData(plane);
+        manager.initializeRemoteObserver(plane);
         manager.currentTask = manager.taskMap.get(TASK1_ID) ?? null;
         manager.notifyTaskListeners();
         return manager;
@@ -96,7 +115,7 @@ export class SyncManager3D {
         console.log("transacting point update for", point.id);
         this.ydoc.transact(() => {
             const existing = this.syncedPointDataMap.get(point.id);
-            this.syncedPointDataMap.set(point.id, point.getLocalData(existing!));
+            this.syncedPointDataMap.set(point.id, point.getLocalData(existing));
         }, point);
     }
 
@@ -145,5 +164,25 @@ export class SyncManager3D {
         if (!existing) return;
         if (existing.completed) return;
         this.taskMap.set(taskId, { ...existing, completed: true });
+    }
+
+    private applyPlaneFromExistingPCAData(plane: BABYLON.Mesh) {
+        const existing = this.syncedPCADataMap.get("pca");
+        this.applyPCADataToPlane(plane, existing);
+    }
+
+    private applyPCADataToPlane(plane: BABYLON.Mesh, data: PCASyncData | undefined) {
+        if (!data) {
+            return;
+        }
+
+        plane.position.set(data.mean.x, data.mean.y, data.mean.z);
+        const normalVec = new BABYLON.Vector3(data.normal.x, data.normal.y, data.normal.z);
+        if (normalVec.lengthSquared() === 0) {
+            return;
+        }
+
+        plane.setDirection(normalVec.normalize());
+        console.log("Updated PCA plane from sync:", data);
     }
 }

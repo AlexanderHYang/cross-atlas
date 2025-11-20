@@ -23,6 +23,17 @@ export class PCAManager {
     return new Vector3(this._mean[0], this._mean[1], this._mean[2])
   }
 
+  public getNormal(): Vector3 {
+    if (this._pcaInstance) {
+      const components = this._pcaInstance.getEigenvectors()
+      if (components && components.columns >= 3) {
+        const normalArr = components.getColumn(2)
+        return new Vector3(normalArr[0], normalArr[1], normalArr[2]).normalize()
+      }
+    }
+    return new Vector3(0, 0, 1)
+  }
+
   /**
    * Create a PCAManager.
    * @param planeSize the half-extent of the 2D PCA plane in output coordinates. 
@@ -155,10 +166,10 @@ export class PCAManager {
   public inverseWithSignedDistance(x: number, y: number, existingVec: Vector3): Vector3 {
     if (!this._pcaInstance) throw new Error('PCA not available')
 
-  // Use raw (unscaled) plane point first, then apply planeSize scaling
-  const rawPlanePoint = this._inverseRaw(x, y)
-  const ps = this._planeSize || 1
-  const planePoint = ps === 1 ? rawPlanePoint : this.getMean().add(rawPlanePoint.subtract(this.getMean()).scale(ps))
+    // Use raw (unscaled) plane point first, then apply planeSize scaling
+    const rawPlanePoint = this._inverseRaw(x, y)
+    const ps = this._planeSize || 1
+    const planePoint = ps === 1 ? rawPlanePoint : this.getMean().add(rawPlanePoint.subtract(this.getMean()).scale(ps))
 
     // mean of the PCA plane
     const mean = this.getMean()
@@ -180,39 +191,4 @@ export class PCAManager {
     const shifted = planePoint.add(normal.scale(signedDist))
     return shifted
   }
-
-  /**
-   * Project a point along the PCA normal vector onto a sphere of given radius.
-   * Uses PCA eigenvectors to compute the normal (3rd principal component).
-   */
-//   public projectAlongNormalToSphere(point: Vector3, radius: number = 1.0): Vector3 {
-//     if (!this._pcaInstance) {
-//       // fallback to radial projection
-//       return point.length() === 0 ? new Vector3(radius, 0, 0) : point.normalize().scale(radius)
-//     }
-
-//     const components = this._pcaInstance.getEigenvectors()
-//     if (!components || components.columns < 3) {
-//       return point.length() === 0 ? new Vector3(radius, 0, 0) : point.normalize().scale(radius)
-//     }
-//     const normalArr = components.getColumn(2)
-//     const normal = new Vector3(normalArr[0], normalArr[1], normalArr[2]).normalize()
-
-//     // Solve || p + t*n ||^2 = r^2
-//     const pDotN = Vector3.Dot(point, normal)
-//     const pLen2 = point.lengthSquared()
-//     const disc = pDotN * pDotN + radius * radius - pLen2
-
-//     const EPS = 1e-9
-//     if (disc < -EPS) {
-//       return point.length() === 0 ? normal.scale(radius) : point.normalize().scale(radius)
-//     }
-
-//     const sqrtD = Math.sqrt(Math.max(0, disc))
-//     const t1 = -pDotN + sqrtD
-//     const t2 = -pDotN - sqrtD
-//     const t = Math.abs(t1) < Math.abs(t2) ? t1 : t2
-//     const intersection = point.add(normal.scale(t))
-//     return intersection.normalize().scale(radius)
-//   }
 }
