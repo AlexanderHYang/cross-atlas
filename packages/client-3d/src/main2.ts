@@ -76,11 +76,14 @@ function handlePointSelection(point: Point3D) {
 }
 
 function setupXRTaskInteractions(xr: WebXRDefaultExperience | null) {
-  if (!xr || !xr.pointerSelection) {
+  const pointerSelection = xr?.pointerSelection
+  const selectionObservable = pointerSelection?.onSelectionObservable
+  if (!selectionObservable) {
+    console.warn('XR pointer selection not available; task interactions disabled')
     return
   }
 
-  xr.pointerSelection.onSelectionObservable.add((event) => {
+  selectionObservable.add((event) => {
     const pickInfo = (event as any)?.pickInfo ?? (event as any)?.pointerInfo?.pickInfo
     if (!pickInfo?.hit || !pickInfo.pickedMesh) {
       return
