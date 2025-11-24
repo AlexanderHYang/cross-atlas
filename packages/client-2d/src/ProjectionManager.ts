@@ -1,16 +1,19 @@
 import { Vector3 } from '@babylonjs/core'
 import { PCAManager } from './PCAManager'
 import { clamp, equirectangularNormalizedXY, inverseEquirectangularNormalizedXY, latLonToVec3, vec3ToLatLon } from '../../shared/src/projection'
+import { SyncManager2D } from './SyncManager2D'
+import { PlaneSyncData } from '@shared/src/sync'
 
 export interface IProjection {
     // project 3D -> normalized 2D
-    project(v: Vector3, existing: Vector3): [number, number]
+    project(v: Vector3): [number, number]
     // inverse 2D -> 3D
     inverse(nx: number, ny: number, existing: Vector3): Vector3
+    getPlaneSyncData(): PlaneSyncData | null
 }
 
 export class EquirectangularProjection implements IProjection {
-    project(v: Vector3, existing: Vector3): [number, number] {
+    project(v: Vector3): [number, number] {
         const { lat, lon } = vec3ToLatLon(v);
         const { nx, ny } =  equirectangularNormalizedXY(lat , lon);
         return [nx, ny];
@@ -25,6 +28,10 @@ export class EquirectangularProjection implements IProjection {
         const v = latLonToVec3(lat, lon, len);
         return v;
     }
+
+    getPlaneSyncData(): PlaneSyncData | null {
+        return null;
+    }
 }
 
 export class PCAProjection implements IProjection {
@@ -38,7 +45,7 @@ export class PCAProjection implements IProjection {
         return this.pcaManager;
     }
 
-    project(v: Vector3, existing: Vector3): [number, number] {
+    project(v: Vector3): [number, number] {
         let [ nx, ny ] = this.pcaManager.project(v);
         nx = clamp(nx, -1, 1);
         ny = clamp(ny, -1, 1);
@@ -48,6 +55,15 @@ export class PCAProjection implements IProjection {
     inverse(nx: number, ny: number, existing: Vector3): Vector3 {
         return this.pcaManager.inverseWithSignedDistance(nx, ny, existing);
     }
+
+    getPlaneSyncData(): PlaneSyncData | null {
+        const mean = this.pcaManager.getMean();
+        const normal = this.pcaManager.getNormal();
+        return {
+            mean: { x: mean.x, y: mean.y, z: mean.z },
+            normal: { x: normal.x, y: normal.y, z: normal.z }
+        }
+    }
 }
 
 export class VerticalPlaneProjection implements IProjection {
@@ -55,10 +71,10 @@ export class VerticalPlaneProjection implements IProjection {
     private normal = new Vector3(0, 0, 1);
     private u = new Vector3(1, 0, 0);
     private v = new Vector3(0, 1, 0);
-    private scaleU = 1;
-    private scaleV = 1;
+    private scaleU = 2;
+    private scaleV = 2;
 
-    project(point: Vector3, existing: Vector3): [number, number] {
+    project(point: Vector3): [number, number] {
         const relative = point.subtract(this.origin);
         const distToPlane = Vector3.Dot(relative, this.normal);
         const projected = relative.subtract(this.normal.scale(distToPlane));
@@ -76,6 +92,13 @@ export class VerticalPlaneProjection implements IProjection {
         const distToPlane = Vector3.Dot(existingRelative, this.normal);
         const finalPoint = pointOnPlane.add(this.normal.scale(distToPlane));
         return finalPoint;
+    }
+
+    getPlaneSyncData(): PlaneSyncData | null {
+        return {
+            mean: { x: this.origin.x, y: this.origin.y, z: this.origin.z },
+            normal: { x: this.normal.x, y: this.normal.y, z: this.normal.z }
+        }
     }
 }
 
@@ -84,10 +107,10 @@ export class HorizontalPlaneProjection implements IProjection {
     private normal = new Vector3(0, 1, 0);
     private u = new Vector3(1, 0, 0);
     private v = new Vector3(0, 0, 1);
-    private scaleU = 1;
-    private scaleV = 1;
+    private scaleU = 2;
+    private scaleV = 2;
 
-    project(point: Vector3, existing: Vector3): [number, number] {
+    project(point: Vector3): [number, number] {
         const relative = point.subtract(this.origin);
         const distToPlane = Vector3.Dot(relative, this.normal);
         const projected = relative.subtract(this.normal.scale(distToPlane));
@@ -106,10 +129,17 @@ export class HorizontalPlaneProjection implements IProjection {
         const finalPoint = pointOnPlane.add(this.normal.scale(distToPlane));
         return finalPoint;
     }
+
+    getPlaneSyncData(): PlaneSyncData | null {
+        return {
+            mean: { x: this.origin.x, y: this.origin.y, z: this.origin.z },
+            normal: { x: this.normal.x, y: this.normal.y, z: this.normal.z }
+        }
+    }
 }
 
 
-export class ProjectionManager implements IProjection {
+export class ProjectionManager {
     private projections: IProjection[] = [
         new EquirectangularProjection(),
         new PCAProjection(new PCAManager()),
@@ -118,17 +148,27 @@ export class ProjectionManager implements IProjection {
     ]
     private currentIndex: number = 0;
 
-    updatePCAData(points: Vector3[]) {
-        const pcaProj = this.projections[1] as PCAProjection;
-        pcaProj.getPcaManager().update(points);
-    }
-
-    cycleProjection() {
+    cycleProjection(syncManager: SyncManager2D) {
         this.currentIndex = (this.currentIndex + 1) % this.projections.length;
+
+        // update PCA if switching to it
+        const currentProjection = this.projections[this.currentIndex];
+        if (currentProjection instanceof PCAProjection) {
+            const pcaProjection = currentProjection as PCAProjection;
+            pcaProjection.getPcaManager().update(
+                syncManager.getRemotePoints()
+                .map(d => new Vector3(d.position.x, d.position.y, d.position.z))
+            )
+        }
+
+        const planeData = currentProjection.getPlaneSyncData();
+        if (planeData) {
+            syncManager.updatePlaneSyncData(planeData);
+        }
     }
 
-    project(v: Vector3, existing: Vector3): [number, number] {
-        return this.projections[this.currentIndex].project(v, existing);
+    project(v: Vector3): [number, number] {
+        return this.projections[this.currentIndex].project(v);
     }
 
     inverse(nx: number, ny: number, existing: Vector3): Vector3 {

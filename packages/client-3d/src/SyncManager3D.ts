@@ -1,6 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
 import * as Y from "yjs";
-import { PCASyncData, PointSyncData } from "../../shared/src/sync";
+import { PlaneSyncData, PointSyncData } from "../../shared/src/sync";
 import { Point3D } from "./Point3D";
 import { WebsocketProvider } from "y-websocket";
 import { TaskState, TASK_COLLECTION, TASK1_ID } from "../../shared/src/task";
@@ -14,7 +14,7 @@ export class SyncManager3D {
     private taskMap: Y.Map<TaskState>;
     private currentTask: TaskState | null = null;
     private taskListeners: Set<(task: TaskState | null) => void> = new Set();
-    private syncedPCADataMap: Y.Map<PCASyncData>;
+    private syncedPCADataMap: Y.Map<PlaneSyncData>;
 
     private constructor() {
         // 1) connect to websocket provider
@@ -38,7 +38,7 @@ export class SyncManager3D {
         this.localPointsById = new Map<string, Point3D>();
         this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
         this.taskMap = this.ydoc.getMap(TASK_COLLECTION) as Y.Map<TaskState>;
-        this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PCASyncData>;
+        this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PlaneSyncData>;
 
         // this might be unneeded?
         // 3) initialize existing remote charts
@@ -171,7 +171,7 @@ export class SyncManager3D {
         this.applyPCADataToPlane(plane, existing);
     }
 
-    private applyPCADataToPlane(plane: BABYLON.Mesh, data: PCASyncData | undefined) {
+    private applyPCADataToPlane(plane: BABYLON.Mesh, data: PlaneSyncData | undefined) {
         if (!data) {
             return;
         }

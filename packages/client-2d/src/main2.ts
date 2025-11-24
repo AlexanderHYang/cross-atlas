@@ -65,23 +65,12 @@ syncManager.ensureTaskTarget()
 
 window.addEventListener('keydown', (ev) => {
 	if (ev.key === 'p' || ev.key === 'P') {
-		if (projectionMode === 'equirectangular') {
-			setProjectionMode('pca')
-			// syncManager.getPCAManager().update(
-			// 		syncManager.getRemotePoints()
-			// 		.map(d => new Vector3(d.position.x, d.position.y, d.position.z))
-			// 	)
-			syncManager.updatePCA()
-			console.log('Switched to PCA projection mode')
-		} else {
-			setProjectionMode('equirectangular')
-			console.log('Switched to Equirectangular projection mode')
-		}
+		syncManager.getProjectionManager().cycleProjection(syncManager)
 		for (const p of syncManager.getLocalPoints()) {
 			// re-apply local data to update nx,ny based on new PCA
 			const remoteData = syncManager.getRemotePointById(p.id)
 			if (remoteData) {
-				p.applyRemoteData(remoteData, syncManager.getPCAManager())
+				p.applyRemoteData(remoteData, syncManager.getProjectionManager())
 			}
 		}
 	}

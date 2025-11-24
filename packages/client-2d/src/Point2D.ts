@@ -5,6 +5,7 @@ import { clamp, equirectangularNormalizedXY, inverseEquirectangularNormalizedXY,
 import { getProjectionMode } from "./main2";
 import { PCAManager } from "./PCAManager";
 import { DefaultPointConfig, getDefaultPointConfig } from "../../shared/src/defaultPoints";
+import { ProjectionManager } from "./ProjectionManager";
 
 export class Point2D {
     id: string;
@@ -99,35 +100,24 @@ export class Point2D {
         }
     }
 
-    public applyRemoteData(remoteData: PointSyncData, pcaManager: PCAManager) {
+    public applyRemoteData(remoteData: PointSyncData, projectionManager: ProjectionManager) {
         const x = remoteData.position.x;
         const y = remoteData.position.y;
         const z = remoteData.position.z;
         const remoteVec = new Vector3(x, y, z);
+
         const remoteLen = remoteVec.length();
         if (remoteLen > 0) {
             this.radiusHint = remoteLen;
         }
+
         if (this.colorLock) {
             this.color.copyFrom(this.colorLock);
         } else {
             this.color.set(remoteData.color.x, remoteData.color.y, remoteData.color.z);
         }
 
-        if (getProjectionMode() === 'pca') {
-            try {
-                const [ nx, ny ] = pcaManager.project(remoteVec);
-                this.nx = clamp(nx, -1, 1);
-                this.ny = clamp(ny, -1, 1);
-                return;
-            } catch (e) {
-                console.warn("Error in PCA projection (falling back to equirectangular):", e);
-            }
-        } 
-
-        // equirectangular projection
-        const { lat, lon } = vec3ToLatLon(remoteVec);
-        const { nx, ny } = equirectangularNormalizedXY(lat, lon);
+        const [ nx, ny ] = projectionManager.project(remoteVec);
         this.nx = nx;
         this.ny = ny;
 
@@ -137,37 +127,17 @@ export class Point2D {
         }
     }
 
-    public getLocalData(existing: PointSyncData | undefined, pcaManager: PCAManager): PointSyncData {
+    public getLocalData(existing: PointSyncData | undefined, projectionManager: ProjectionManager): PointSyncData {
         const existingVec = existing
             ? new Vector3(existing.position.x, existing.position.y, existing.position.z)
-            : undefined;
+            : new Vector3(0, 0, 0);
 
-        if (getProjectionMode() === 'pca' && existingVec) {
-            try {
-                const v = pcaManager.inverseWithSignedDistance(this.nx, this.ny, existingVec)
-                return {
-                    id: this.id,
-                    position: { x: v.x, y: v.y, z: v.z },
-                    color: { x: this.color.x, y: this.color.y, z: this.color.z }
-                }
-            } catch (e) {
-                console.warn("Error in PCA inverse projection (falling back to equirectangular):", e);
-            }
-        } 
-
-        // equirectangular projection
-        const lockedCoords = this.positionLock ?? null;
-        const nx = lockedCoords ? lockedCoords.nx : this.nx;
-        const ny = lockedCoords ? lockedCoords.ny : this.ny;
-        const { lat, lon } = inverseEquirectangularNormalizedXY(nx, ny);
-        let len = this.radiusHint || 1;
-        if (existingVec) {
-            const existingLen = existingVec.length();
-            if (existingLen > 0) {
-                len = existingLen;
-            }
+        if (this.positionLock) {
+            this.nx = this.positionLock.nx;
+            this.ny = this.positionLock.ny;
         }
-        const v = latLonToVec3(lat, lon, len);
+        
+        const v = projectionManager.inverse(this.nx, this.ny, existingVec);
 
         const pos: Vector3SyncData = { x: v.x, y: v.y, z: v.z };
         const color = { x: this.color.x, y: this.color.y, z: this.color.z };
