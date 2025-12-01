@@ -10,14 +10,17 @@ export class Point2D {
     id: string;
     onLocalChange: () => void;
     color: Vector3 = new Vector3(1, 1, 1)
+    private baseColor: Vector3 = new Vector3(1, 1, 1)
 
     // 2d specific state
     nx: number = 0;
     ny: number = 0;
     private radiusHint: number = 1;
     private draggable: boolean = true;
+    private selectable: boolean = true;
     private colorLock: Vector3 | null = null;
     private positionLock: { nx: number; ny: number } | null = null;
+    private flashHandle: number | null = null;
 
     constructor(id: string, syncManager: SyncManager2D) {
         this.id = id;
@@ -36,8 +39,50 @@ export class Point2D {
         this.draggable = value;
     }
 
+    public isDraggable() {
+        return this.draggable;
+    }
+
+    public setSelectable(value: boolean) {
+        this.selectable = value;
+    }
+
     public setColor(color: Vector3) {
         this.color.copyFrom(color);
+    }
+
+    public getBaseColor(): Vector3 {
+        return this.baseColor.clone();
+    }
+
+    public setBaseColor(color: Vector3) {
+        this.baseColor.copyFrom(color);
+    }
+
+    public resetToBaseColor() {
+        this.color.copyFrom(this.baseColor);
+        this.materializeColorChange();
+    }
+
+    public setDisplayColor(color: Vector3) {
+        this.color.copyFrom(color);
+        this.materializeColorChange();
+    }
+
+    private materializeColorChange() {
+        if (this.flashHandle !== null) {
+            window.clearTimeout(this.flashHandle);
+            this.flashHandle = null;
+        }
+        this.onLocalChange();
+    }
+
+    public flashColorSync(color: Vector3, durationMs: number = 800) {
+        this.setDisplayColor(color);
+        this.flashHandle = window.setTimeout(() => {
+            this.resetToBaseColor();
+            this.flashHandle = null;
+        }, durationMs);
     }
 
     public setLockedColor(color: Vector3) {
@@ -77,20 +122,16 @@ export class Point2D {
         }
         const color = resolved.color ? new Vector3(resolved.color.x, resolved.color.y, resolved.color.z) : undefined;
         const isDraggable = resolved.draggable !== false;
+        const isSelectable = resolved.selectable !== false;
         this.setDraggable(isDraggable);
+        this.setSelectable(isSelectable);
         if (color) {
-            if (isDraggable) {
-                this.clearLockedColor();
-                this.setColor(color);
-            } else {
-                this.setLockedColor(color);
-            }
-        } else if (!isDraggable) {
-            // ensure the current color stays fixed even without explicit config color
-            this.setLockedColor(this.color);
+            this.setBaseColor(color);
+            this.setColor(color);
         } else {
-            this.clearLockedColor();
+            this.setBaseColor(this.color);
         }
+        this.clearLockedColor();
 
         if (resolved.locked2dPosition) {
             this.setPositionLock(resolved.locked2dPosition.nx, resolved.locked2dPosition.ny);
@@ -108,11 +149,7 @@ export class Point2D {
         if (remoteLen > 0) {
             this.radiusHint = remoteLen;
         }
-        if (this.colorLock) {
-            this.color.copyFrom(this.colorLock);
-        } else {
-            this.color.set(remoteData.color.x, remoteData.color.y, remoteData.color.z);
-        }
+        this.color.set(remoteData.color.x, remoteData.color.y, remoteData.color.z);
 
         if (getProjectionMode() === 'pca') {
             try {
@@ -175,26 +212,31 @@ export class Point2D {
     }
 
     // draw a simple point on canvas
-    draw(ctx: CanvasRenderingContext2D, width: number, height: number, isTaskTarget: boolean, _taskCompleted: boolean) {
+    draw(
+        ctx: CanvasRenderingContext2D,
+        width: number,
+        height: number,
+        _isTaskTarget: boolean,
+        _taskCompleted: boolean,
+        hideColor: boolean = false,
+        overrideColor: Vector3 | null = null
+    ) {
         const x = ((this.nx + 1) / 2) * width;
         const y = ((1 - (this.ny + 1) / 2)) * height;
         ctx.beginPath();
         // color stored in this.color as Vector3 (r,g,b) in 0..1
-        if (isTaskTarget) {
-            ctx.fillStyle = '#2ecc71';
-        } else {
-            const r = Math.round(Math.min(1, Math.max(0, this.color.x)) * 255);
-            const g = Math.round(Math.min(1, Math.max(0, this.color.y)) * 255);
-            const b = Math.round(Math.min(1, Math.max(0, this.color.z)) * 255);
-            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-        }
+        const sourceColor = overrideColor ?? (hideColor ? this.baseColor : this.color);
+        const r = Math.round(Math.min(1, Math.max(0, sourceColor.x)) * 255);
+        const g = Math.round(Math.min(1, Math.max(0, sourceColor.y)) * 255);
+        const b = Math.round(Math.min(1, Math.max(0, sourceColor.z)) * 255);
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         const radius = 12;
         ctx.arc(x, y, radius, 0, Math.PI * 2);
         ctx.fill();
     }
 
     hitTest(px: number, py: number, width: number, height: number) {
-        if (!this.draggable) {
+        if (!this.selectable) {
             return false;
         }
         const x = ((this.nx + 1) / 2) * width;

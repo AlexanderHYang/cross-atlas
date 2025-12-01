@@ -22,6 +22,7 @@ const sphereCenter = new Vector3(0, liftOffset, 0)
 
 // create SyncManager
 const pointsByMeshId = new Map<string, Point3D>()
+const pointsById = new Map<string, Point3D>()
 const syncManager3D = await SyncManager3D.create(plane)
 
 // create simple 3D points and add them to sync manager
@@ -35,13 +36,17 @@ for (const cfg of DEFAULT_POINT_CONFIGS) {
   const point = new Point3D(cfg.id, scene, syncManager3D, initialPosition, {
     color,
     draggable: cfg.draggable,
+    selectable: cfg.selectable,
   })
   syncManager3D.registerPoint(point)
   pointsByMeshId.set(point.mesh.id, point)
+  pointsById.set(point.id, point)
 }
 
 const successColor = Color3.FromHexString('#2ecc71')
 const errorColor = Color3.FromHexString('#c0392b')
+let stageTransitionHandle: number | null = null
+let lastStage: number | null = null
 
 scene.onPointerObservable.add((pointerInfo) => {
   if (pointerInfo.type !== PointerEventTypes.POINTERPICK) {
@@ -59,6 +64,9 @@ scene.onPointerObservable.add((pointerInfo) => {
 })
 
 setupXRTaskInteractions(xrExperience)
+syncManager3D.onTaskStateChange((task) => {
+  handleTaskStateChange(task)
+})
 
 function handlePointSelection(point: Point3D) {
   const task = syncManager3D.getCurrentTask()
@@ -66,13 +74,21 @@ function handlePointSelection(point: Point3D) {
     return
   }
 
-  if (point.id === task.targetPointId) {
-    point.setPermanentColor(successColor)
-    point.onLocalChange()
-    syncManager3D.completeTask(task.id)
-  } else {
-    point.flashColor(errorColor, 1000)
+  const stage = task.stage ?? 1
+
+  // Stage 1 or 3: 3D user matches the 2D-highlighted point.
+  if (stage === 1 || stage === 3) {
+    if (point.id === task.targetPointId) {
+      point.setDisplayColor(successColor)
+      syncManager3D.markGuessStageSuccess(task.id)
+      scheduleNextStageFrom3D(stage, task.id)
+    } else {
+      point.flashColorSynced(errorColor, 1000)
+    }
+    return
   }
+
+  // Stage 2 is driven by 2D clicks; ignore 3D selections.
 }
 
 function setupXRTaskInteractions(xr: WebXRDefaultExperience | null) {
@@ -94,6 +110,57 @@ function setupXRTaskInteractions(xr: WebXRDefaultExperience | null) {
     }
     handlePointSelection(point)
   })
+}
+
+function handleTaskStateChange(task: ReturnType<typeof syncManager3D.getCurrentTask>) {
+  const stage = task?.stage ?? 1
+  if (lastStage !== stage && task?.feedback === 'none') {
+    resetAllPointColors()
+  }
+  lastStage = stage
+  if (stage === 2 || stage === 4) {
+    applyStage2Visuals(task)
+  }
+}
+
+function applyStage2Visuals(task: ReturnType<typeof syncManager3D.getCurrentTask>) {
+  const stage = task?.stage ?? 1
+  if (!task || (stage !== 2 && stage !== 4) || !task.targetPointId) {
+    return
+  }
+
+  if (task.feedback === 'none') {
+    resetAllPointColors()
+  }
+
+  const targetPoint = pointsById.get(task.targetPointId)
+  if (!targetPoint) {
+    return
+  }
+
+  if (task.feedback === 'none' || task.feedback === 'success') {
+    targetPoint.setDisplayColor(successColor)
+  }
+}
+
+function resetAllPointColors() {
+  for (const p of pointsById.values()) {
+    p.resetToBaseColor()
+  }
+}
+
+function scheduleNextStageFrom3D(currentStage: number, taskId: string) {
+  if (stageTransitionHandle !== null) {
+    window.clearTimeout(stageTransitionHandle)
+  }
+  stageTransitionHandle = window.setTimeout(() => {
+    stageTransitionHandle = null
+    if (currentStage === 1) {
+      syncManager3D.setStage(2, taskId)
+    } else if (currentStage === 3) {
+      syncManager3D.setStage(4, taskId)
+    }
+  }, 1000)
 }
 
 

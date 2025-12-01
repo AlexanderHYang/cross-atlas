@@ -4,6 +4,7 @@ import { PCASyncData, PointSyncData } from "../../shared/src/sync";
 import { Point3D } from "./Point3D";
 import { WebsocketProvider } from "y-websocket";
 import { TaskState, TASK_COLLECTION, TASK1_ID } from "../../shared/src/task";
+import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
 
 export class SyncManager3D {
     private ydoc: Y.Doc;
@@ -65,6 +66,32 @@ export class SyncManager3D {
         });
     }
 
+    private normalizeTaskState(task: TaskState | null | undefined): TaskState | null {
+        if (!task) return null;
+        const stage = task.stage ?? 1;
+        const hintSide = task.hintSide ?? "2d";
+        const feedback = task.feedback ?? "none";
+        const completed = task.completed ?? false;
+
+        if (
+            stage === task.stage &&
+            hintSide === task.hintSide &&
+            feedback === task.feedback &&
+            completed === task.completed
+        ) {
+            return task;
+        }
+
+        return {
+            id: task.id,
+            targetPointId: task.targetPointId,
+            stage,
+            hintSide,
+            feedback,
+            completed
+        };
+    }
+
     private initializeRemoteObserver(plane: BABYLON.Mesh) {
         this.syncedPointDataMap.observe((event, transaction) => {
             for (const key of event.keysChanged) {
@@ -88,7 +115,12 @@ export class SyncManager3D {
         });
 
         this.taskMap.observe(() => {
-            this.currentTask = this.taskMap.get(TASK1_ID) ?? null;
+            const raw = this.taskMap.get(TASK1_ID);
+            const normalized = this.normalizeTaskState(raw);
+            if (normalized && raw && normalized !== raw) {
+                this.taskMap.set(TASK1_ID, normalized);
+            }
+            this.currentTask = normalized;
             this.notifyTaskListeners();
         });
         
@@ -106,7 +138,7 @@ export class SyncManager3D {
         await manager.waitForInitialSync();
         manager.applyPlaneFromExistingPCAData(plane);
         manager.initializeRemoteObserver(plane);
-        manager.currentTask = manager.taskMap.get(TASK1_ID) ?? null;
+        manager.currentTask = manager.normalizeTaskState(manager.taskMap.get(TASK1_ID));
         manager.notifyTaskListeners();
         return manager;
     }
@@ -159,11 +191,53 @@ export class SyncManager3D {
         return this.currentTask;
     }
 
-    public completeTask(taskId: string = TASK1_ID) {
-        const existing = this.taskMap.get(taskId);
+    private pick2DClickableTargetId() {
+        const candidateIds = Array.from(this.localPointsById.keys()).filter((id) => {
+            const cfg = getDefaultPointConfig(id);
+            if (cfg && cfg.selectable === false) {
+                return false;
+            }
+            return true;
+        });
+        if (candidateIds.length === 0) {
+            return null;
+        }
+        const randomId = candidateIds[Math.floor(Math.random() * candidateIds.length)];
+        return randomId;
+    }
+
+    public markGuessStageSuccess(taskId: string = TASK1_ID) {
+        const existing = this.normalizeTaskState(this.taskMap.get(taskId));
         if (!existing) return;
-        if (existing.completed) return;
-        this.taskMap.set(taskId, { ...existing, completed: true });
+        const stage = existing.stage ?? 1;
+        if (stage !== 1 && stage !== 3) return;
+
+        const updated: TaskState = {
+            ...existing,
+            feedback: "success",
+            completed: true
+        };
+        this.taskMap.set(taskId, updated);
+        this.currentTask = updated;
+        this.notifyTaskListeners();
+    }
+
+    public setStage(stage: 1 | 2 | 3 | 4, taskId: string = TASK1_ID) {
+        const nextTarget = this.pick2DClickableTargetId();
+        if (!nextTarget) return;
+
+        const hintSide = stage === 1 || stage === 3 ? "2d" : "3d";
+        const nextState: TaskState = {
+            id: taskId,
+            targetPointId: nextTarget,
+            stage,
+            hintSide,
+            feedback: "none",
+            completed: false
+        };
+        this.taskMap.set(taskId, nextState);
+        this.currentTask = nextState;
+        this.notifyTaskListeners();
     }
 
     private applyPlaneFromExistingPCAData(plane: BABYLON.Mesh) {

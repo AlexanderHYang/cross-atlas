@@ -47,6 +47,32 @@ export class SyncManager2D {
         this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PCASyncData>;
     }
 
+    private normalizeTaskState(task: TaskState | null | undefined): TaskState | null {
+        if (!task) return null;
+        const stage = task.stage ?? 1;
+        const hintSide = task.hintSide ?? "2d";
+        const feedback = task.feedback ?? "none";
+        const completed = task.completed ?? false;
+
+        if (
+            stage === task.stage &&
+            hintSide === task.hintSide &&
+            feedback === task.feedback &&
+            completed === task.completed
+        ) {
+            return task;
+        }
+
+        return {
+            id: task.id,
+            targetPointId: task.targetPointId,
+            stage,
+            hintSide,
+            feedback,
+            completed
+        };
+    }
+
     private waitForInitialSync(): Promise<void> {
         return new Promise((resolve) => {
             this.provider.once("sync", () => {
@@ -85,7 +111,12 @@ export class SyncManager2D {
         });
 
         this.taskMap.observe(() => {
-            this.currentTask = this.taskMap.get(TASK1_ID) ?? null;
+            const raw = this.taskMap.get(TASK1_ID);
+            const normalized = this.normalizeTaskState(raw);
+            if (normalized && raw && normalized !== raw) {
+                this.taskMap.set(TASK1_ID, normalized);
+            }
+            this.currentTask = normalized;
             this.notifyTaskListeners();
         });
     }
@@ -94,7 +125,7 @@ export class SyncManager2D {
         const manager = new SyncManager2D();
         await manager.waitForInitialSync();
         manager.initializeRemoteObserver();
-        manager.currentTask = manager.taskMap.get(TASK1_ID) ?? null;
+        manager.currentTask = manager.normalizeTaskState(manager.taskMap.get(TASK1_ID));
         manager.notifyTaskListeners();
         return manager;
     }
@@ -164,18 +195,11 @@ export class SyncManager2D {
         return this.pcaManager;
     }
 
-    public ensureTaskTarget(taskId: string = TASK1_ID) {
-        const existing = this.taskMap.get(taskId);
-        if (existing && existing.targetPointId) {
-            this.currentTask = existing;
-            this.notifyTaskListeners();
-            return existing;
-        }
-
+    private pickRandomTargetId() {
         const candidateIds = Array.from(this.localPointsById.values())
             .filter((pt) => {
                 const cfg = getDefaultPointConfig(pt.id);
-                if (cfg && cfg.draggable === false) {
+                if (cfg && cfg.selectable === false) {
                     return false;
                 }
                 return true;
@@ -187,11 +211,76 @@ export class SyncManager2D {
         }
 
         const randomId = candidateIds[Math.floor(Math.random() * candidateIds.length)];
-        const taskState = createTaskState(taskId, randomId);
+        return randomId;
+    }
+
+    public ensureTaskTarget(taskId: string = TASK1_ID) {
+        const existing = this.normalizeTaskState(this.taskMap.get(taskId));
+        if (existing && existing.targetPointId) {
+            if (existing !== this.taskMap.get(taskId)) {
+                this.taskMap.set(taskId, existing);
+            }
+            this.currentTask = existing;
+            this.notifyTaskListeners();
+            return existing;
+        }
+
+        const randomId = this.pickRandomTargetId();
+        if (!randomId) {
+            return null;
+        }
+
+        const taskState = createTaskState(taskId, randomId, 1, "2d");
         this.taskMap.set(taskId, taskState);
         this.currentTask = taskState;
         this.notifyTaskListeners();
         return taskState;
+    }
+
+    public setStage2SelectionResult(isCorrect: boolean, taskId: string = TASK1_ID) {
+        const existing = this.normalizeTaskState(this.taskMap.get(taskId));
+        if (!existing) return;
+        const stage = existing.stage ?? 1;
+        if ((stage !== 2 && stage !== 4) || !existing.targetPointId) return;
+        if (existing.completed && existing.feedback === "success") return;
+
+        const feedback = isCorrect ? "success" : "error";
+        const updated: TaskState = {
+            ...existing,
+            feedback,
+            completed: isCorrect
+        };
+        this.taskMap.set(taskId, updated);
+        this.currentTask = updated;
+        this.notifyTaskListeners();
+
+        if (isCorrect) {
+            const nextStage: 1 | 2 | 3 | 4 = stage === 2 ? 3 : 1;
+            window.setTimeout(() => {
+                this.setStage(nextStage, taskId);
+            }, 1000);
+        }
+    }
+
+    private resetAllPointColors() {
+        for (const p of this.localPointsById.values()) {
+            p.resetToBaseColor();
+        }
+    }
+
+    public setStage(stage: 1 | 2 | 3 | 4, taskId: string = TASK1_ID) {
+        this.resetAllPointColors();
+
+        const randomId = this.pickRandomTargetId();
+        if (!randomId) {
+            return;
+        }
+
+        const hintSide = stage === 1 || stage === 3 ? "2d" : "3d";
+        const taskState = createTaskState(taskId, randomId, stage, hintSide);
+        this.taskMap.set(taskId, taskState);
+        this.currentTask = taskState;
+        this.notifyTaskListeners();
     }
 
     private notifyTaskListeners() {

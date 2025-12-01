@@ -23,10 +23,33 @@ document.body.style.background = DASHBOARD_BG
 document.body.appendChild(canvas)
 
 const style = document.createElement('style')
-style.textContent = `html, body { height:100%; background: ${DASHBOARD_BG}; } #points-canvas { display:block; }`
+style.textContent = `
+html, body { height:100%; background: ${DASHBOARD_BG}; }
+#points-canvas { display:block; }
+#trial-box {
+	position: absolute;
+	top: 16px;
+	left: 16px;
+	padding: 8px 12px;
+	background: rgba(0,0,0,0.35);
+	color: #fff;
+	font-family: sans-serif;
+	border: 1px solid #444;
+	border-radius: 6px;
+	box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+`
 document.head.appendChild(style)
 
 const ctx = canvas.getContext('2d')!
+const SUCCESS_COLOR_VEC = new Vector3(0x2e / 255, 0xcc / 255, 0x71 / 255)
+const ERROR_COLOR_VEC = new Vector3(0xc0 / 255, 0x39 / 255, 0x2b / 255)
+let lastStage: number | null = null
+
+const trialBox = document.createElement('div')
+trialBox.id = 'trial-box'
+trialBox.textContent = 'Trial 1'
+document.body.appendChild(trialBox)
 
 
 // define projection mode
@@ -62,6 +85,7 @@ if (syncManager.getLocalPoints().length === 0) {
 }
 
 syncManager.ensureTaskTarget()
+syncManager.onTaskStateChange(handleTaskStateChange)
 
 window.addEventListener('keydown', (ev) => {
 	if (ev.key === 'p' || ev.key === 'P') {
@@ -133,18 +157,18 @@ function drawAll() {
 	const points = syncManager.getLocalPoints()
 	const taskState = syncManager.getCurrentTask()
 	for (const p of points) {
-		const isTarget = !!taskState && taskState.targetPointId === p.id
+		const stage = taskState?.stage ?? 1
+		const isTarget = !!taskState && (stage === 1 || stage === 3) && taskState.targetPointId === p.id
 		const isCompleted = !!taskState?.completed
-		p.draw(ctx, width, height, isTarget, isCompleted)
+		const hideColor = !!taskState && (stage === 2 || stage === 4) && taskState.targetPointId === p.id && taskState.feedback === 'none'
+		const overrideColor = isTarget ? SUCCESS_COLOR_VEC : null
+		p.draw(ctx, width, height, isTarget, isCompleted, hideColor, overrideColor)
 	}
 
-	ctx.fillStyle = '#222'
-	ctx.font = '16px sans-serif'
-	const status = taskState?.completed ? '✅ Completed! Waiting for next trial.' : 'Task 1: Click the matching sphere in 3D when the green circle is selected.'
-	ctx.fillText(status, b.x + 8, b.y + b.h + 24)
 }
 
 let dragging: Point2D | null = null
+let dragMoved = false
 function clampToBounds(px: number, py: number) {
 	const b = getBounds()
 	const clampedX = Math.min(b.x + b.w, Math.max(b.x, px))
@@ -161,8 +185,11 @@ canvas.addEventListener('pointerdown', (ev) => {
 	for (let i = points.length - 1; i >= 0; i--) {
 		const p = points[i]
 		if (p.hitTest(px, py, width, height)) {
-			dragging = p
-			try { canvas.setPointerCapture(ev.pointerId) } catch {}
+			if (p.isDraggable()) {
+				dragging = p
+				dragMoved = false
+				try { canvas.setPointerCapture(ev.pointerId) } catch {}
+			}
 			break
 		}
 	}
@@ -170,6 +197,7 @@ canvas.addEventListener('pointerdown', (ev) => {
 
 canvas.addEventListener('pointermove', (ev) => {
 	if (!dragging) return
+	dragMoved = true
 	const rect = canvas.getBoundingClientRect()
 	let px = ev.clientX - rect.left
 	let py = ev.clientY - rect.top
@@ -181,10 +209,44 @@ canvas.addEventListener('pointermove', (ev) => {
 })
 
 canvas.addEventListener('pointerup', (ev) => {
-	if (!dragging) return
-	try { canvas.releasePointerCapture(ev.pointerId) } catch {}
-	dragging = null
+	const wasDragging = !!dragging
+	if (dragging) {
+		try { canvas.releasePointerCapture(ev.pointerId) } catch {}
+		dragging = null
+	}
+
+	const shouldTreatAsClick = !wasDragging || !dragMoved
+	dragMoved = false
+	if (!shouldTreatAsClick) {
+		return
+	}
+
+	const rect = canvas.getBoundingClientRect()
+	const px = ev.clientX - rect.left
+	const py = ev.clientY - rect.top
+	tryHandle2DSelection(px, py)
 })
+
+function tryHandle2DSelection(px: number, py: number) {
+	const taskState = syncManager.getCurrentTask()
+	const stage = taskState?.stage ?? 1
+	if (!taskState || (stage !== 2 && stage !== 4) || taskState.completed || !taskState.targetPointId) return
+
+	const points = syncManager.getLocalPoints()
+	for (let i = points.length - 1; i >= 0; i--) {
+		const p = points[i]
+		if (p.hitTest(px, py, width, height)) {
+			const isCorrect = p.id === taskState.targetPointId
+			if (isCorrect) {
+				p.setDisplayColor(SUCCESS_COLOR_VEC)
+			} else {
+				p.flashColorSync(ERROR_COLOR_VEC, 800)
+			}
+			syncManager.setStage2SelectionResult(isCorrect, taskState.id)
+			break
+		}
+	}
+}
 
 // animate
 function loop() {
@@ -192,3 +254,11 @@ function loop() {
 	requestAnimationFrame(loop)
 }
 loop()
+
+function handleTaskStateChange(taskState: ReturnType<typeof syncManager.getCurrentTask>) {
+	const stage = taskState?.stage ?? 1
+	const label = `Trial ${stage}`
+	trialBox.textContent = label
+
+	lastStage = stage
+}

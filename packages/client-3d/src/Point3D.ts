@@ -5,6 +5,7 @@ import { SyncManager3D } from "./SyncManager3D";
 export type Point3DOptions = {
     color?: Color3;
     draggable?: boolean;
+    selectable?: boolean;
 };
 
 export class Point3D {
@@ -15,6 +16,7 @@ export class Point3D {
     private positionBehavior?: SixDofDragBehavior;
     private material: StandardMaterial;
     private defaultColor: Color3;
+    private baseColor: Color3;
     private flashHandle: number | null = null;
 
     constructor(
@@ -34,6 +36,7 @@ export class Point3D {
         sphere.material = mat;
         this.mesh = sphere;
         this.material = mat;
+        this.baseColor = this.color.clone();
         this.defaultColor = this.color.clone();
 
         if (initialPosition) {
@@ -41,7 +44,8 @@ export class Point3D {
         }
 
         const canDrag = options?.draggable ?? true;
-        this.mesh.isPickable = canDrag;
+        const selectable = options?.selectable ?? true;
+        this.mesh.isPickable = selectable;
         if (canDrag) {
             this.positionBehavior = new SixDofDragBehavior();
             this.positionBehavior.faceCameraOnDragStart = true;
@@ -68,7 +72,6 @@ export class Point3D {
         this.mesh.position.copyFrom(pos);
         if (remoteData.color) {
             this.material.diffuseColor.set(remoteData.color.x, remoteData.color.y, remoteData.color.z);
-            this.defaultColor = this.material.diffuseColor.clone();
         }
     }
 
@@ -88,18 +91,36 @@ export class Point3D {
         this.applyColor(this.defaultColor);
     }
 
+    public setDisplayColor(color: Color3) {
+        this.applyColor(color);
+        this.onLocalChange();
+    }
+
+    public resetToBaseColor() {
+        this.defaultColor = this.baseColor.clone();
+        this.applyColor(this.defaultColor);
+        this.material.emissiveColor = Color3.Black();
+        this.onLocalChange();
+    }
+
+    public getDefaultColor(): Color3 {
+        return this.defaultColor.clone();
+    }
+
     public resetColor() {
         this.applyColor(this.defaultColor);
     }
 
-    public flashColor(color: Color3, durationMs: number) {
+    public flashColorSynced(color: Color3, durationMs: number) {
         if (this.flashHandle !== null) {
             window.clearTimeout(this.flashHandle);
             this.flashHandle = null;
         }
         this.applyColor(color);
+        this.onLocalChange();
         this.flashHandle = window.setTimeout(() => {
-            this.resetColor();
+            this.resetToBaseColor();
+            this.onLocalChange();
             this.flashHandle = null;
         }, durationMs);
     }
