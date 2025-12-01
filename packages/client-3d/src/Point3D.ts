@@ -18,6 +18,7 @@ export class Point3D {
     private defaultColor: Color3;
     private baseColor: Color3;
     private flashHandle: number | null = null;
+    private localOverrideColor: Color3 | null = null;
 
     constructor(
         id: string,
@@ -86,6 +87,13 @@ export class Point3D {
         this.material.diffuseColor = color.clone();
     }
 
+    public setLocalOverrideColor(color: Color3) {
+        if (!this.localOverrideColor) {
+            this.localOverrideColor = this.material.diffuseColor.clone();
+        }
+        this.material.diffuseColor = color.clone();
+    }
+
     public setPermanentColor(color: Color3) {
         this.defaultColor = color.clone();
         this.applyColor(this.defaultColor);
@@ -99,8 +107,15 @@ export class Point3D {
     public resetToBaseColor() {
         this.defaultColor = this.baseColor.clone();
         this.applyColor(this.defaultColor);
-        this.material.emissiveColor = Color3.Black();
         this.onLocalChange();
+        this.localOverrideColor = null;
+    }
+
+    public clearLocalOverrideColor() {
+        if (this.localOverrideColor) {
+            this.material.diffuseColor = this.localOverrideColor.clone();
+            this.localOverrideColor = null;
+        }
     }
 
     public getDefaultColor(): Color3 {

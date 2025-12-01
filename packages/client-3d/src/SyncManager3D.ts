@@ -55,7 +55,6 @@ export class SyncManager3D {
         //         this.localChartsById.set(chart3d.id, chart3d);
         //     }
         // });
-
     }
 
     private waitForInitialSync(): Promise<void> {
@@ -68,16 +67,22 @@ export class SyncManager3D {
 
     private normalizeTaskState(task: TaskState | null | undefined): TaskState | null {
         if (!task) return null;
-        const stage = task.stage ?? 1;
+        const trial = (task as any).trial ?? (task as any).stage ?? 1;
         const hintSide = task.hintSide ?? "2d";
         const feedback = task.feedback ?? "none";
         const completed = task.completed ?? false;
+        const clicked2D = task.clicked2D ?? false;
+        const clicked3D = task.clicked3D ?? false;
+        const targetPointId3D = task.targetPointId3D;
 
         if (
-            stage === task.stage &&
+            trial === (task as any).trial &&
             hintSide === task.hintSide &&
             feedback === task.feedback &&
-            completed === task.completed
+            completed === task.completed &&
+            clicked2D === task.clicked2D &&
+            clicked3D === task.clicked3D &&
+            targetPointId3D === task.targetPointId3D
         ) {
             return task;
         }
@@ -85,10 +90,13 @@ export class SyncManager3D {
         return {
             id: task.id,
             targetPointId: task.targetPointId,
-            stage,
+            trial,
             hintSide,
             feedback,
-            completed
+            completed,
+            clicked2D,
+            clicked3D,
+            targetPointId3D,
         };
     }
 
@@ -123,7 +131,7 @@ export class SyncManager3D {
             this.currentTask = normalized;
             this.notifyTaskListeners();
         });
-        
+
         this.syncedPCADataMap.observe((event) => {
             // currently only one PCA entry expected with key "pca"
             for (const key of event.keysChanged) {
@@ -206,34 +214,61 @@ export class SyncManager3D {
         return randomId;
     }
 
-    public markGuessStageSuccess(taskId: string = TASK1_ID) {
+    public markGuessTrialSuccess(taskId: string = TASK1_ID) {
         const existing = this.normalizeTaskState(this.taskMap.get(taskId));
         if (!existing) return;
-        const stage = existing.stage ?? 1;
-        if (stage !== 1 && stage !== 3) return;
+        const trial = existing.trial ?? 1;
+        if (trial !== 1 && trial !== 3) return;
 
         const updated: TaskState = {
             ...existing,
             feedback: "success",
-            completed: true
+            completed: true,
         };
         this.taskMap.set(taskId, updated);
         this.currentTask = updated;
         this.notifyTaskListeners();
     }
 
-    public setStage(stage: 1 | 2 | 3 | 4, taskId: string = TASK1_ID) {
+    /**
+     * Handle Task 2 collaborative trial clicks from the 3D side.
+     */
+    public handleTask2Click3D(isCorrect: boolean, taskId: string = TASK1_ID) {
+        const existing = this.normalizeTaskState(this.taskMap.get(taskId));
+        if (!existing || (existing.trial !== 5 && existing.trial !== 6) || !existing.targetPointId3D) return;
+        if (existing.completed) return;
+
+        const updated: TaskState = {
+            ...existing,
+            clicked3D: isCorrect,
+            feedback: !isCorrect ? "error" : existing.clicked2D ? "success" : "none",
+            completed: isCorrect && !!existing.clicked2D,
+        };
+
+        if (updated.completed) {
+            console.log("🎉 TRIAL 5 COMPLETED! Both sides clicked correctly.");
+            if (existing.trial === 5) {
+                this.scheduleTrial6Repeat(updated);
+            }
+        }
+
+        this.taskMap.set(taskId, updated);
+        this.currentTask = updated;
+        this.notifyTaskListeners();
+    }
+
+    public setTrial(trial: 1 | 2 | 3 | 4, taskId: string = TASK1_ID) {
         const nextTarget = this.pick2DClickableTargetId();
         if (!nextTarget) return;
 
-        const hintSide = stage === 1 || stage === 3 ? "2d" : "3d";
+        const hintSide = trial === 1 || trial === 3 ? "2d" : "3d";
         const nextState: TaskState = {
             id: taskId,
             targetPointId: nextTarget,
-            stage,
+            trial,
             hintSide,
             feedback: "none",
-            completed: false
+            completed: false,
         };
         this.taskMap.set(taskId, nextState);
         this.currentTask = nextState;
@@ -243,6 +278,35 @@ export class SyncManager3D {
     private applyPlaneFromExistingPCAData(plane: BABYLON.Mesh) {
         const existing = this.syncedPCADataMap.get("pca");
         this.applyPCADataToPlane(plane, existing);
+    }
+
+    private scheduleTrial6Repeat(completedTask: TaskState) {
+        window.setTimeout(() => {
+            const latest = this.normalizeTaskState(this.taskMap.get(completedTask.id));
+            if (!latest || !latest.completed || latest.trial !== 5) {
+                return;
+            }
+            const nextTarget2D = this.pick2DClickableTargetId();
+            const nextTarget3D = this.pick2DClickableTargetId();
+            if (!nextTarget2D || !nextTarget3D) {
+                console.warn("Unable to schedule trial 6: missing targets");
+                return;
+            }
+            const next: TaskState = {
+                ...latest,
+                targetPointId: nextTarget2D,
+                targetPointId3D: nextTarget3D,
+                trial: 6,
+                hintSide: "both",
+                feedback: "none",
+                completed: false,
+                clicked2D: false,
+                clicked3D: false,
+            };
+            this.taskMap.set(completedTask.id, next);
+            this.currentTask = next;
+            this.notifyTaskListeners();
+        }, 2000);
     }
 
     private applyPCADataToPlane(plane: BABYLON.Mesh, data: PCASyncData | undefined) {
