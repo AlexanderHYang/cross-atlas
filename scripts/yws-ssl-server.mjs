@@ -187,7 +187,7 @@ server.on("request", (_req, res) => {
     <!doctype html>
     <html>
       <head>
-        <title>CrossDash Yjs Server</title>
+        <title>CrossDash - Yjs Server</title>
         <style>
           body { font-family: system-ui, sans-serif; margin: 40px; background: #f5f5f5; }
           .card { background: #fff; padding: 32px; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,0.08); }

@@ -19,6 +19,7 @@ export class Point3D {
     private baseColor: Color3;
     private flashHandle: number | null = null;
     private localOverrideColor: Color3 | null = null;
+    private selectable: boolean;
 
     constructor(
         id: string,
@@ -29,13 +30,17 @@ export class Point3D {
     ) {
         this.id = id;
         this.color = options?.color ?? Color3.White();
+        this.selectable = options?.selectable ?? true;
 
-        // create a simple sphere to represent the point
-        const sphere = MeshBuilder.CreateSphere(`point_${id}`, { diameter: 0.2 }, scene);
+        // create a simple primitive to represent the point (landmark is a cube)
+        const primitive =
+            id === "point3"
+                ? MeshBuilder.CreateBox(`point_${id}`, { size: 0.2 }, scene)
+                : MeshBuilder.CreateSphere(`point_${id}`, { diameter: 0.2 }, scene);
         const mat = new StandardMaterial(`pointmat_${id}`, scene);
         mat.diffuseColor = this.color;
-        sphere.material = mat;
-        this.mesh = sphere;
+        primitive.material = mat;
+        this.mesh = primitive;
         this.material = mat;
         this.baseColor = this.color.clone();
         this.defaultColor = this.color.clone();
@@ -45,8 +50,7 @@ export class Point3D {
         }
 
         const canDrag = options?.draggable ?? true;
-        const selectable = options?.selectable ?? true;
-        this.mesh.isPickable = selectable;
+        this.mesh.isPickable = this.selectable;
         if (canDrag) {
             this.positionBehavior = new SixDofDragBehavior();
             this.positionBehavior.faceCameraOnDragStart = true;
@@ -97,6 +101,7 @@ export class Point3D {
     public setPermanentColor(color: Color3) {
         this.defaultColor = color.clone();
         this.applyColor(this.defaultColor);
+        this.onLocalChange();
     }
 
     public setDisplayColor(color: Color3) {
@@ -104,11 +109,21 @@ export class Point3D {
         this.onLocalChange();
     }
 
+    public setSelectable(selectable: boolean) {
+        this.selectable = selectable;
+        this.mesh.isPickable = selectable;
+    }
+
+    public isSelectable(): boolean {
+        return this.selectable;
+    }
+
     public resetToBaseColor() {
         this.defaultColor = this.baseColor.clone();
         this.applyColor(this.defaultColor);
         this.onLocalChange();
         this.localOverrideColor = null;
+        this.setSelectable(true);
     }
 
     public clearLocalOverrideColor() {

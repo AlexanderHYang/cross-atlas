@@ -6,6 +6,7 @@ export async function initWebXR(
     scene: BABYLON.Scene
 ): Promise<BABYLON.WebXRDefaultExperience | null> {
     try {
+
         const xr = await scene.createDefaultXRExperienceAsync({
             uiOptions: {
                 sessionMode: "immersive-vr",

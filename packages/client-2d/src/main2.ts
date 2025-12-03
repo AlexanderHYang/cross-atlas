@@ -4,6 +4,7 @@ import { SyncManager2D } from "./SyncManager2D";
 import { equirectangularNormalizedXY, vec3ToLatLon } from "../../shared/src/projection";
 import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from "../../shared/src/defaultPoints";
 import { getTaskAndTrial } from "../../shared/src/task";
+import { TRIAL7_COLOR_PAIRS, getColorPairByKey } from "../../shared/src/trial7ColorPairs";
 
 const DASHBOARD_BG = "#828485ff";
 
@@ -39,6 +40,18 @@ html, body { height:100%; background: ${DASHBOARD_BG}; }
 	border-radius: 6px;
 	box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
+#instruction-box {
+	position: absolute;
+	top: 16px;
+	left: 180px;
+	padding: 8px 12px;
+	background: rgba(0,0,0,0.35);
+	color: #fff;
+	font-family: sans-serif;
+	border: 1px solid #444;
+	border-radius: 6px;
+	box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
 `;
 document.head.appendChild(style);
 
@@ -46,11 +59,27 @@ const ctx = canvas.getContext("2d")!;
 const SUCCESS_COLOR_VEC = new Vector3(0x2e / 255, 0xcc / 255, 0x71 / 255);
 const ERROR_COLOR_VEC = new Vector3(0xc0 / 255, 0x39 / 255, 0x2b / 255);
 let lastTrial: number | null = null;
+let lastProcessedErrorPointId3D: string | null = null;
+
+function hexToVector3(hex: string) {
+    const trimmed = hex.replace("#", "");
+    const bigint = Number.parseInt(trimmed, 16);
+    return new Vector3(
+        ((bigint >> 16) & 255) / 255,
+        ((bigint >> 8) & 255) / 255,
+        (bigint & 255) / 255
+    );
+}
 
 const trialBox = document.createElement("div");
 trialBox.id = "trial-box";
 trialBox.textContent = "Trial 1";
 document.body.appendChild(trialBox);
+
+const instructionBox = document.createElement("div");
+instructionBox.id = "instruction-box";
+instructionBox.textContent = "Waiting for trial 7";
+document.body.appendChild(instructionBox);
 
 // define projection mode
 let projectionMode: "equirectangular" | "pca" = "equirectangular";
@@ -164,20 +193,28 @@ function drawAll() {
 
         if (taskState && trial >= 1 && trial <= 4) {
             // Task 1 logic
-            isTarget = (trial === 1 || trial === 3) && taskState.targetPointId === p.id;
+            isTarget = (trial === 1 || trial === 3) && taskState.targetPointId2D === p.id;
             hideColor =
                 (trial === 2 || trial === 4) &&
-                taskState.targetPointId === p.id &&
+                taskState.targetPointId2D === p.id &&
                 taskState.feedback !== "success";
             overrideColor = isTarget ? SUCCESS_COLOR_VEC : null;
         } else if (taskState && (trial === 5 || trial === 6)) {
             // Task 2 logic: show the OTHER player's target in green locally
             const partnerTargetId = taskState.targetPointId3D;
-            const ownTargetId = taskState.targetPointId;
+            const ownTargetId = taskState.targetPointId2D;
             if (partnerTargetId && partnerTargetId === p.id) {
                 overrideColor = SUCCESS_COLOR_VEC;
             } else if (taskState.clicked2D && ownTargetId === p.id) {
                 overrideColor = SUCCESS_COLOR_VEC;
+            }
+        } else if (taskState && trial === 7 && taskState.trial7Assignments) {
+            const partnerAssignment = taskState.trial7Assignments.find((a) => a.point3D === p.id);
+            if (partnerAssignment) {
+                const pair = getColorPairByKey(partnerAssignment.key);
+                if (pair) {
+                    overrideColor = hexToVector3(pair.hex3D);
+                }
             }
         }
 
@@ -255,12 +292,19 @@ function tryHandle2DSelection(px: number, py: number) {
     const trial = taskState?.trial ?? 1;
 
     // Task 1 logic
-    if (taskState && trial >= 2 && trial <= 4 && !taskState.completed && taskState.targetPointId) {
+    if (
+        taskState &&
+        trial >= 2 &&
+        trial <= 4 &&
+        !taskState.completed &&
+        taskState.targetPointId2D
+    ) {
         const points = syncManager.getLocalPoints();
         for (let i = points.length - 1; i >= 0; i--) {
             const p = points[i];
             if (p.hitTest(px, py, width, height)) {
-                const isCorrect = p.id === taskState.targetPointId;
+                console.debug("2D Point clicked:", p.id);
+                const isCorrect = p.id === taskState.targetPointId2D;
                 if (isCorrect) {
                     p.setDisplayColor(SUCCESS_COLOR_VEC);
                 } else {
@@ -274,7 +318,12 @@ function tryHandle2DSelection(px: number, py: number) {
     }
 
     // Task 2 logic
-    if (taskState && (trial === 5 || trial === 6) && !taskState.completed && taskState.targetPointId) {
+    if (
+        taskState &&
+        (trial === 5 || trial === 6) &&
+        !taskState.completed &&
+        taskState.targetPointId2D
+    ) {
         console.log("Task 2 2D click detected");
         const points = syncManager.getLocalPoints();
         for (let i = points.length - 1; i >= 0; i--) {
@@ -284,8 +333,13 @@ function tryHandle2DSelection(px: number, py: number) {
                 if (taskState.targetPointId3D && p.id === taskState.targetPointId3D) {
                     return;
                 }
-                console.log("Task 2 2D: Clicked point:", p.id, "Target:", taskState.targetPointId);
-                const isCorrect = p.id === taskState.targetPointId;
+                console.log(
+                    "Task 2 2D: Clicked point:",
+                    p.id,
+                    "Target:",
+                    taskState.targetPointId2D
+                );
+                const isCorrect = p.id === taskState.targetPointId2D;
                 console.log("Task 2 2D: Is correct?", isCorrect);
                 if (isCorrect) {
                     p.setDisplayColor(SUCCESS_COLOR_VEC);
@@ -296,6 +350,40 @@ function tryHandle2DSelection(px: number, py: number) {
                 break;
             }
         }
+        return;
+    }
+
+    if (taskState && trial === 7 && !taskState.completed && taskState.targetPointId2D) {
+        const pair = getColorPairByKey(taskState.colorPairKey);
+        const ownColor = pair ? hexToVector3(pair.hex2D) : SUCCESS_COLOR_VEC;
+        const points = syncManager.getLocalPoints();
+        for (let i = points.length - 1; i >= 0; i--) {
+            const p = points[i];
+            if (!p.hitTest(px, py, width, height)) continue;
+
+            // Ignore clicks on the 3D partner's target
+            if (taskState.targetPointId3D && p.id === taskState.targetPointId3D) {
+                return;
+            }
+
+            const isCorrect = p.id === taskState.targetPointId2D;
+            if (isCorrect) {
+                p.setDisplayColor(ownColor);
+                p.setSelectable(false);
+                drawAll();
+            } else {
+                const original = p.getBaseColor();
+                p.setColor(ERROR_COLOR_VEC);
+                drawAll();
+                setTimeout(() => {
+                    p.setColor(original);
+                    drawAll();
+                }, 800);
+            }
+            syncManager.handleTrial7Click2D(isCorrect, p.id, taskState.id);
+            break;
+        }
+        return;
     }
 }
 
@@ -311,13 +399,86 @@ function handleTaskStateChange(taskState: ReturnType<typeof syncManager.getCurre
     const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(trial);
     const label = `Task ${taskNumber}: Trial ${trialNumber}/${totalTrials}`;
     trialBox.textContent = label;
+    if (taskState?.trial === 7) {
+        const activeIndex = taskState.colorPairIndex ?? 0;
+        const pair = getColorPairByKey(
+            taskState.trial7Assignments?.[activeIndex]?.key ?? taskState.colorPairKey
+        );
+        if (pair) {
+            instructionBox.textContent = `Find ${pair.name2D}`;
+        } else {
+            instructionBox.textContent = "Match the instructed colors";
+        }
+    } else {
+        instructionBox.textContent = "";
+    }
     console.log("2D Task state changed:", {
         trial,
-        targetPointId: taskState?.targetPointId,
+        targetPointId2D: taskState?.targetPointId2D,
         targetPointId3D: taskState?.targetPointId3D,
         clicked2D: taskState?.clicked2D,
         clicked3D: taskState?.clicked3D,
     });
 
+    // Sync error flash from 3D side to 2D side for Trial 7
+    if (
+        trial === 7 &&
+        taskState?.errorPointId3D &&
+        taskState.errorPointId3D !== lastProcessedErrorPointId3D
+    ) {
+        lastProcessedErrorPointId3D = taskState.errorPointId3D;
+        const points = syncManager.getLocalPoints();
+        const errorPoint = points.find((p) => p.id === taskState.errorPointId3D);
+        if (errorPoint) {
+            errorPoint.flashColorSync(ERROR_COLOR_VEC, 800);
+        }
+    } else if (!taskState?.errorPointId3D) {
+        lastProcessedErrorPointId3D = null;
+    }
+
+    applyCompletedTrial7Pairs(taskState);
+    ensureActiveTrial7TargetSelectable(taskState);
+
     lastTrial = trial;
+}
+
+function applyCompletedTrial7Pairs(taskState: ReturnType<typeof syncManager.getCurrentTask>) {
+    if (!taskState || taskState.trial !== 7 || !taskState.trial7Assignments) return;
+
+    const points = syncManager.getLocalPoints();
+    for (const entry of taskState.trial7Assignments) {
+        const fullySolved = entry.done2D && entry.done3D;
+        if (!fullySolved) continue;
+        const point = points.find((p) => p.id === entry.point2D);
+        const partnerPoint = points.find((p) => p.id === entry.point3D);
+        const pair = getColorPairByKey(entry.key);
+        if (point && pair) {
+            const color = hexToVector3(pair.hex2D);
+            point.setBaseColor(color);
+            point.setDisplayColor(color);
+            point.setSelectable(false);
+        }
+        if (partnerPoint && pair) {
+            const partnerColor = hexToVector3(pair.hex3D);
+            partnerPoint.setBaseColor(partnerColor);
+            partnerPoint.setDisplayColor(partnerColor);
+            partnerPoint.setSelectable(false);
+        }
+    }
+}
+
+function ensureActiveTrial7TargetSelectable(
+    taskState: ReturnType<typeof syncManager.getCurrentTask>
+) {
+    if (!taskState || taskState.trial !== 7 || !taskState.trial7Assignments) return;
+    const activeIndex = taskState.colorPairIndex ?? 0;
+    const active = taskState.trial7Assignments[activeIndex];
+    if (!active) return;
+
+    // Only re-enable the active 2D target; partner targets stay locked
+    const points = syncManager.getLocalPoints();
+    const point = points.find((p) => p.id === active.point2D);
+    if (point && !active.done2D) {
+        point.setSelectable(true);
+    }
 }
