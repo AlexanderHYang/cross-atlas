@@ -3,11 +3,50 @@ import { PCASyncData, PointSyncData } from "../../shared/src/sync";
 import { Point2D } from "./Point2D";
 import { WebsocketProvider } from "y-websocket";
 import { PCAManager } from "./PCAManager";
-import { TaskState, TASK_COLLECTION, TASK1_ID, createTaskState } from "../../shared/src/task";
+import {
+    TaskState,
+    TASK_COLLECTION,
+    TASK1_ID,
+    TASK2_ID,
+    TASK3_ID,
+    TASK_META_COLLECTION,
+    TaskMeta,
+    TaskId,
+    createTaskState,
+    TRANSITION_DELAY_MS,
+    getTaskFlowState,
+    getTaskIdFromFlowState,
+    determineNextAction,
+    createNextState,
+    createInitialTask1State,
+    createInitialTask2State,
+    createInitialTask3State,
+    logTrialStart,
+    logTrialEnd,
+    handleTask1Selection2D,
+    handleTask2Selection2D,
+    handleTask3Selection2D,
+    isTask1Trial,
+    isTask2Trial,
+    isTask3Trial,
+    getFirstEnabledTask,
+    type PointIdProvider,
+} from "../../shared/src/task";
 import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
 import { Vector3 } from "@babylonjs/core";
+import { getColorPairByKey, TRIAL7_COLOR_PAIRS } from "../../shared/src/trial7ColorPairs";
 
-export class SyncManager2D {
+function hexToVec3(hex: string) {
+    const trimmed = hex.replace("#", "");
+    const bigint = Number.parseInt(trimmed, 16);
+    return new Vector3(
+        ((bigint >> 16) & 255) / 255,
+        ((bigint >> 8) & 255) / 255,
+        (bigint & 255) / 255
+    );
+}
+
+export class SyncManager2D implements PointIdProvider {
     private ydoc: Y.Doc;
     private provider: WebsocketProvider;
 
@@ -15,11 +54,15 @@ export class SyncManager2D {
 
     private syncedPointDataMap: Y.Map<PointSyncData>;
     private taskMap: Y.Map<TaskState>;
+    private taskMetaMap: Y.Map<TaskMeta>;
     private syncedPCADataMap: Y.Map<PCASyncData>;
 
     private pcaManager = new PCAManager(3);
     private currentTask: TaskState | null = null;
     private taskListeners: Set<(task: TaskState | null) => void> = new Set();
+    private activeTaskId: TaskId = TASK1_ID;
+    private transitionTimeout: number | null = null;
+    private updatingMeta = false;
 
     private constructor() {
         // 1) connect to websocket provider
@@ -44,6 +87,7 @@ export class SyncManager2D {
         this.localPointsById = new Map<string, Point2D>();
         this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
         this.taskMap = this.ydoc.getMap(TASK_COLLECTION) as Y.Map<TaskState>;
+        this.taskMetaMap = this.ydoc.getMap(TASK_META_COLLECTION) as Y.Map<TaskMeta>;
         this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PCASyncData>;
     }
 
@@ -56,6 +100,11 @@ export class SyncManager2D {
         const clicked2D = task.clicked2D ?? false;
         const clicked3D = task.clicked3D ?? false;
         const targetPointId3D = task.targetPointId3D;
+        const errorPointId2D = task.errorPointId2D ?? null;
+        const errorPointId3D = task.errorPointId3D ?? null;
+        const colorPairKey = task.colorPairKey;
+        const colorPairIndex = task.colorPairIndex;
+        const trial7Assignments = task.trial7Assignments ?? [];
 
         if (
             trial === (task as any).trial &&
@@ -64,14 +113,19 @@ export class SyncManager2D {
             completed === task.completed &&
             clicked2D === task.clicked2D &&
             clicked3D === task.clicked3D &&
-            targetPointId3D === task.targetPointId3D
+            targetPointId3D === task.targetPointId3D &&
+            errorPointId2D === task.errorPointId2D &&
+            errorPointId3D === task.errorPointId3D &&
+            colorPairKey === task.colorPairKey &&
+            colorPairIndex === task.colorPairIndex &&
+            trial7Assignments === task.trial7Assignments
         ) {
             return task;
         }
 
         return {
             id: task.id,
-            targetPointId: task.targetPointId,
+            targetPointId2D: task.targetPointId2D,
             trial,
             hintSide,
             feedback,
@@ -79,6 +133,11 @@ export class SyncManager2D {
             clicked2D,
             clicked3D,
             targetPointId3D,
+            errorPointId2D,
+            errorPointId3D,
+            colorPairKey,
+            colorPairIndex,
+            trial7Assignments,
         };
     }
 
@@ -101,6 +160,13 @@ export class SyncManager2D {
         });
     }
 
+    private setActiveTask(taskId: TaskId) {
+        this.activeTaskId = taskId;
+        this.updatingMeta = true;
+        this.taskMetaMap.set("active", { activeTaskId: taskId });
+        this.updatingMeta = false;
+    }
+
     private initializeRemoteObserver() {
         this.syncedPointDataMap.observe((event, transaction) => {
             for (const key of event.keysChanged) {
@@ -119,13 +185,30 @@ export class SyncManager2D {
             }
         });
 
+        this.taskMetaMap.observe(() => {
+            if (this.updatingMeta) return;
+            const meta = this.taskMetaMap.get("active");
+            if (meta?.activeTaskId) {
+                this.activeTaskId = meta.activeTaskId;
+                const raw = this.taskMap.get(this.activeTaskId);
+                const normalized = this.normalizeTaskState(raw);
+                if (normalized && raw && normalized !== raw) {
+                    this.taskMap.set(this.activeTaskId, normalized);
+                }
+                this.currentTask = normalized;
+                this.applyTrial7Colors(normalized?.trial7Assignments);
+                this.notifyTaskListeners();
+            }
+        });
+
         this.taskMap.observe(() => {
-            const raw = this.taskMap.get(TASK1_ID);
+            const raw = this.taskMap.get(this.activeTaskId);
             const normalized = this.normalizeTaskState(raw);
             if (normalized && raw && normalized !== raw) {
-                this.taskMap.set(TASK1_ID, normalized);
+                this.taskMap.set(this.activeTaskId, normalized);
             }
             this.currentTask = normalized;
+            this.applyTrial7Colors(normalized?.trial7Assignments);
             this.notifyTaskListeners();
         });
     }
@@ -134,13 +217,21 @@ export class SyncManager2D {
         const manager = new SyncManager2D();
         await manager.waitForInitialSync();
         manager.initializeRemoteObserver();
-        manager.currentTask = manager.normalizeTaskState(manager.taskMap.get(TASK1_ID));
+        const meta = manager.taskMetaMap.get("active");
+        manager.activeTaskId = meta?.activeTaskId ?? TASK2_ID;
+        if (!meta) {
+            manager.taskMetaMap.set("active", { activeTaskId: manager.activeTaskId });
+        }
+        manager.currentTask = manager.normalizeTaskState(manager.taskMap.get(manager.activeTaskId));
+        if (!manager.currentTask || !manager.currentTask.targetPointId2D) {
+            manager.ensureTaskTarget(manager.activeTaskId);
+        }
         manager.notifyTaskListeners();
         return manager;
     }
 
     public transactPointUpdate(point: Point2D) {
-        console.log("transacting point update for", point.id);
+        console.debug("Transacting point update for", point.id);
         this.ydoc.transact(() => {
             const existing = this.syncedPointDataMap.get(point.id);
             this.syncedPointDataMap.set(point.id, point.getLocalData(existing, this.pcaManager));
@@ -202,7 +293,8 @@ export class SyncManager2D {
         return this.pcaManager;
     }
 
-    private pickRandomTargetId() {
+    // PointIdProvider interface implementation
+    public pickRandomTargetId(): string | null {
         const candidateIds = Array.from(this.localPointsById.values())
             .filter((pt) => {
                 const cfg = getDefaultPointConfig(pt.id);
@@ -221,26 +313,175 @@ export class SyncManager2D {
         return randomId;
     }
 
-    public ensureTaskTarget(taskId: string = TASK1_ID) {
-        const existing = this.normalizeTaskState(this.taskMap.get(taskId));
-        if (existing && existing.targetPointId) {
-            if (existing !== this.taskMap.get(taskId)) {
-                this.taskMap.set(taskId, existing);
+    public pickDistinctTargetIds(count: number): string[] | null {
+        const candidateIds = Array.from(this.localPointsById.values())
+            .filter((pt) => {
+                const cfg = getDefaultPointConfig(pt.id);
+                if (cfg && cfg.selectable === false) {
+                    return false;
+                }
+                return true;
+            })
+            .map((pt) => pt.id);
+
+        if (candidateIds.length < count) {
+            return null;
+        }
+
+        // Shuffle and take first `count` elements
+        const shuffled = [...candidateIds].sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, count);
+    }
+
+    public ensureTaskTarget(taskId: TaskId = this.activeTaskId) {
+        const meta = this.taskMetaMap.get("active");
+        if (meta?.activeTaskId) {
+            this.activeTaskId = meta.activeTaskId;
+        }
+
+        const existing = this.normalizeTaskState(this.taskMap.get(this.activeTaskId));
+        if (existing && existing.targetPointId2D) {
+            if (existing !== this.taskMap.get(this.activeTaskId)) {
+                this.taskMap.set(this.activeTaskId, existing);
             }
             this.currentTask = existing;
             this.notifyTaskListeners();
             return existing;
         }
 
-        this.setTrial(1, taskId);
+        // Start with the first enabled task based on flow config
+        const firstTask = getFirstEnabledTask();
+        if (!firstTask) {
+            console.warn("No tasks enabled in flow config!");
+            return this.currentTask;
+        }
+
+        if (firstTask === TASK1_ID) {
+            this.startTask1();
+        } else if (firstTask === TASK2_ID) {
+            this.startTask2();
+        } else if (firstTask === TASK3_ID) {
+            this.startTask3();
+        }
         return this.currentTask;
     }
 
+    /**
+     * Start Task 1 from the beginning
+     */
+    private startTask1() {
+        this.setActiveTask(TASK1_ID);
+        this.resetAllPointColors();
+
+        const taskState = createInitialTask1State(this);
+        if (!taskState) {
+            console.warn("Unable to start Task 1: no selectable points");
+            return;
+        }
+
+        this.taskMap.set(TASK1_ID, taskState);
+        this.currentTask = taskState;
+        logTrialStart(taskState, "2D");
+        this.notifyTaskListeners();
+    }
+
+    /**
+     * Start Task 2 from the beginning
+     */
+    private startTask2() {
+        this.setActiveTask(TASK2_ID);
+        this.resetAllPointColors();
+
+        const taskState = createInitialTask2State(this);
+        if (!taskState) {
+            console.warn("Unable to start Task 2: no selectable points");
+            return;
+        }
+
+        this.taskMap.set(TASK2_ID, taskState);
+        this.currentTask = taskState;
+        logTrialStart(taskState, "2D");
+        this.notifyTaskListeners();
+    }
+
+    /**
+     * Start Task 3 from the beginning
+     */
+    private startTask3() {
+        this.setActiveTask(TASK3_ID);
+        this.resetAllPointColors();
+
+        const taskState = createInitialTask3State(this);
+        if (!taskState) {
+            console.warn("Unable to start Task 3: not enough selectable points");
+            return;
+        }
+
+        this.applyTrial7Colors(taskState.trial7Assignments);
+        this.taskMap.set(TASK3_ID, taskState);
+        this.currentTask = taskState;
+        logTrialStart(taskState, "2D");
+        this.notifyTaskListeners();
+    }
+
+    /**
+     * Handle selection from 2D side - unified handler for all tasks
+     */
+    public handleSelection2D(selectedPointId: string) {
+        const existing = this.normalizeTaskState(this.taskMap.get(this.activeTaskId));
+        if (!existing || existing.completed) return { isCorrect: false };
+
+        const trial = existing.trial;
+        let result: {
+            updated: TaskState;
+            isCorrect: boolean;
+            shouldTransition?: boolean;
+            shouldAdvancePair?: boolean;
+        };
+
+        if (isTask1Trial(trial)) {
+            // Task 1: Only trials 2 and 4 are handled by 2D
+            const task1Result = handleTask1Selection2D(existing, selectedPointId);
+            result = { ...task1Result, shouldAdvancePair: false };
+        } else if (isTask2Trial(trial)) {
+            const task2Result = handleTask2Selection2D(existing, selectedPointId);
+            result = { ...task2Result, shouldAdvancePair: false };
+        } else if (isTask3Trial(trial)) {
+            const task3Result = handleTask3Selection2D(existing, selectedPointId);
+            result = {
+                updated: task3Result.updated,
+                isCorrect: task3Result.isCorrect,
+                shouldTransition: task3Result.shouldAdvancePair,
+                shouldAdvancePair: task3Result.shouldAdvancePair,
+            };
+        } else {
+            return { isCorrect: false };
+        }
+
+        // Update state
+        this.taskMap.set(this.activeTaskId, result.updated);
+        this.currentTask = result.updated;
+        this.notifyTaskListeners();
+
+        // Schedule transition if needed
+        if (result.shouldTransition || result.shouldAdvancePair) {
+            logTrialEnd(result.updated, "2D");
+            this.scheduleNextTransition(result.updated);
+        }
+
+        return { isCorrect: result.isCorrect };
+    }
+
+    /**
+     * Legacy method - redirects to handleSelection2D
+     */
     public setTrial2SelectionResult(isCorrect: boolean, taskId: string = TASK1_ID) {
+        // This method is called with the result already computed
+        // We need to handle it differently - update state directly
         const existing = this.normalizeTaskState(this.taskMap.get(taskId));
         if (!existing) return;
         const trial = existing.trial ?? 1;
-        if ((trial !== 2 && trial !== 4) || !existing.targetPointId) return;
+        if ((trial !== 2 && trial !== 4) || !existing.targetPointId2D) return;
         if (existing.completed && existing.feedback === "success") return;
 
         const feedback = isCorrect ? "success" : "error";
@@ -254,23 +495,22 @@ export class SyncManager2D {
         this.notifyTaskListeners();
 
         if (isCorrect) {
-            const nextTrial: 1 | 2 | 3 | 4 | "collab" = trial === 2 ? 3 : "collab";
-            window.setTimeout(() => {
-                if (nextTrial === "collab") {
-                    this.startCollaborativeTrial(taskId);
-                } else {
-                    this.setTrial(nextTrial, taskId);
-                }
-            }, 2000);
+            logTrialEnd(updated, "2D");
+            this.scheduleNextTransition(updated);
         }
     }
 
     /**
      * Handle Task 2 collaborative trial clicks from the 2D side.
      */
-    public handleTask2Click2D(isCorrect: boolean, taskId: string = TASK1_ID) {
+    public handleTask2Click2D(isCorrect: boolean, taskId: string = TASK2_ID) {
         const existing = this.normalizeTaskState(this.taskMap.get(taskId));
-        if (!existing || (existing.trial !== 5 && existing.trial !== 6) || !existing.targetPointId) return;
+        if (
+            !existing ||
+            (existing.trial !== 5 && existing.trial !== 6) ||
+            !existing.targetPointId2D
+        )
+            return;
         if (existing.completed) return;
 
         const updated: TaskState = {
@@ -280,25 +520,93 @@ export class SyncManager2D {
             completed: isCorrect && !!existing.clicked3D,
         };
 
+        this.taskMap.set(taskId, updated);
+        this.currentTask = updated;
+        this.notifyTaskListeners();
+
         if (updated.completed) {
-            console.log("🎉 TRIAL 5 COMPLETED! Both sides clicked correctly.");
-            if (existing.trial === 5) {
-                this.scheduleTrial6Repeat(updated);
-            }
+            console.log("🎉 Task 2 trial completed! Both sides clicked correctly.");
+            logTrialEnd(updated, "2D");
+            this.scheduleNextTransition(updated);
         }
+    }
+
+    public handleTrial7Click2D(
+        isCorrect: boolean,
+        selectedPointId: string,
+        taskId: string = TASK3_ID
+    ) {
+        const existing = this.normalizeTaskState(this.taskMap.get(taskId));
+        if (!existing || existing.trial !== 7 || !existing.trial7Assignments) return;
+        if (existing.completed) return;
+
+        const activeIndex = existing.colorPairIndex ?? 0;
+        const currentAssignment = existing.trial7Assignments[activeIndex];
+        if (!currentAssignment) return;
+
+        const updatedAssignments = [...existing.trial7Assignments];
+        updatedAssignments[activeIndex] = {
+            ...currentAssignment,
+            done2D: isCorrect ? true : currentAssignment.done2D,
+        };
+
+        const updated: TaskState = {
+            ...existing,
+            clicked2D: isCorrect,
+            feedback: !isCorrect ? "error" : existing.clicked3D ? "success" : "none",
+            completed: isCorrect && !!existing.clicked3D,
+            trial7Assignments: updatedAssignments,
+            errorPointId2D: !isCorrect ? selectedPointId : null,
+            errorPointId3D: null,
+        };
 
         this.taskMap.set(taskId, updated);
         this.currentTask = updated;
         this.notifyTaskListeners();
+
+        if (!isCorrect) {
+            window.setTimeout(() => {
+                const latest = this.normalizeTaskState(this.taskMap.get(taskId));
+                if (!latest || latest.trial !== 7) return;
+                if (latest.errorPointId2D !== selectedPointId) return;
+                const cleared: TaskState = { ...latest, errorPointId2D: null };
+                this.taskMap.set(taskId, cleared);
+                this.currentTask = cleared;
+                this.notifyTaskListeners();
+            }, 850);
+        }
+
+        if (updated.completed) {
+            logTrialEnd(updated, "2D");
+            this.scheduleNextTransition(updated);
+        }
     }
 
     private resetAllPointColors() {
         for (const p of this.localPointsById.values()) {
             p.resetToBaseColor();
+            p.setSelectable(true);
+        }
+    }
+
+    private applyTrial7Colors(assignments: TaskState["trial7Assignments"] | undefined | null) {
+        if (!assignments || assignments.length === 0) return;
+
+        // Show the partner's (3D) targets on the 2D canvas
+        for (const entry of assignments) {
+            const partnerPoint = this.localPointsById.get(entry.point3D);
+            const pair = getColorPairByKey(entry.key);
+            if (partnerPoint && pair) {
+                const c = hexToVec3(pair.hex3D);
+                partnerPoint.setBaseColor(c);
+                partnerPoint.setColor(c);
+                partnerPoint.setSelectable(false);
+            }
         }
     }
 
     public setTrial(trial: 1 | 2 | 3 | 4, taskId: string = TASK1_ID) {
+        this.setActiveTask(taskId as TaskId);
         this.resetAllPointColors();
 
         const randomId = this.pickRandomTargetId();
@@ -310,51 +618,74 @@ export class SyncManager2D {
         const taskState = createTaskState(taskId, randomId, trial, hintSide);
         this.taskMap.set(taskId, taskState);
         this.currentTask = taskState;
+        logTrialStart(taskState, "2D");
         this.notifyTaskListeners();
     }
 
-    private startCollaborativeTrial(taskId: string = TASK1_ID) {
-        const target2D = this.pickRandomTargetId();
-        const target3D = this.pickRandomTargetId();
-        if (!target2D || !target3D) {
-            console.warn("Unable to start collaborative trial: missing targets");
-            return;
+    /**
+     * Unified transition scheduler - handles all task/trial transitions
+     */
+    private scheduleNextTransition(completedTask: TaskState) {
+        if (this.transitionTimeout !== null) {
+            window.clearTimeout(this.transitionTimeout);
+            this.transitionTimeout = null;
         }
-        this.resetAllPointColors();
-        const taskState = createTaskState(taskId, target2D, 5, "both", target3D);
-        this.taskMap.set(taskId, taskState);
-        this.currentTask = taskState;
-        this.notifyTaskListeners();
-    }
 
-    private scheduleTrial6Repeat(completedTask: TaskState) {
-        window.setTimeout(() => {
+        this.transitionTimeout = window.setTimeout(() => {
+            this.transitionTimeout = null;
+
+            // Verify the task is still completed
             const latest = this.normalizeTaskState(this.taskMap.get(completedTask.id));
-            if (!latest || !latest.completed || latest.trial !== 5) {
+            if (!latest || !latest.completed) {
                 return;
             }
-            const nextTarget2D = this.pickRandomTargetId();
-            const nextTarget3D = this.pickRandomTargetId();
-            if (!nextTarget2D || !nextTarget3D) {
-                console.warn("Unable to schedule trial 6: missing targets");
-                return;
+
+            // Determine what to do next
+            const action = determineNextAction(latest);
+            console.log(
+                `[2D] Transition action: ${action.action}`,
+                action.nextTaskId ? `-> ${action.nextTaskId}` : ""
+            );
+
+            switch (action.action) {
+                case "next-trial": {
+                    this.resetAllPointColors();
+                    const nextState = createNextState(latest, action, this);
+                    if (nextState) {
+                        const taskId = getTaskIdFromFlowState(getTaskFlowState(nextState));
+                        this.setActiveTask(taskId);
+                        this.taskMap.set(taskId, nextState);
+                        this.currentTask = nextState;
+                        logTrialStart(nextState, "2D");
+                        this.notifyTaskListeners();
+                    }
+                    break;
+                }
+                case "next-task": {
+                    if (action.nextTaskId === TASK2_ID) {
+                        console.log("🎉 Task 1 complete! Starting Task 2...");
+                        this.startTask2();
+                    } else if (action.nextTaskId === TASK3_ID) {
+                        console.log("🎉 Task 2 complete! Starting Task 3...");
+                        this.startTask3();
+                    }
+                    break;
+                }
+                case "advance-pair": {
+                    const nextState = createNextState(latest, action, this);
+                    if (nextState) {
+                        this.taskMap.set(TASK3_ID, nextState);
+                        this.currentTask = nextState;
+                        this.notifyTaskListeners();
+                    }
+                    break;
+                }
+                case "all-complete": {
+                    console.log("🎉🎉🎉 All tasks complete!");
+                    break;
+                }
             }
-            this.resetAllPointColors();
-            const next: TaskState = {
-                ...latest,
-                targetPointId: nextTarget2D,
-                targetPointId3D: nextTarget3D,
-                trial: 6,
-                hintSide: "both",
-                feedback: "none",
-                completed: false,
-                clicked2D: false,
-                clicked3D: false,
-            };
-            this.taskMap.set(completedTask.id, next);
-            this.currentTask = next;
-            this.notifyTaskListeners();
-        }, 2000);
+        }, TRANSITION_DELAY_MS);
     }
 
     private notifyTaskListeners() {

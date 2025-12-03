@@ -2,7 +2,7 @@ import { PointSyncData, Vector3SyncData } from "../../shared/src/sync";
 import { Vector3 } from '@babylonjs/core'
 import { SyncManager2D } from "./SyncManager2D";
 import { clamp, equirectangularNormalizedXY, inverseEquirectangularNormalizedXY, latLonToVec3, vec3ToLatLon } from "../../shared/src/projection";
-import { getProjectionMode } from "./main2";
+import { getProjectionMode } from "./main-2d";
 import { PCAManager } from "./PCAManager";
 import { DefaultPointConfig, getDefaultPointConfig } from "../../shared/src/defaultPoints";
 
@@ -223,7 +223,6 @@ export class Point2D {
     ) {
         const x = ((this.nx + 1) / 2) * width;
         const y = ((1 - (this.ny + 1) / 2)) * height;
-        ctx.beginPath();
         // color stored in this.color as Vector3 (r,g,b) in 0..1
         const sourceColor = overrideColor ?? (hideColor ? this.baseColor : this.color);
         const r = Math.round(Math.min(1, Math.max(0, sourceColor.x)) * 255);
@@ -231,8 +230,14 @@ export class Point2D {
         const b = Math.round(Math.min(1, Math.max(0, sourceColor.z)) * 255);
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         const radius = 12;
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.fill();
+
+        if (this.id === "point3") {
+            ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+        } else {
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     hitTest(px: number, py: number, width: number, height: number) {
@@ -241,9 +246,14 @@ export class Point2D {
         }
         const x = ((this.nx + 1) / 2) * width;
         const y = ((1 - (this.ny + 1) / 2)) * height;
+        const radius = 12;
+
+        if (this.id === "point3") {
+            return px >= x - radius && px <= x + radius && py >= y - radius && py <= y + radius;
+        }
+
         const dx = px - x;
         const dy = py - y;
-        const radius = 12;
         return dx * dx + dy * dy <= radius * radius;
     }
 
