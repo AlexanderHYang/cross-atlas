@@ -31,8 +31,8 @@ export type TaskFlowConfig = {
 
 /*-------- Task switch --------*/
 let taskFlowConfig: TaskFlowConfig = {
-    task1: true,
-    task2: true,
+    task1: false,
+    task2: false,
     task3: true,
 };
 
@@ -58,6 +58,11 @@ export type Trial7Assignment = {
     point3D: string;
     done2D?: boolean;
     done3D?: boolean;
+    /**
+     * Which side initially sees the hint for this color.
+     * The opposite side is the seeker for the turn.
+     */
+    hintSide: "2d" | "3d";
 };
 
 export type TaskState = {
@@ -74,9 +79,10 @@ export type TaskState = {
      */
     trial: TaskTrial;
     /**
-     * Which side currently sees the target hint.
-     * For Task 2/3, both sides see targets simultaneously.
-     */
+ * Which side currently sees the target hint.
+ * For Task 2, both sides see targets simultaneously.
+ * For Task 3, only the hintSide sees the active color; the partner seeks.
+ */
     hintSide: "2d" | "3d" | "both";
     /**
      * Feedback from the active trial: none, wrong guess, or success.
@@ -212,6 +218,7 @@ export {
     createInitialTask3State,
     logTrialStart,
     logTrialEnd,
+    logTaskLifecycle,
     getFirstEnabledTask,
     getNextEnabledTask,
     type PointIdProvider,

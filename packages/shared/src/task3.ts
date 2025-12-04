@@ -35,6 +35,7 @@ export function createTask3Assignments(
         point3D: pointIds[idx + pairCount],
         done2D: false,
         done3D: false,
+        hintSide: idx % 2 === 0 ? "2d" : "3d",
     }));
 }
 
@@ -49,7 +50,7 @@ export function createTask3State(assignments: Trial7Assignment[]): TaskState | n
         targetPointId2D: first.point2D,
         targetPointId3D: first.point3D,
         trial: 7,
-        hintSide: "both",
+        hintSide: first.hintSide,
         feedback: "none",
         completed: false,
         clicked2D: false,
@@ -74,10 +75,11 @@ export function getNextTask3PairIndex(currentState: TaskState): number | null {
 }
 
 export function isTask3Complete(currentState: TaskState): boolean {
-    if (!currentState.trial7Assignments) return true;
+    if (!currentState.trial7Assignments || currentState.trial7Assignments.length === 0) {
+        return true;
+    }
 
-    const currentIndex = currentState.colorPairIndex ?? 0;
-    return currentIndex >= currentState.trial7Assignments.length - 1 && currentState.completed;
+    return currentState.trial7Assignments.every((entry) => entry.done2D && entry.done3D);
 }
 
 /**
@@ -91,12 +93,6 @@ export function handleTask3Selection2D(
         return { updated: currentState, isCorrect: false, shouldAdvancePair: false };
     }
 
-    // Ignore clicks on the 3D partner's target
-    if (selectedPointId === currentState.targetPointId3D) {
-        return { updated: currentState, isCorrect: false, shouldAdvancePair: false };
-    }
-
-    const isCorrect = selectedPointId === currentState.targetPointId2D;
     const activeIndex = currentState.colorPairIndex ?? 0;
     const currentAssignment = currentState.trial7Assignments[activeIndex];
 
@@ -104,26 +100,35 @@ export function handleTask3Selection2D(
         return { updated: currentState, isCorrect: false, shouldAdvancePair: false };
     }
 
+    // Ignore clicks on the 3D partner's target
+    if (selectedPointId === currentState.targetPointId3D) {
+        return { updated: currentState, isCorrect: false, shouldAdvancePair: false };
+    }
+
+    const isCorrect = selectedPointId === currentState.targetPointId2D;
+
     const updatedAssignments = [...currentState.trial7Assignments];
     updatedAssignments[activeIndex] = {
         ...currentAssignment,
-        done2D: isCorrect ? true : currentAssignment.done2D,
+        done2D: isCorrect || currentAssignment.done2D,
+        done3D: currentAssignment.done3D,
     };
 
-    const bothCorrect = isCorrect && !!currentState.clicked3D;
+    const pairSolved = updatedAssignments[activeIndex].done2D && updatedAssignments[activeIndex].done3D;
 
     const updated: TaskState = {
         ...currentState,
         clicked2D: isCorrect,
-        feedback: !isCorrect ? "error" : bothCorrect ? "success" : "none",
-        completed: bothCorrect,
+        clicked3D: currentState.clicked3D,
+        feedback: !isCorrect ? "error" : pairSolved ? "success" : "none",
+        completed: pairSolved,
         trial7Assignments: updatedAssignments,
         // Set errorPointId2D when wrong click so 3D side can show the flash
         errorPointId2D: !isCorrect ? selectedPointId : null,
         errorPointId3D: null, // Clear any previous 3D error
     };
 
-    return { updated, isCorrect, shouldAdvancePair: bothCorrect };
+    return { updated, isCorrect, shouldAdvancePair: pairSolved };
 }
 
 /**
@@ -137,39 +142,41 @@ export function handleTask3Selection3D(
         return { updated: currentState, isCorrect: false, shouldAdvancePair: false };
     }
 
+    const activeIndex = currentState.colorPairIndex ?? 0;
+    const currentAssignment = currentState.trial7Assignments[activeIndex];
+    if (!currentAssignment) {
+        return { updated: currentState, isCorrect: false, shouldAdvancePair: false };
+    }
+
     // Ignore clicks on the 2D partner's target
     if (selectedPointId === currentState.targetPointId2D) {
         return { updated: currentState, isCorrect: false, shouldAdvancePair: false };
     }
 
     const isCorrect = selectedPointId === currentState.targetPointId3D;
-    const activeIndex = currentState.colorPairIndex ?? 0;
-    const currentAssignment = currentState.trial7Assignments[activeIndex];
-
-    if (!currentAssignment) {
-        return { updated: currentState, isCorrect: false, shouldAdvancePair: false };
-    }
 
     const updatedAssignments = [...currentState.trial7Assignments];
     updatedAssignments[activeIndex] = {
         ...currentAssignment,
-        done3D: isCorrect ? true : currentAssignment.done3D,
+        done2D: currentAssignment.done2D,
+        done3D: isCorrect || currentAssignment.done3D,
     };
 
-    const bothCorrect = isCorrect && !!currentState.clicked2D;
+    const pairSolved = updatedAssignments[activeIndex].done2D && updatedAssignments[activeIndex].done3D;
 
     const updated: TaskState = {
         ...currentState,
         clicked3D: isCorrect,
-        feedback: !isCorrect ? "error" : bothCorrect ? "success" : "none",
-        completed: bothCorrect,
+        clicked2D: currentState.clicked2D,
+        feedback: !isCorrect ? "error" : pairSolved ? "success" : "none",
+        completed: pairSolved,
         trial7Assignments: updatedAssignments,
         // Set errorPointId3D when wrong click so 2D side can show the flash
         errorPointId3D: !isCorrect ? selectedPointId : null,
         errorPointId2D: null, // Clear any previous 2D error
     };
 
-    return { updated, isCorrect, shouldAdvancePair: bothCorrect };
+    return { updated, isCorrect, shouldAdvancePair: pairSolved };
 }
 
 /**
@@ -197,9 +204,12 @@ export function advanceToNextPair(currentState: TaskState): TaskState | null {
         targetPointId3D: nextAssignment.point3D,
         colorPairKey: nextAssignment.key,
         colorPairIndex: nextIndex,
+        hintSide: nextAssignment.hintSide,
         feedback: "none",
         completed: false,
         clicked2D: false,
         clicked3D: false,
+        errorPointId2D: null,
+        errorPointId3D: null,
     };
 }

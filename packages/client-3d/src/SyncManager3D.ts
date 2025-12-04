@@ -17,11 +17,9 @@ import {
     getTaskIdFromFlowState,
     determineNextAction,
     createNextState,
-    createInitialTask1State,
     createInitialTask2State,
     createInitialTask3State,
-    logTrialStart,
-    logTrialEnd,
+    logTaskLifecycle,
     handleTask1Selection3D,
     handleTask2Selection3D,
     handleTask3Selection3D,
@@ -32,6 +30,8 @@ import {
 } from "../../shared/src/task";
 import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
 
+const TASK3_NEUTRAL_COLOR = new BABYLON.Color3(0.82, 0.82, 0.82);
+
 export class SyncManager3D implements PointIdProvider {
     private ydoc: Y.Doc;
     private provider: WebsocketProvider;
@@ -41,6 +41,7 @@ export class SyncManager3D implements PointIdProvider {
     private taskMap: Y.Map<TaskState>;
     private taskMetaMap: Y.Map<TaskMeta>;
     private currentTask: TaskState | null = null;
+    private lastLoggedTask: TaskState | null = null;
     private taskListeners: Set<(task: TaskState | null) => void> = new Set();
     private syncedPCADataMap: Y.Map<PCASyncData>;
     private transitionTimeout: number | null = null;
@@ -94,6 +95,11 @@ export class SyncManager3D implements PointIdProvider {
                 resolve();
             });
         });
+    }
+
+    private logLifecycle(next: TaskState | null) {
+        logTaskLifecycle(this.lastLoggedTask, next, "3D");
+        this.lastLoggedTask = next;
     }
 
     private setActiveTask(taskId: TaskId) {
@@ -186,6 +192,7 @@ export class SyncManager3D implements PointIdProvider {
                     this.taskMap.set(this.activeTaskId, normalized);
                 }
                 this.currentTask = normalized;
+                this.logLifecycle(this.currentTask);
                 this.notifyTaskListeners();
             }
         });
@@ -197,6 +204,7 @@ export class SyncManager3D implements PointIdProvider {
                 this.taskMap.set(this.activeTaskId, normalized);
             }
             this.currentTask = normalized;
+            this.logLifecycle(this.currentTask);
             this.notifyTaskListeners();
         });
 
@@ -232,6 +240,11 @@ export class SyncManager3D implements PointIdProvider {
             manager.currentTask = manager.normalizeTaskState(
                 manager.taskMap.get(manager.activeTaskId)
             );
+        } else {
+            manager.logLifecycle(manager.currentTask);
+        }
+        if (manager.currentTask?.trial === 7) {
+            manager.setNeutralColorsForTask3(manager.currentTask.trial7Assignments);
         }
         manager.notifyTaskListeners();
         return manager;
@@ -246,7 +259,7 @@ export class SyncManager3D implements PointIdProvider {
     }
 
     public registerPoint(point: Point3D) {
-        console.log("registering point", point.id);
+        console.debug("registering point", point.id);
 
         if (this.localPointsById.has(point.id)) {
             console.warn("Point with id", point.id, "is already registered.");
@@ -257,12 +270,12 @@ export class SyncManager3D implements PointIdProvider {
         // if remote exists, apply it without re-emitting
         const remote = this.syncedPointDataMap.get(point.id);
         if (remote) {
-            console.log("applying existing remote data to newly registered point", point.id);
+            console.debug("applying existing remote data to newly registered point", point.id);
             point.applyRemoteData(remote);
             this.transactPointUpdate(point);
         } else {
             // first writer writes initial state
-            console.log("no existing remote data for point", point.id);
+            console.debug("no existing remote data for point", point.id);
             this.transactPointUpdate(point);
         }
     }
@@ -335,7 +348,6 @@ export class SyncManager3D implements PointIdProvider {
         };
         this.taskMap.set(taskId, updated);
         this.currentTask = updated;
-        logTrialEnd(updated, "3D");
         this.notifyTaskListeners();
 
         // Schedule transition to next trial
@@ -367,8 +379,6 @@ export class SyncManager3D implements PointIdProvider {
         this.notifyTaskListeners();
 
         if (updated.completed) {
-            console.log("🎉 Task 2 trial completed! Both sides clicked correctly.");
-            logTrialEnd(updated, "3D");
             this.scheduleNextTransition(updated);
         }
     }
@@ -382,31 +392,14 @@ export class SyncManager3D implements PointIdProvider {
         if (!existing || existing.trial !== 7 || !existing.trial7Assignments) return;
         if (existing.completed) return;
 
-        const activeIndex = existing.colorPairIndex ?? 0;
-        const currentAssignment = existing.trial7Assignments[activeIndex];
-        if (!currentAssignment) return;
-
-        const updatedAssignments = [...existing.trial7Assignments];
-        updatedAssignments[activeIndex] = {
-            ...currentAssignment,
-            done3D: isCorrect ? true : currentAssignment.done3D,
-        };
-
-        const updated: TaskState = {
-            ...existing,
-            clicked3D: isCorrect,
-            feedback: !isCorrect ? "error" : existing.clicked2D ? "success" : "none",
-            completed: isCorrect && !!existing.clicked2D,
-            trial7Assignments: updatedAssignments,
-            errorPointId3D: !isCorrect ? selectedPointId : null,
-            errorPointId2D: null,
-        };
+        const result = handleTask3Selection3D(existing, selectedPointId);
+        const updated = result.updated;
 
         this.taskMap.set(taskId, updated);
         this.currentTask = updated;
         this.notifyTaskListeners();
 
-        if (!isCorrect) {
+        if (!result.isCorrect) {
             window.setTimeout(() => {
                 const latest = this.normalizeTaskState(this.taskMap.get(taskId));
                 if (!latest || latest.trial !== 7) return;
@@ -419,7 +412,6 @@ export class SyncManager3D implements PointIdProvider {
         }
 
         if (updated.completed) {
-            logTrialEnd(updated, "3D");
             this.scheduleNextTransition(updated);
         }
     }
@@ -440,7 +432,6 @@ export class SyncManager3D implements PointIdProvider {
         };
         this.taskMap.set(taskId, nextState);
         this.currentTask = nextState;
-        logTrialStart(nextState, "3D");
         this.notifyTaskListeners();
     }
 
@@ -477,7 +468,6 @@ export class SyncManager3D implements PointIdProvider {
                         this.setActiveTask(taskId);
                         this.taskMap.set(taskId, nextState);
                         this.currentTask = nextState;
-                        logTrialStart(nextState, "3D");
                         this.notifyTaskListeners();
                     }
                     break;
@@ -523,7 +513,6 @@ export class SyncManager3D implements PointIdProvider {
 
         this.taskMap.set(TASK2_ID, taskState);
         this.currentTask = taskState;
-        logTrialStart(taskState, "3D");
         this.notifyTaskListeners();
     }
 
@@ -539,10 +528,37 @@ export class SyncManager3D implements PointIdProvider {
             return;
         }
 
+        this.setNeutralColorsForTask3(taskState.trial7Assignments);
         this.taskMap.set(TASK3_ID, taskState);
         this.currentTask = taskState;
-        logTrialStart(taskState, "3D");
         this.notifyTaskListeners();
+    }
+
+    private setNeutralColorsForTask3(assignments?: TaskState["trial7Assignments"] | null) {
+        const solvedIds = new Set<string>();
+        if (assignments) {
+            for (const entry of assignments) {
+                if (entry.done2D && entry.done3D) {
+                    solvedIds.add(entry.point2D);
+                    solvedIds.add(entry.point3D);
+                }
+            }
+        }
+
+        for (const p of this.localPointsById.values()) {
+            const cfg = getDefaultPointConfig(p.id);
+            if (cfg?.selectable === false) {
+                if (cfg.color) {
+                    const base = new BABYLON.Color3(cfg.color.x, cfg.color.y, cfg.color.z);
+                    p.setPermanentColor(base);
+                }
+                p.setSelectable(false);
+                continue;
+            }
+            if (solvedIds.has(p.id)) continue;
+            p.setPermanentColor(TASK3_NEUTRAL_COLOR);
+            p.setSelectable(true);
+        }
     }
 
     private applyPlaneFromExistingPCAData(plane: BABYLON.Mesh) {

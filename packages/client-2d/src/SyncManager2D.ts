@@ -21,8 +21,7 @@ import {
     createInitialTask1State,
     createInitialTask2State,
     createInitialTask3State,
-    logTrialStart,
-    logTrialEnd,
+    logTaskLifecycle,
     handleTask1Selection2D,
     handleTask2Selection2D,
     handleTask3Selection2D,
@@ -34,17 +33,8 @@ import {
 } from "../../shared/src/task";
 import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
 import { Vector3 } from "@babylonjs/core";
-import { getColorPairByKey, TRIAL7_COLOR_PAIRS } from "../../shared/src/trial7ColorPairs";
 
-function hexToVec3(hex: string) {
-    const trimmed = hex.replace("#", "");
-    const bigint = Number.parseInt(trimmed, 16);
-    return new Vector3(
-        ((bigint >> 16) & 255) / 255,
-        ((bigint >> 8) & 255) / 255,
-        (bigint & 255) / 255
-    );
-}
+const TASK3_NEUTRAL_COLOR = new Vector3(0.82, 0.82, 0.82);
 
 export class SyncManager2D implements PointIdProvider {
     private ydoc: Y.Doc;
@@ -59,6 +49,7 @@ export class SyncManager2D implements PointIdProvider {
 
     private pcaManager = new PCAManager(3);
     private currentTask: TaskState | null = null;
+    private lastLoggedTask: TaskState | null = null;
     private taskListeners: Set<(task: TaskState | null) => void> = new Set();
     private activeTaskId: TaskId = TASK1_ID;
     private transitionTimeout: number | null = null;
@@ -144,12 +135,12 @@ export class SyncManager2D implements PointIdProvider {
     private waitForInitialSync(): Promise<void> {
         return new Promise((resolve) => {
             this.provider.once("sync", () => {
-                console.log("initializing points from remote");
+                console.log("Initializing points from remote");
                 for (const c of this.syncedPointDataMap.values()) {
                     const p = new Point2D(c.id, this);
                     p.applyDefaultConfig();
                     p.applyRemoteData(c, this.pcaManager);
-                    console.log("initializing point from remote:", c);
+                    console.debug("Initializing point from remote:", c);
                     if (p.hasLockedColor() || p.hasPositionLock()) {
                         this.transactPointUpdate(p);
                     }
@@ -158,6 +149,11 @@ export class SyncManager2D implements PointIdProvider {
                 resolve();
             });
         });
+    }
+
+    private logLifecycle(next: TaskState | null) {
+        logTaskLifecycle(this.lastLoggedTask, next, "2D");
+        this.lastLoggedTask = next;
     }
 
     private setActiveTask(taskId: TaskId) {
@@ -196,7 +192,7 @@ export class SyncManager2D implements PointIdProvider {
                     this.taskMap.set(this.activeTaskId, normalized);
                 }
                 this.currentTask = normalized;
-                this.applyTrial7Colors(normalized?.trial7Assignments);
+                this.logLifecycle(this.currentTask);
                 this.notifyTaskListeners();
             }
         });
@@ -208,7 +204,7 @@ export class SyncManager2D implements PointIdProvider {
                 this.taskMap.set(this.activeTaskId, normalized);
             }
             this.currentTask = normalized;
-            this.applyTrial7Colors(normalized?.trial7Assignments);
+            this.logLifecycle(this.currentTask);
             this.notifyTaskListeners();
         });
     }
@@ -225,6 +221,11 @@ export class SyncManager2D implements PointIdProvider {
         manager.currentTask = manager.normalizeTaskState(manager.taskMap.get(manager.activeTaskId));
         if (!manager.currentTask || !manager.currentTask.targetPointId2D) {
             manager.ensureTaskTarget(manager.activeTaskId);
+        } else {
+            manager.logLifecycle(manager.currentTask);
+        }
+        if (manager.currentTask?.trial === 7) {
+            manager.setNeutralColorsForTask3(manager.currentTask.trial7Assignments);
         }
         manager.notifyTaskListeners();
         return manager;
@@ -239,7 +240,7 @@ export class SyncManager2D implements PointIdProvider {
     }
 
     public registerPoint(point: Point2D) {
-        console.log("registering point", point.id);
+        console.debug("registering point", point.id);
 
         if (this.localPointsById.has(point.id)) {
             console.warn("Point with id", point.id, "is already registered.");
@@ -251,14 +252,14 @@ export class SyncManager2D implements PointIdProvider {
         // if remote exists, apply it without re-emitting
         const remote = this.syncedPointDataMap.get(point.id);
         if (remote) {
-            console.log("applying existing remote data to newly registered point", point.id);
+            console.debug("applying existing remote data to newly registered point", point.id);
             point.applyRemoteData(remote, this.pcaManager);
             if (point.hasLockedColor() || point.hasPositionLock()) {
                 this.transactPointUpdate(point);
             }
         } else {
             // first writer writes initial state
-            console.log("no existing remote data for point", point.id);
+            console.debug("no existing remote data for point", point.id);
             this.transactPointUpdate(point);
         }
     }
@@ -381,7 +382,6 @@ export class SyncManager2D implements PointIdProvider {
 
         this.taskMap.set(TASK1_ID, taskState);
         this.currentTask = taskState;
-        logTrialStart(taskState, "2D");
         this.notifyTaskListeners();
     }
 
@@ -400,7 +400,6 @@ export class SyncManager2D implements PointIdProvider {
 
         this.taskMap.set(TASK2_ID, taskState);
         this.currentTask = taskState;
-        logTrialStart(taskState, "2D");
         this.notifyTaskListeners();
     }
 
@@ -417,10 +416,9 @@ export class SyncManager2D implements PointIdProvider {
             return;
         }
 
-        this.applyTrial7Colors(taskState.trial7Assignments);
+        this.setNeutralColorsForTask3(taskState.trial7Assignments);
         this.taskMap.set(TASK3_ID, taskState);
         this.currentTask = taskState;
-        logTrialStart(taskState, "2D");
         this.notifyTaskListeners();
     }
 
@@ -465,7 +463,6 @@ export class SyncManager2D implements PointIdProvider {
 
         // Schedule transition if needed
         if (result.shouldTransition || result.shouldAdvancePair) {
-            logTrialEnd(result.updated, "2D");
             this.scheduleNextTransition(result.updated);
         }
 
@@ -495,7 +492,6 @@ export class SyncManager2D implements PointIdProvider {
         this.notifyTaskListeners();
 
         if (isCorrect) {
-            logTrialEnd(updated, "2D");
             this.scheduleNextTransition(updated);
         }
     }
@@ -525,8 +521,6 @@ export class SyncManager2D implements PointIdProvider {
         this.notifyTaskListeners();
 
         if (updated.completed) {
-            console.log("🎉 Task 2 trial completed! Both sides clicked correctly.");
-            logTrialEnd(updated, "2D");
             this.scheduleNextTransition(updated);
         }
     }
@@ -540,31 +534,14 @@ export class SyncManager2D implements PointIdProvider {
         if (!existing || existing.trial !== 7 || !existing.trial7Assignments) return;
         if (existing.completed) return;
 
-        const activeIndex = existing.colorPairIndex ?? 0;
-        const currentAssignment = existing.trial7Assignments[activeIndex];
-        if (!currentAssignment) return;
-
-        const updatedAssignments = [...existing.trial7Assignments];
-        updatedAssignments[activeIndex] = {
-            ...currentAssignment,
-            done2D: isCorrect ? true : currentAssignment.done2D,
-        };
-
-        const updated: TaskState = {
-            ...existing,
-            clicked2D: isCorrect,
-            feedback: !isCorrect ? "error" : existing.clicked3D ? "success" : "none",
-            completed: isCorrect && !!existing.clicked3D,
-            trial7Assignments: updatedAssignments,
-            errorPointId2D: !isCorrect ? selectedPointId : null,
-            errorPointId3D: null,
-        };
+        const result = handleTask3Selection2D(existing, selectedPointId);
+        const updated = result.updated;
 
         this.taskMap.set(taskId, updated);
         this.currentTask = updated;
         this.notifyTaskListeners();
 
-        if (!isCorrect) {
+        if (!result.isCorrect) {
             window.setTimeout(() => {
                 const latest = this.normalizeTaskState(this.taskMap.get(taskId));
                 if (!latest || latest.trial !== 7) return;
@@ -577,31 +554,53 @@ export class SyncManager2D implements PointIdProvider {
         }
 
         if (updated.completed) {
-            logTrialEnd(updated, "2D");
             this.scheduleNextTransition(updated);
         }
     }
 
     private resetAllPointColors() {
         for (const p of this.localPointsById.values()) {
+            const cfg = getDefaultPointConfig(p.id);
+            if (cfg?.selectable === false) {
+                if (cfg.color) {
+                    const base = new Vector3(cfg.color.x, cfg.color.y, cfg.color.z);
+                    p.setBaseColor(base);
+                    p.setDisplayColor(base);
+                }
+                p.setSelectable(false);
+                continue;
+            }
             p.resetToBaseColor();
             p.setSelectable(true);
         }
     }
 
-    private applyTrial7Colors(assignments: TaskState["trial7Assignments"] | undefined | null) {
-        if (!assignments || assignments.length === 0) return;
-
-        // Show the partner's (3D) targets on the 2D canvas
-        for (const entry of assignments) {
-            const partnerPoint = this.localPointsById.get(entry.point3D);
-            const pair = getColorPairByKey(entry.key);
-            if (partnerPoint && pair) {
-                const c = hexToVec3(pair.hex3D);
-                partnerPoint.setBaseColor(c);
-                partnerPoint.setColor(c);
-                partnerPoint.setSelectable(false);
+    private setNeutralColorsForTask3(assignments?: TaskState["trial7Assignments"] | null) {
+        const solvedIds = new Set<string>();
+        if (assignments) {
+            for (const entry of assignments) {
+                if (entry.done2D && entry.done3D) {
+                    solvedIds.add(entry.point2D);
+                    solvedIds.add(entry.point3D);
+                }
             }
+        }
+
+        for (const p of this.localPointsById.values()) {
+            const cfg = getDefaultPointConfig(p.id);
+            if (cfg?.selectable === false) {
+                if (cfg.color) {
+                    const base = new Vector3(cfg.color.x, cfg.color.y, cfg.color.z);
+                    p.setBaseColor(base);
+                    p.setDisplayColor(base);
+                }
+                p.setSelectable(false);
+                continue;
+            }
+            if (solvedIds.has(p.id)) continue;
+            p.setBaseColor(TASK3_NEUTRAL_COLOR);
+            p.setDisplayColor(TASK3_NEUTRAL_COLOR);
+            p.setSelectable(true);
         }
     }
 
@@ -618,7 +617,6 @@ export class SyncManager2D implements PointIdProvider {
         const taskState = createTaskState(taskId, randomId, trial, hintSide);
         this.taskMap.set(taskId, taskState);
         this.currentTask = taskState;
-        logTrialStart(taskState, "2D");
         this.notifyTaskListeners();
     }
 
@@ -656,7 +654,6 @@ export class SyncManager2D implements PointIdProvider {
                         this.setActiveTask(taskId);
                         this.taskMap.set(taskId, nextState);
                         this.currentTask = nextState;
-                        logTrialStart(nextState, "2D");
                         this.notifyTaskListeners();
                     }
                     break;

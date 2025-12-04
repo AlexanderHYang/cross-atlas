@@ -58,7 +58,6 @@ document.head.appendChild(style);
 const ctx = canvas.getContext("2d")!;
 const SUCCESS_COLOR_VEC = new Vector3(0x2e / 255, 0xcc / 255, 0x71 / 255);
 const ERROR_COLOR_VEC = new Vector3(0xc0 / 255, 0x39 / 255, 0x2b / 255);
-let lastTrial: number | null = null;
 let lastProcessedErrorPointId3D: string | null = null;
 
 function hexToVector3(hex: string) {
@@ -78,7 +77,7 @@ document.body.appendChild(trialBox);
 
 const instructionBox = document.createElement("div");
 instructionBox.id = "instruction-box";
-instructionBox.textContent = "Waiting for trial 7";
+instructionBox.style.display = "none";
 document.body.appendChild(instructionBox);
 
 // define projection mode
@@ -185,6 +184,10 @@ function drawAll() {
     // draw points
     const points = syncManager.getLocalPoints();
     const taskState = syncManager.getCurrentTask();
+    const activeTrial7Assignment =
+        taskState?.trial === 7 && taskState.trial7Assignments
+            ? taskState.trial7Assignments[taskState.colorPairIndex ?? 0]
+            : null;
     for (const p of points) {
         const trial = taskState?.trial ?? 1;
         let isTarget = false;
@@ -208,13 +211,13 @@ function drawAll() {
             } else if (taskState.clicked2D && ownTargetId === p.id) {
                 overrideColor = SUCCESS_COLOR_VEC;
             }
-        } else if (taskState && trial === 7 && taskState.trial7Assignments) {
-            const partnerAssignment = taskState.trial7Assignments.find((a) => a.point3D === p.id);
-            if (partnerAssignment) {
-                const pair = getColorPairByKey(partnerAssignment.key);
-                if (pair) {
-                    overrideColor = hexToVector3(pair.hex3D);
-                }
+        } else if (taskState && trial === 7 && activeTrial7Assignment) {
+            const pair = getColorPairByKey(activeTrial7Assignment.key);
+            const pairSolved = activeTrial7Assignment.done2D && activeTrial7Assignment.done3D;
+
+            // Task 2-style: show the partner's target hint (3D sphere) on 2D
+            if (!pairSolved && pair && p.id === activeTrial7Assignment.point3D) {
+                overrideColor = hexToVector3(pair.hex3D);
             }
         }
 
@@ -340,7 +343,6 @@ function tryHandle2DSelection(px: number, py: number) {
                     taskState.targetPointId2D
                 );
                 const isCorrect = p.id === taskState.targetPointId2D;
-                console.log("Task 2 2D: Is correct?", isCorrect);
                 if (isCorrect) {
                     p.setDisplayColor(SUCCESS_COLOR_VEC);
                 } else {
@@ -354,17 +356,15 @@ function tryHandle2DSelection(px: number, py: number) {
     }
 
     if (taskState && trial === 7 && !taskState.completed && taskState.targetPointId2D) {
-        const pair = getColorPairByKey(taskState.colorPairKey);
+        const activeIndex = taskState.colorPairIndex ?? 0;
+        const activeAssignment = taskState.trial7Assignments?.[activeIndex];
+
+        const pair = activeAssignment ? getColorPairByKey(activeAssignment.key) : null;
         const ownColor = pair ? hexToVector3(pair.hex2D) : SUCCESS_COLOR_VEC;
         const points = syncManager.getLocalPoints();
         for (let i = points.length - 1; i >= 0; i--) {
             const p = points[i];
             if (!p.hitTest(px, py, width, height)) continue;
-
-            // Ignore clicks on the 3D partner's target
-            if (taskState.targetPointId3D && p.id === taskState.targetPointId3D) {
-                return;
-            }
 
             const isCorrect = p.id === taskState.targetPointId2D;
             if (isCorrect) {
@@ -400,19 +400,25 @@ function handleTaskStateChange(taskState: ReturnType<typeof syncManager.getCurre
     const label = `Task ${taskNumber}: Trial ${trialNumber}/${totalTrials}`;
     trialBox.textContent = label;
     if (taskState?.trial === 7) {
+        instructionBox.style.display = "block";
         const activeIndex = taskState.colorPairIndex ?? 0;
-        const pair = getColorPairByKey(
-            taskState.trial7Assignments?.[activeIndex]?.key ?? taskState.colorPairKey
-        );
+        const activeAssignment = taskState.trial7Assignments?.[activeIndex];
+        const pair = getColorPairByKey(activeAssignment?.key ?? taskState.colorPairKey);
+        const hintSide =
+            (taskState.hintSide as "2d" | "3d" | undefined) ??
+            activeAssignment?.hintSide ??
+            "2d";
         if (pair) {
-            instructionBox.textContent = `Find ${pair.name2D}`;
+            const colorWord = `<span style="color:${pair.hex2D};font-weight:bold;">${pair.name2D}</span>`;
+            instructionBox.innerHTML = `Find the ${colorWord} sphere`;
         } else {
             instructionBox.textContent = "Match the instructed colors";
         }
     } else {
         instructionBox.textContent = "";
+        instructionBox.style.display = "none";
     }
-    console.log("2D Task state changed:", {
+    console.debug("2D Task state changed:", {
         trial,
         targetPointId2D: taskState?.targetPointId2D,
         targetPointId3D: taskState?.targetPointId3D,
@@ -438,8 +444,6 @@ function handleTaskStateChange(taskState: ReturnType<typeof syncManager.getCurre
 
     applyCompletedTrial7Pairs(taskState);
     ensureActiveTrial7TargetSelectable(taskState);
-
-    lastTrial = trial;
 }
 
 function applyCompletedTrial7Pairs(taskState: ReturnType<typeof syncManager.getCurrentTask>) {
@@ -471,14 +475,19 @@ function ensureActiveTrial7TargetSelectable(
     taskState: ReturnType<typeof syncManager.getCurrentTask>
 ) {
     if (!taskState || taskState.trial !== 7 || !taskState.trial7Assignments) return;
-    const activeIndex = taskState.colorPairIndex ?? 0;
-    const active = taskState.trial7Assignments[activeIndex];
-    if (!active) return;
+    const solvedIds = new Set<string>();
+    for (const entry of taskState.trial7Assignments) {
+        if (entry.done2D && entry.done3D) {
+            solvedIds.add(entry.point2D);
+        }
+    }
 
-    // Only re-enable the active 2D target; partner targets stay locked
     const points = syncManager.getLocalPoints();
-    const point = points.find((p) => p.id === active.point2D);
-    if (point && !active.done2D) {
-        point.setSelectable(true);
+    for (const p of points) {
+        if (solvedIds.has(p.id)) {
+            p.setSelectable(false);
+        } else {
+            p.setSelectable(true);
+        }
     }
 }

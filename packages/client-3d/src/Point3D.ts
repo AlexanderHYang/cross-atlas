@@ -1,4 +1,12 @@
-import { Scene, Mesh, MeshBuilder, StandardMaterial, Color3, Vector3, SixDofDragBehavior } from "@babylonjs/core";
+import {
+    Scene,
+    Mesh,
+    MeshBuilder,
+    StandardMaterial,
+    Color3,
+    Vector3,
+    SixDofDragBehavior,
+} from "@babylonjs/core";
 import { Vector3SyncData, PointSyncData } from "../../shared/src/sync";
 import { SyncManager3D } from "./SyncManager3D";
 
@@ -73,17 +81,30 @@ export class Point3D {
     }
 
     public applyRemoteData(remoteData: PointSyncData) {
-        const pos = new Vector3(remoteData.position.x, remoteData.position.y, remoteData.position.z);
+        const pos = new Vector3(
+            remoteData.position.x,
+            remoteData.position.y,
+            remoteData.position.z
+        );
         this.mesh.position.copyFrom(pos);
-        if (remoteData.color) {
-            this.material.diffuseColor.set(remoteData.color.x, remoteData.color.y, remoteData.color.z);
+        // Skip applying remote color if we're currently flashing or showing a local override
+        if (remoteData.color && this.flashHandle === null && !this.localOverrideColor) {
+            this.material.diffuseColor.set(
+                remoteData.color.x,
+                remoteData.color.y,
+                remoteData.color.z
+            );
         }
     }
 
     public getLocalData(existing?: PointSyncData): PointSyncData {
         const pos = this.mesh.position;
         const vectorData: Vector3SyncData = { x: pos.x, y: pos.y, z: pos.z };
-        const color = { x: this.material.diffuseColor.r, y: this.material.diffuseColor.g, z: this.material.diffuseColor.b };
+        const color = {
+            x: this.material.diffuseColor.r,
+            y: this.material.diffuseColor.g,
+            z: this.material.diffuseColor.b,
+        };
         return { id: this.id, position: vectorData, color: color };
     }
 
@@ -99,6 +120,7 @@ export class Point3D {
     }
 
     public setPermanentColor(color: Color3) {
+        this.baseColor = color.clone();
         this.defaultColor = color.clone();
         this.applyColor(this.defaultColor);
         this.onLocalChange();
