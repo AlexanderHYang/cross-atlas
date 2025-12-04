@@ -27,7 +27,7 @@ import {
     isTask2Trial,
     isTask3Trial,
     type PointIdProvider,
-} from "../../shared/src/task";
+} from "../../shared/src/tasks";
 import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
 
 const TASK3_NEUTRAL_COLOR = new BABYLON.Color3(0.82, 0.82, 0.82);

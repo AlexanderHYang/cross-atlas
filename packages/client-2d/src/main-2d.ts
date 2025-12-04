@@ -3,8 +3,15 @@ import { Point2D } from "./Point2D";
 import { SyncManager2D } from "./SyncManager2D";
 import { equirectangularNormalizedXY, vec3ToLatLon } from "../../shared/src/projection";
 import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from "../../shared/src/defaultPoints";
-import { getTaskAndTrial } from "../../shared/src/task";
-import { TRIAL7_COLOR_PAIRS, getColorPairByKey } from "../../shared/src/trial7ColorPairs";
+import {
+    TaskColorConfig2D,
+    applyTaskVisuals2D,
+    evaluateSelection2D,
+    getInstructionForTask,
+    getPointVisual2D,
+    getTaskAndTrial,
+    processTrial7ErrorFlash2D,
+} from "../../shared/src/tasks";
 
 const DASHBOARD_BG = "#828485ff";
 
@@ -59,16 +66,10 @@ const ctx = canvas.getContext("2d")!;
 const SUCCESS_COLOR_VEC = new Vector3(0x2e / 255, 0xcc / 255, 0x71 / 255);
 const ERROR_COLOR_VEC = new Vector3(0xc0 / 255, 0x39 / 255, 0x2b / 255);
 let lastProcessedErrorPointId3D: string | null = null;
-
-function hexToVector3(hex: string) {
-    const trimmed = hex.replace("#", "");
-    const bigint = Number.parseInt(trimmed, 16);
-    return new Vector3(
-        ((bigint >> 16) & 255) / 255,
-        ((bigint >> 8) & 255) / 255,
-        (bigint & 255) / 255
-    );
-}
+const colorConfig2D: TaskColorConfig2D = {
+    success: SUCCESS_COLOR_VEC,
+    error: ERROR_COLOR_VEC,
+};
 
 const trialBox = document.createElement("div");
 trialBox.id = "trial-box";
@@ -184,45 +185,18 @@ function drawAll() {
     // draw points
     const points = syncManager.getLocalPoints();
     const taskState = syncManager.getCurrentTask();
-    const activeTrial7Assignment =
-        taskState?.trial === 7 && taskState.trial7Assignments
-            ? taskState.trial7Assignments[taskState.colorPairIndex ?? 0]
-            : null;
     for (const p of points) {
-        const trial = taskState?.trial ?? 1;
-        let isTarget = false;
-        let hideColor = false;
-        let overrideColor: typeof SUCCESS_COLOR_VEC | null = null;
-
-        if (taskState && trial >= 1 && trial <= 4) {
-            // Task 1 logic
-            isTarget = (trial === 1 || trial === 3) && taskState.targetPointId2D === p.id;
-            hideColor =
-                (trial === 2 || trial === 4) &&
-                taskState.targetPointId2D === p.id &&
-                taskState.feedback !== "success";
-            overrideColor = isTarget ? SUCCESS_COLOR_VEC : null;
-        } else if (taskState && (trial === 5 || trial === 6)) {
-            // Task 2 logic: show the OTHER player's target in green locally
-            const partnerTargetId = taskState.targetPointId3D;
-            const ownTargetId = taskState.targetPointId2D;
-            if (partnerTargetId && partnerTargetId === p.id) {
-                overrideColor = SUCCESS_COLOR_VEC;
-            } else if (taskState.clicked2D && ownTargetId === p.id) {
-                overrideColor = SUCCESS_COLOR_VEC;
-            }
-        } else if (taskState && trial === 7 && activeTrial7Assignment) {
-            const pair = getColorPairByKey(activeTrial7Assignment.key);
-            const pairSolved = activeTrial7Assignment.done2D && activeTrial7Assignment.done3D;
-
-            // Task 2-style: show the partner's target hint (3D sphere) on 2D
-            if (!pairSolved && pair && p.id === activeTrial7Assignment.point3D) {
-                overrideColor = hexToVector3(pair.hex3D);
-            }
-        }
-
+        const visuals = getPointVisual2D(taskState, p.id, colorConfig2D);
         const isCompleted = !!taskState?.completed;
-        p.draw(ctx, width, height, isTarget, isCompleted, hideColor, overrideColor);
+        p.draw(
+            ctx,
+            width,
+            height,
+            visuals.isTarget,
+            isCompleted,
+            visuals.hideColor,
+            visuals.overrideColor
+        );
     }
 }
 
@@ -292,99 +266,38 @@ canvas.addEventListener("pointerup", (ev) => {
 
 function tryHandle2DSelection(px: number, py: number) {
     const taskState = syncManager.getCurrentTask();
-    const trial = taskState?.trial ?? 1;
-
-    // Task 1 logic
-    if (
-        taskState &&
-        trial >= 2 &&
-        trial <= 4 &&
-        !taskState.completed &&
-        taskState.targetPointId2D
-    ) {
-        const points = syncManager.getLocalPoints();
-        for (let i = points.length - 1; i >= 0; i--) {
-            const p = points[i];
-            if (p.hitTest(px, py, width, height)) {
-                console.debug("2D Point clicked:", p.id);
-                const isCorrect = p.id === taskState.targetPointId2D;
-                if (isCorrect) {
-                    p.setDisplayColor(SUCCESS_COLOR_VEC);
-                } else {
-                    p.flashColorSync(ERROR_COLOR_VEC, 800);
-                }
-                syncManager.setTrial2SelectionResult(isCorrect, taskState.id);
-                break;
-            }
-        }
-        return;
-    }
-
-    // Task 2 logic
-    if (
-        taskState &&
-        (trial === 5 || trial === 6) &&
-        !taskState.completed &&
-        taskState.targetPointId2D
-    ) {
-        console.log("Task 2 2D click detected");
-        const points = syncManager.getLocalPoints();
-        for (let i = points.length - 1; i >= 0; i--) {
-            const p = points[i];
-            if (p.hitTest(px, py, width, height)) {
-                // Ignore clicks on the partner's green target
-                if (taskState.targetPointId3D && p.id === taskState.targetPointId3D) {
-                    return;
-                }
-                console.log(
-                    "Task 2 2D: Clicked point:",
-                    p.id,
-                    "Target:",
-                    taskState.targetPointId2D
-                );
-                const isCorrect = p.id === taskState.targetPointId2D;
-                if (isCorrect) {
-                    p.setDisplayColor(SUCCESS_COLOR_VEC);
-                } else {
-                    p.flashColorSync(ERROR_COLOR_VEC, 800);
-                }
-                syncManager.handleTask2Click2D(isCorrect, taskState.id);
-                break;
-            }
-        }
-        return;
-    }
-
-    if (taskState && trial === 7 && !taskState.completed && taskState.targetPointId2D) {
-        const activeIndex = taskState.colorPairIndex ?? 0;
-        const activeAssignment = taskState.trial7Assignments?.[activeIndex];
-
-        const pair = activeAssignment ? getColorPairByKey(activeAssignment.key) : null;
-        const ownColor = pair ? hexToVector3(pair.hex2D) : SUCCESS_COLOR_VEC;
-        const points = syncManager.getLocalPoints();
-        for (let i = points.length - 1; i >= 0; i--) {
-            const p = points[i];
-            if (!p.hitTest(px, py, width, height)) continue;
-
-            const isCorrect = p.id === taskState.targetPointId2D;
-            if (isCorrect) {
-                p.setDisplayColor(ownColor);
-                p.setSelectable(false);
-                drawAll();
-            } else {
-                const original = p.getBaseColor();
-                p.setColor(ERROR_COLOR_VEC);
-                drawAll();
-                setTimeout(() => {
-                    p.setColor(original);
-                    drawAll();
-                }, 800);
-            }
-            syncManager.handleTrial7Click2D(isCorrect, p.id, taskState.id);
+    const points = syncManager.getLocalPoints();
+    let clicked: Point2D | null = null;
+    for (let i = points.length - 1; i >= 0; i--) {
+        const p = points[i];
+        if (p.hitTest(px, py, width, height)) {
+            clicked = p;
             break;
         }
+    }
+
+    if (!clicked) return;
+
+    const selection = evaluateSelection2D(taskState, clicked.id, colorConfig2D);
+    if (!selection.handled) {
         return;
     }
+
+    if (selection.isCorrect) {
+        const color = selection.successColor ?? SUCCESS_COLOR_VEC;
+        clicked.setDisplayColor(color);
+        if (selection.lockOnSuccess) {
+            clicked.setSelectable(false);
+        }
+        drawAll();
+    } else {
+        const errorColor = selection.errorColor ?? ERROR_COLOR_VEC;
+        const duration = selection.errorFlashDurationMs ?? 800;
+
+        clicked.flashColorSync(errorColor, duration);
+    }
+
+    syncManager.handleSelection2D(clicked.id);
 }
 
 // animate
@@ -399,20 +312,13 @@ function handleTaskStateChange(taskState: ReturnType<typeof syncManager.getCurre
     const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(trial);
     const label = `Task ${taskNumber}: Trial ${trialNumber}/${totalTrials}`;
     trialBox.textContent = label;
-    if (taskState?.trial === 7) {
+    const instruction = getInstructionForTask(taskState);
+    if (instruction.visible) {
         instructionBox.style.display = "block";
-        const activeIndex = taskState.colorPairIndex ?? 0;
-        const activeAssignment = taskState.trial7Assignments?.[activeIndex];
-        const pair = getColorPairByKey(activeAssignment?.key ?? taskState.colorPairKey);
-        const hintSide =
-            (taskState.hintSide as "2d" | "3d" | undefined) ??
-            activeAssignment?.hintSide ??
-            "2d";
-        if (pair) {
-            const colorWord = `<span style="color:${pair.hex2D};font-weight:bold;">${pair.name2D}</span>`;
-            instructionBox.innerHTML = `Find the ${colorWord} sphere`;
+        if (instruction.html) {
+            instructionBox.innerHTML = instruction.html;
         } else {
-            instructionBox.textContent = "Match the instructed colors";
+            instructionBox.textContent = instruction.text ?? "";
         }
     } else {
         instructionBox.textContent = "";
@@ -426,68 +332,16 @@ function handleTaskStateChange(taskState: ReturnType<typeof syncManager.getCurre
         clicked3D: taskState?.clicked3D,
     });
 
-    // Sync error flash from 3D side to 2D side for Trial 7
-    if (
-        trial === 7 &&
-        taskState?.errorPointId3D &&
-        taskState.errorPointId3D !== lastProcessedErrorPointId3D
-    ) {
-        lastProcessedErrorPointId3D = taskState.errorPointId3D;
-        const points = syncManager.getLocalPoints();
-        const errorPoint = points.find((p) => p.id === taskState.errorPointId3D);
-        if (errorPoint) {
-            errorPoint.flashColorSync(ERROR_COLOR_VEC, 800);
-        }
-    } else if (!taskState?.errorPointId3D) {
+    if (trial === 7) {
+        lastProcessedErrorPointId3D = processTrial7ErrorFlash2D(
+            taskState,
+            syncManager.getLocalPoints(),
+            ERROR_COLOR_VEC,
+            lastProcessedErrorPointId3D
+        );
+    } else {
         lastProcessedErrorPointId3D = null;
     }
 
-    applyCompletedTrial7Pairs(taskState);
-    ensureActiveTrial7TargetSelectable(taskState);
-}
-
-function applyCompletedTrial7Pairs(taskState: ReturnType<typeof syncManager.getCurrentTask>) {
-    if (!taskState || taskState.trial !== 7 || !taskState.trial7Assignments) return;
-
-    const points = syncManager.getLocalPoints();
-    for (const entry of taskState.trial7Assignments) {
-        const fullySolved = entry.done2D && entry.done3D;
-        if (!fullySolved) continue;
-        const point = points.find((p) => p.id === entry.point2D);
-        const partnerPoint = points.find((p) => p.id === entry.point3D);
-        const pair = getColorPairByKey(entry.key);
-        if (point && pair) {
-            const color = hexToVector3(pair.hex2D);
-            point.setBaseColor(color);
-            point.setDisplayColor(color);
-            point.setSelectable(false);
-        }
-        if (partnerPoint && pair) {
-            const partnerColor = hexToVector3(pair.hex3D);
-            partnerPoint.setBaseColor(partnerColor);
-            partnerPoint.setDisplayColor(partnerColor);
-            partnerPoint.setSelectable(false);
-        }
-    }
-}
-
-function ensureActiveTrial7TargetSelectable(
-    taskState: ReturnType<typeof syncManager.getCurrentTask>
-) {
-    if (!taskState || taskState.trial !== 7 || !taskState.trial7Assignments) return;
-    const solvedIds = new Set<string>();
-    for (const entry of taskState.trial7Assignments) {
-        if (entry.done2D && entry.done3D) {
-            solvedIds.add(entry.point2D);
-        }
-    }
-
-    const points = syncManager.getLocalPoints();
-    for (const p of points) {
-        if (solvedIds.has(p.id)) {
-            p.setSelectable(false);
-        } else {
-            p.setSelectable(true);
-        }
-    }
+    applyTaskVisuals2D(taskState, syncManager.getLocalPoints());
 }

@@ -9,7 +9,12 @@ import {
     DEFAULT_SPHERE_RADIUS,
     getDefaultPointConfig,
 } from "../../shared/src/defaultPoints";
-import { getColorPairByKey } from "../../shared/src/trial7ColorPairs";
+import {
+    TaskColorConfig3D,
+    applyTaskVisuals3D,
+    evaluateSelection3D,
+    processTrial7ErrorFlash3D,
+} from "../../shared/src/tasks";
 
 // initialize scene
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
@@ -54,10 +59,10 @@ let lastTrial: number | null = null;
 let lastColorPairIndex: number | null = null;
 let lastProcessedErrorPointId2D: string | null = null;
 let flashingPointId3D: string | null = null;
-
-function hexToColor3(hex: string) {
-    return Color3.FromHexString(hex);
-}
+const colorConfig3D: TaskColorConfig3D = {
+    success: successColor,
+    error: errorColor,
+};
 
 scene.onPointerObservable.add((pointerInfo) => {
     if (pointerInfo.type !== PointerEventTypes.POINTERPICK) {
@@ -90,69 +95,48 @@ function handlePointSelection(point: Point3D) {
         return;
     }
 
-    const trial = task.trial ?? 1;
-
-    // Task 1 logic: Trials 1 or 3 - 3D user matches the 2D-highlighted point.
-    if (trial === 1 || trial === 3) {
-        if (!task.targetPointId2D) return;
-        if (point.id === task.targetPointId2D) {
-            point.setDisplayColor(successColor);
-            syncManager3D.markGuessTrialSuccess(task.id);
-            scheduleNextTrialFrom3D(trial, task.id);
-        } else {
-            point.flashColorSynced(errorColor, 1000);
-        }
+    const selection = evaluateSelection3D(task, point.id, colorConfig3D);
+    if (!selection.handled) {
         return;
     }
 
-    // Trials 2 or 4 are driven by 2D clicks; ignore 3D selections in Task 1.
-    if (trial === 2 || trial === 4) {
-        return;
-    }
-
-    // Trial 7: color-paired collaborative round
-    if (trial === 7) {
-        if (!task.targetPointId3D) {
-            console.warn("Trial 7: No targetPointId3D set!");
-            return;
-        }
-        const pair = getColorPairByKey(
-            task.trial7Assignments?.[task.colorPairIndex ?? 0]?.key ?? task.colorPairKey
-        );
-        const ownColor = pair ? hexToColor3(pair.hex3D) : successColor;
-        const isCorrect = point.id === task.targetPointId3D;
-        if (isCorrect) {
-            point.setDisplayColor(ownColor);
+    if (selection.isCorrect) {
+        const color = selection.successColor ?? successColor;
+        point.setDisplayColor(color);
+        if (selection.lockOnSuccess) {
             point.setSelectable(false);
-        } else {
-            flashingPointId3D = point.id;
-            point.flashColorSynced(errorColor, 800);
-            setTimeout(() => {
-                flashingPointId3D = null;
-            }, 850);
         }
-        syncManager3D.handleTrial7Click3D(isCorrect, point.id, task.id);
-        return;
+    } else {
+        const flashColor = selection.errorColor ?? errorColor;
+        const duration = selection.flashDurationMs ?? 800;
+        if (selection.stateUpdate === "task3") {
+            flashingPointId3D = point.id;
+        }
+        point.flashColorSynced(flashColor, duration);
+        if (selection.stateUpdate === "task3") {
+            setTimeout(() => {
+                if (flashingPointId3D === point.id) {
+                    flashingPointId3D = null;
+                }
+            }, duration + 50);
+        }
     }
 
-    // Task 2 logic: Trials 5/6 - collaborative trial
-    if (trial === 5 || trial === 6) {
-        console.log("Task 2 click detected. Point:", point.id, "Target:", task.targetPointId3D);
-        if (!task.targetPointId3D) {
-            console.warn("Task 2: No targetPointId3D set!");
-            return;
-        }
-        // Ignore clicks on the other player's target (shown in green locally)
-        if (point.id === task.targetPointId2D) {
-            return;
-        }
-        const isCorrect = point.id === task.targetPointId3D;
-        if (isCorrect) {
-            point.setDisplayColor(successColor);
-        } else {
-            point.flashColorSynced(errorColor, 800);
-        }
-        syncManager3D.handleTask2Click3D(isCorrect, task.id);
+    switch (selection.stateUpdate) {
+        case "task1":
+            if (selection.isCorrect) {
+                syncManager3D.markGuessTrialSuccess(task.id);
+                if (selection.advanceTrial) {
+                    scheduleNextTrialFrom3D(task.trial, task.id);
+                }
+            }
+            break;
+        case "task2":
+            syncManager3D.handleTask2Click3D(!!selection.isCorrect, task.id);
+            break;
+        case "task3":
+            syncManager3D.handleTrial7Click3D(!!selection.isCorrect, point.id, task.id);
+            break;
     }
 }
 
@@ -189,6 +173,7 @@ function handleTaskStateChange(task: ReturnType<typeof syncManager3D.getCurrentT
 
     if (trial !== 7) {
         clearLocalHints();
+        flashingPointId3D = null;
     }
 
     const colorPairIndex = task?.colorPairIndex ?? null;
@@ -214,113 +199,26 @@ function handleTaskStateChange(task: ReturnType<typeof syncManager3D.getCurrentT
     lastTrial = trial;
     lastColorPairIndex = colorPairIndex;
 
-    if (trial === 2 || trial === 4) {
-        applyTrial2Visuals(task);
-    } else if (trial === 5 || trial === 6) {
-        applyTask2Visuals(task);
-    } else if (trial === 7) {
-        applyTrial7Visuals(task);
+    applyTaskVisuals3D(task, pointsById, colorConfig3D, {
+        flashingPointId: flashingPointId3D,
+        resetAllPointColors,
+    });
+
+    if (trial === 7) {
+        lastProcessedErrorPointId2D = processTrial7ErrorFlash3D(
+            task,
+            pointsById,
+            errorColor,
+            lastProcessedErrorPointId2D
+        );
+    } else {
+        lastProcessedErrorPointId2D = null;
     }
 }
 
 function clearLocalHints() {
     for (const p of pointsById.values()) {
         p.clearLocalOverrideColor();
-    }
-}
-
-function applyTask2Visuals(task: ReturnType<typeof syncManager3D.getCurrentTask>) {
-    if (!task || (task.trial !== 5 && task.trial !== 6)) {
-        return;
-    }
-
-    // Show the other player's target (2D target) locally in green without syncing
-    if (task.targetPointId2D) {
-        const partnerTarget = pointsById.get(task.targetPointId2D);
-        partnerTarget?.setLocalOverrideColor(successColor);
-    }
-
-    // Keep showing synced success on the 3D user's own target after a correct click
-    if (task.clicked3D && task.targetPointId3D) {
-        const targetPoint = pointsById.get(task.targetPointId3D);
-        if (!targetPoint) {
-            console.warn("Task 2: Target point not found:", task.targetPointId3D);
-            return;
-        }
-        targetPoint.setDisplayColor(successColor);
-    }
-}
-
-function applyTrial7Visuals(task: ReturnType<typeof syncManager3D.getCurrentTask>) {
-    if (!task || task.trial !== 7) {
-        return;
-    }
-
-    const activeIndex = task.colorPairIndex ?? 0;
-    const activeAssignment = task.trial7Assignments?.[activeIndex];
-    const activePair = activeAssignment ? getColorPairByKey(activeAssignment.key) : null;
-    const activeSolved = activeAssignment && activeAssignment.done2D && activeAssignment.done3D;
-
-    // Only keep hint color visible on the active target; clear everything else unless flashing
-    if (!flashingPointId3D) {
-        clearLocalHints();
-    }
-
-    // Make unsolved own-target spheres clickable; partner hint spheres stay non-clickable; solved stay locked
-    if (task.trial7Assignments) {
-        for (const entry of task.trial7Assignments) {
-            const vrTarget = pointsById.get(entry.point3D);
-            const pcHintSphere = pointsById.get(entry.point2D);
-            const solved = entry.done2D && entry.done3D;
-
-            if (vrTarget) {
-                vrTarget.setSelectable(!solved);
-            }
-            if (pcHintSphere) {
-                pcHintSphere.setSelectable(false);
-            }
-        }
-    }
-
-    // Task 2-style: show the partner's target hint (2D circle) on 3D
-    if (activeAssignment && activePair && !activeSolved) {
-        const partnerPoint = pointsById.get(activeAssignment.point2D);
-        if (partnerPoint) {
-            partnerPoint.setLocalOverrideColor(hexToColor3(activePair.hex2D));
-        }
-    }
-
-    applyCompletedTrial7Pairs(task);
-
-    // Sync error flash from 2D side to 3D side
-    if (task.errorPointId2D && task.errorPointId2D !== lastProcessedErrorPointId2D) {
-        lastProcessedErrorPointId2D = task.errorPointId2D;
-        const errorPoint = pointsById.get(task.errorPointId2D);
-        if (errorPoint) {
-            errorPoint.flashColorSynced(errorColor, 800);
-        }
-    } else if (!task.errorPointId2D) {
-        lastProcessedErrorPointId2D = null;
-    }
-}
-
-function applyTrial2Visuals(task: ReturnType<typeof syncManager3D.getCurrentTask>) {
-    const trial = task?.trial ?? 1;
-    if (!task || (trial !== 2 && trial !== 4) || !task.targetPointId2D) {
-        return;
-    }
-
-    if (task.feedback === "none") {
-        resetAllPointColors();
-    }
-
-    const targetPoint = pointsById.get(task.targetPointId2D);
-    if (!targetPoint) {
-        return;
-    }
-
-    if (task.feedback === "none" || task.feedback === "success") {
-        targetPoint.setDisplayColor(successColor);
     }
 }
 
@@ -337,30 +235,6 @@ function resetAllPointColors() {
         }
         p.resetToBaseColor();
         p.setSelectable(true);
-    }
-}
-
-function applyCompletedTrial7Pairs(task: ReturnType<typeof syncManager3D.getCurrentTask>) {
-    if (!task || task.trial !== 7 || !task.trial7Assignments) return;
-
-    for (const entry of task.trial7Assignments) {
-        const fullySolved = entry.done2D && entry.done3D;
-        if (!fullySolved) continue;
-        const point = pointsById.get(entry.point3D);
-        const partnerPoint = pointsById.get(entry.point2D);
-        const pair = getColorPairByKey(entry.key);
-        if (point && pair) {
-            point.clearLocalOverrideColor();
-            const color = hexToColor3(pair.hex3D);
-            point.setPermanentColor(color);
-            point.setSelectable(false);
-        }
-        if (partnerPoint && pair) {
-            partnerPoint.clearLocalOverrideColor();
-            const partnerColor = hexToColor3(pair.hex2D);
-            partnerPoint.setPermanentColor(partnerColor);
-            partnerPoint.setSelectable(false);
-        }
     }
 }
 

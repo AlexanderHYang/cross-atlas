@@ -5,7 +5,16 @@
  * Both must click their correct targets to complete the trial.
  */
 
-import type { TaskState, TaskTrial } from "./task";
+import type {
+    TaskState,
+    TaskTrial,
+    TaskColorConfig2D,
+    TaskColorConfig3D,
+    TaskPointVisual2D,
+    TaskSelection2DEffect,
+    TaskSelection3DEffect,
+    TaskPoint3D,
+} from "./task";
 
 export const TASK2_ID = "task2";
 export const TASK2_TRIALS: TaskTrial[] = [5, 6];
@@ -101,4 +110,103 @@ export function handleTask2Selection3D(
     };
 
     return { updated, isCorrect, shouldTransition: bothCorrect };
+}
+
+const DEFAULT_VISUAL_2D: TaskPointVisual2D = {
+    isTarget: false,
+    hideColor: false,
+    overrideColor: null,
+};
+
+export function getTask2PointVisual2D(
+    taskState: TaskState | null,
+    pointId: string,
+    colors: TaskColorConfig2D
+): TaskPointVisual2D {
+    if (!taskState || !isTask2Trial(taskState.trial)) {
+        return DEFAULT_VISUAL_2D;
+    }
+
+    const partnerTargetId = taskState.targetPointId3D;
+    const ownTargetId = taskState.targetPointId2D;
+    let overrideColor: TaskPointVisual2D["overrideColor"] = null;
+
+    if (partnerTargetId && partnerTargetId === pointId) {
+        overrideColor = colors.success;
+    } else if (taskState.clicked2D && ownTargetId === pointId) {
+        overrideColor = colors.success;
+    }
+
+    return {
+        isTarget: ownTargetId === pointId,
+        hideColor: false,
+        overrideColor,
+    };
+}
+
+export function evaluateTask2Selection2D(
+    taskState: TaskState | null,
+    selectedPointId: string,
+    colors: TaskColorConfig2D
+): TaskSelection2DEffect {
+    if (!taskState || !isTask2Trial(taskState.trial) || taskState.completed) {
+        return { handled: false };
+    }
+
+    if (!taskState.targetPointId2D || selectedPointId === taskState.targetPointId3D) {
+        return { handled: false };
+    }
+
+    const isCorrect = selectedPointId === taskState.targetPointId2D;
+    return {
+        handled: true,
+        isCorrect,
+        successColor: colors.success,
+        errorColor: colors.error,
+        errorFlashDurationMs: 800,
+    };
+}
+
+export function evaluateTask2Selection3D(
+    taskState: TaskState | null,
+    selectedPointId: string,
+    colors: TaskColorConfig3D
+): TaskSelection3DEffect {
+    if (!taskState || !isTask2Trial(taskState.trial) || taskState.completed) {
+        return { handled: false };
+    }
+
+    if (!taskState.targetPointId3D || selectedPointId === taskState.targetPointId2D) {
+        return { handled: false };
+    }
+
+    const isCorrect = selectedPointId === taskState.targetPointId3D;
+    return {
+        handled: true,
+        isCorrect,
+        successColor: colors.success,
+        errorColor: colors.error,
+        flashDurationMs: 800,
+        stateUpdate: "task2",
+    };
+}
+
+export function applyTask2Visuals3D(
+    taskState: TaskState | null,
+    pointsById: Map<string, TaskPoint3D>,
+    colors: TaskColorConfig3D
+) {
+    if (!taskState || !isTask2Trial(taskState.trial)) {
+        return;
+    }
+
+    if (taskState.targetPointId2D) {
+        const partnerTarget = pointsById.get(taskState.targetPointId2D);
+        partnerTarget?.setLocalOverrideColor(colors.success);
+    }
+
+    if (taskState.clicked3D && taskState.targetPointId3D) {
+        const targetPoint = pointsById.get(taskState.targetPointId3D);
+        targetPoint?.setDisplayColor(colors.success);
+    }
 }

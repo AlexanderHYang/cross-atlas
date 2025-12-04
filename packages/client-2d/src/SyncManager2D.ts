@@ -30,11 +30,11 @@ import {
     isTask3Trial,
     getFirstEnabledTask,
     type PointIdProvider,
-} from "../../shared/src/task";
+} from "../../shared/src/tasks";
 import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
 import { Vector3 } from "@babylonjs/core";
 
-const TASK3_NEUTRAL_COLOR = new Vector3(0.82, 0.82, 0.82);
+const TASK3_NEUTRAL_COLOR = new Vector3(1, 1, 1);
 
 export class SyncManager2D implements PointIdProvider {
     private ydoc: Y.Doc;
@@ -464,6 +464,20 @@ export class SyncManager2D implements PointIdProvider {
         // Schedule transition if needed
         if (result.shouldTransition || result.shouldAdvancePair) {
             this.scheduleNextTransition(result.updated);
+        }
+
+        // Clear trial 7 error after the flash so repeated incorrect clicks still sync
+        if (isTask3Trial(trial) && !result.isCorrect) {
+            const errorId = selectedPointId;
+            window.setTimeout(() => {
+                const latest = this.normalizeTaskState(this.taskMap.get(this.activeTaskId));
+                if (!latest || latest.trial !== 7) return;
+                if (latest.errorPointId2D !== errorId) return;
+                const cleared: TaskState = { ...latest, errorPointId2D: null };
+                this.taskMap.set(this.activeTaskId, cleared);
+                this.currentTask = cleared;
+                this.notifyTaskListeners();
+            }, result.updated.errorPointId2D ? 850 : 850);
         }
 
         return { isCorrect: result.isCorrect };

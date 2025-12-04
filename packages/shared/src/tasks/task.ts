@@ -1,3 +1,30 @@
+import { Color3, Vector3 } from "@babylonjs/core";
+import {
+    getTask1PointVisual2D,
+    evaluateTask1Selection2D,
+    evaluateTask1Selection3D,
+    applyTask1Visuals3D,
+    isTask1Trial,
+} from "./task1";
+import {
+    getTask2PointVisual2D,
+    evaluateTask2Selection2D,
+    evaluateTask2Selection3D,
+    applyTask2Visuals3D,
+    isTask2Trial,
+} from "./task2";
+import {
+    getTask3PointVisual2D,
+    evaluateTask3Selection2D,
+    evaluateTask3Selection3D,
+    getTask3Instruction,
+    applyTask3Visuals2D,
+    applyTask3Visuals3D,
+    processTrial7ErrorFlash2D,
+    processTrial7ErrorFlash3D,
+    isTask3Trial,
+} from "./task3";
+
 /**
  * Common types and constants for the task system.
  *
@@ -31,8 +58,8 @@ export type TaskFlowConfig = {
 
 /*-------- Task switch --------*/
 let taskFlowConfig: TaskFlowConfig = {
-    task1: false,
-    task2: false,
+    task1: true,
+    task2: true,
     task3: true,
 };
 
@@ -122,6 +149,71 @@ export type TaskState = {
     trial7Assignments?: Trial7Assignment[];
 };
 
+export type TaskInstructionContent = {
+    visible: boolean;
+    text?: string;
+    html?: string;
+};
+
+export type TaskColorConfig2D = {
+    success: Vector3;
+    error: Vector3;
+};
+
+export type TaskColorConfig3D = {
+    success: Color3;
+    error: Color3;
+};
+
+export type TaskPointVisual2D = {
+    isTarget: boolean;
+    hideColor: boolean;
+    overrideColor: Vector3 | null;
+};
+
+export type TaskSelection2DEffect = {
+    handled: boolean;
+    isCorrect?: boolean;
+    successColor?: Vector3;
+    errorColor?: Vector3;
+    lockOnSuccess?: boolean;
+    revertToBaseAfterError?: boolean;
+    errorFlashDurationMs?: number;
+};
+
+export type TaskSelection3DEffect = {
+    handled: boolean;
+    isCorrect?: boolean;
+    successColor?: Color3;
+    errorColor?: Color3;
+    lockOnSuccess?: boolean;
+    advanceTrial?: boolean;
+    flashDurationMs?: number;
+    stateUpdate?: "task1" | "task2" | "task3";
+};
+
+export type TaskPoint2D = {
+    id: string;
+    setBaseColor(color: Vector3): void;
+    setDisplayColor(color: Vector3): void;
+    setSelectable(selectable: boolean): void;
+    getBaseColor(): Vector3;
+    setColor(color: Vector3): void;
+    flashColorSync(color: Vector3, durationMs: number): void;
+};
+
+export type TaskPoint3D = {
+    id: string;
+    setDisplayColor(color: Color3): void;
+    setLocalOverrideColor(color: Color3): void;
+    setPermanentColor(color: Color3): void;
+    setSelectable(selectable: boolean): void;
+    clearLocalOverrideColor(): void;
+    resetToBaseColor(): void;
+    getDefaultColor(): Color3;
+    flashColorSynced(color: Color3, durationMs: number): void;
+};
+
 export const TASK_COLLECTION = "task";
 export const TASK_META_COLLECTION = "taskMeta";
 
@@ -181,6 +273,119 @@ export function getTaskAndTrial(trial: TaskTrial): {
     return { taskNumber: 1, trialNumber: 1, totalTrials: 4 };
 }
 
+const DEFAULT_POINT_VISUAL_2D: TaskPointVisual2D = {
+    isTarget: false,
+    hideColor: false,
+    overrideColor: null,
+};
+
+export function getPointVisual2D(
+    taskState: TaskState | null,
+    pointId: string,
+    colors: TaskColorConfig2D
+): TaskPointVisual2D {
+    if (!taskState) {
+        return DEFAULT_POINT_VISUAL_2D;
+    }
+
+    if (isTask1Trial(taskState.trial)) {
+        return getTask1PointVisual2D(taskState, pointId, colors);
+    }
+
+    if (isTask2Trial(taskState.trial)) {
+        return getTask2PointVisual2D(taskState, pointId, colors);
+    }
+
+    if (isTask3Trial(taskState.trial)) {
+        return getTask3PointVisual2D(taskState, pointId);
+    }
+
+    return DEFAULT_POINT_VISUAL_2D;
+}
+
+export function evaluateSelection2D(
+    taskState: TaskState | null,
+    selectedPointId: string,
+    colors: TaskColorConfig2D
+): TaskSelection2DEffect {
+    if (!taskState) {
+        return { handled: false };
+    }
+
+    if (isTask1Trial(taskState.trial)) {
+        return evaluateTask1Selection2D(taskState, selectedPointId, colors);
+    }
+
+    if (isTask2Trial(taskState.trial)) {
+        return evaluateTask2Selection2D(taskState, selectedPointId, colors);
+    }
+
+    if (isTask3Trial(taskState.trial)) {
+        return evaluateTask3Selection2D(taskState, selectedPointId, colors);
+    }
+
+    return { handled: false };
+}
+
+export function evaluateSelection3D(
+    taskState: TaskState | null,
+    selectedPointId: string,
+    colors: TaskColorConfig3D
+): TaskSelection3DEffect {
+    if (!taskState) {
+        return { handled: false };
+    }
+
+    if (isTask1Trial(taskState.trial)) {
+        return evaluateTask1Selection3D(taskState, selectedPointId, colors);
+    }
+
+    if (isTask2Trial(taskState.trial)) {
+        return evaluateTask2Selection3D(taskState, selectedPointId, colors);
+    }
+
+    if (isTask3Trial(taskState.trial)) {
+        return evaluateTask3Selection3D(taskState, selectedPointId, colors);
+    }
+
+    return { handled: false };
+}
+
+export function getInstructionForTask(taskState: TaskState | null): TaskInstructionContent {
+    if (taskState?.trial === 7) {
+        return getTask3Instruction(taskState);
+    }
+    return { visible: false, text: "" };
+}
+
+export function applyTaskVisuals2D(taskState: TaskState | null, points: Iterable<TaskPoint2D>) {
+    if (taskState?.trial === 7) {
+        applyTask3Visuals2D(taskState, points);
+    }
+}
+
+export function applyTaskVisuals3D(
+    taskState: TaskState | null,
+    pointsById: Map<string, TaskPoint3D>,
+    colors: TaskColorConfig3D,
+    options?: { flashingPointId?: string | null; resetAllPointColors?: () => void }
+) {
+    if (!taskState) return;
+
+    if (isTask1Trial(taskState.trial)) {
+        applyTask1Visuals3D(
+            taskState,
+            pointsById,
+            colors,
+            options?.resetAllPointColors ?? (() => {})
+        );
+    } else if (isTask2Trial(taskState.trial)) {
+        applyTask2Visuals3D(taskState, pointsById, colors);
+    } else if (isTask3Trial(taskState.trial)) {
+        applyTask3Visuals3D(taskState, pointsById, colors, options?.flashingPointId ?? null);
+    }
+}
+
 // Re-export task-specific functions for convenience
 export {
     isTask1Trial,
@@ -188,6 +393,10 @@ export {
     handleTask1Selection2D,
     handleTask1Selection3D,
     getNextTask1Trial,
+    getTask1PointVisual2D,
+    evaluateTask1Selection2D,
+    evaluateTask1Selection3D,
+    applyTask1Visuals3D,
 } from "./task1";
 
 export {
@@ -196,6 +405,10 @@ export {
     handleTask2Selection2D,
     handleTask2Selection3D,
     getNextTask2Trial,
+    getTask2PointVisual2D,
+    evaluateTask2Selection2D,
+    evaluateTask2Selection3D,
+    applyTask2Visuals3D,
 } from "./task2";
 
 export {
@@ -205,6 +418,18 @@ export {
     handleTask3Selection2D,
     handleTask3Selection3D,
     advanceToNextPair,
+    getTask3PointVisual2D,
+    evaluateTask3Selection2D,
+    evaluateTask3Selection3D,
+    getTask3Instruction,
+    applyTask3Visuals2D,
+    applyTask3Visuals3D,
+    applyCompletedTrial7Pairs2D,
+    applyCompletedTrial7Pairs3D,
+    setTrial7Selectability2D,
+    setTrial7Selectability3D,
+    processTrial7ErrorFlash2D,
+    processTrial7ErrorFlash3D,
 } from "./task3";
 
 export {
@@ -224,4 +449,4 @@ export {
     type PointIdProvider,
     type TaskFlowState,
     type TaskTransition,
-} from "./taskRunner";
+} from "../taskRunner";

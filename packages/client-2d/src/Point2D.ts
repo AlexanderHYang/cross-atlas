@@ -27,6 +27,7 @@ export class Point2D {
     private colorLock: Vector3 | null = null;
     private positionLock: { nx: number; ny: number } | null = null;
     private flashHandle: number | null = null;
+    private flashing: boolean = false;
 
     constructor(id: string, syncManager: SyncManager2D) {
         this.id = id;
@@ -51,6 +52,10 @@ export class Point2D {
 
     public setSelectable(value: boolean) {
         this.selectable = value;
+    }
+
+    public isSelectable() {
+        return this.selectable;
     }
 
     public setColor(color: Vector3) {
@@ -84,9 +89,18 @@ export class Point2D {
     }
 
     public flashColorSync(color: Vector3, durationMs: number = 800) {
+        if (this.flashHandle !== null) {
+            window.clearTimeout(this.flashHandle);
+            this.flashHandle = null;
+        }
+        const wasSelectable = this.selectable;
+        this.flashing = true;
+        this.setSelectable(false);
         this.setDisplayColor(color);
         this.flashHandle = window.setTimeout(() => {
             this.resetToBaseColor();
+            this.setSelectable(wasSelectable);
+            this.flashing = false;
             this.flashHandle = null;
         }, durationMs);
     }
@@ -258,7 +272,7 @@ export class Point2D {
     }
 
     hitTest(px: number, py: number, width: number, height: number) {
-        if (!this.selectable) {
+        if (!this.selectable || this.flashing) {
             return false;
         }
         const x = ((this.nx + 1) / 2) * width;

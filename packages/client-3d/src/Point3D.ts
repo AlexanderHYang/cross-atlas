@@ -164,6 +164,8 @@ export class Point3D {
     }
 
     public flashColorSynced(color: Color3, durationMs: number) {
+        const wasSelectable = this.selectable;
+        this.setSelectable(false);
         if (this.flashHandle !== null) {
             window.clearTimeout(this.flashHandle);
             this.flashHandle = null;
@@ -172,6 +174,7 @@ export class Point3D {
         this.onLocalChange();
         this.flashHandle = window.setTimeout(() => {
             this.resetToBaseColor();
+            this.setSelectable(wasSelectable);
             this.onLocalChange();
             this.flashHandle = null;
         }, durationMs);

@@ -7,8 +7,8 @@
  * - State management for the overall task flow
  */
 
-import type { TaskState, TaskId, TaskTrial, Trial7Assignment } from "./task";
-import { getTaskFlowConfig, getTaskAndTrial } from "./task";
+import type { TaskState, TaskId, TaskTrial, Trial7Assignment } from "./tasks/task";
+import { getTaskFlowConfig, getTaskAndTrial } from "./tasks/task";
 import {
     TASK1_ID,
     createTask1State,
@@ -16,7 +16,7 @@ import {
     isTask1Trial,
     isTask1Complete,
     Task1Trial,
-} from "./task1";
+} from "./tasks/task1";
 import {
     TASK2_ID,
     createTask2State,
@@ -24,7 +24,7 @@ import {
     isTask2Trial,
     isTask2Complete,
     Task2Trial,
-} from "./task2";
+} from "./tasks/task2";
 import {
     TASK3_ID,
     createTask3State,
@@ -32,7 +32,7 @@ import {
     isTask3Trial,
     advanceToNextPair,
     isTask3Complete,
-} from "./task3";
+} from "./tasks/task3";
 
 export const TRANSITION_DELAY_MS = 2000;
 
