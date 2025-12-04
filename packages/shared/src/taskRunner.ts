@@ -8,7 +8,7 @@
  */
 
 import type { TaskState, TaskId, TaskTrial, Trial7Assignment } from "./task";
-import { getTaskFlowConfig } from "./task";
+import { getTaskFlowConfig, getTaskAndTrial } from "./task";
 import {
     TASK1_ID,
     createTask1State,
@@ -143,10 +143,9 @@ export function createNextTask1TrialState(
  * Creates an initial state for Task 2
  */
 export function createInitialTask2State(provider: PointIdProvider): TaskState | null {
-    const target2D = provider.pickRandomTargetId();
-    const target3D = provider.pickRandomTargetId();
-
-    if (!target2D || !target3D) return null;
+    const targets = provider.pickDistinctTargetIds(2);
+    if (!targets || targets.length < 2) return null;
+    const [target2D, target3D] = targets;
 
     return createTask2State(target2D, target3D, 5);
 }
@@ -163,10 +162,9 @@ export function createNextTask2TrialState(
 
     if (!nextTrial) return null; // Task 2 complete
 
-    const target2D = provider.pickRandomTargetId();
-    const target3D = provider.pickRandomTargetId();
-
-    if (!target2D || !target3D) return null;
+    const targets = provider.pickDistinctTargetIds(2);
+    if (!targets || targets.length < 2) return null;
+    const [target2D, target3D] = targets;
 
     return createTask2State(target2D, target3D, nextTrial);
 }
@@ -273,14 +271,68 @@ export function createNextState(
  * Logs trial start
  */
 export function logTrialStart(state: TaskState, side: "2D" | "3D" = "2D") {
-    console.log(`[${side}][Task ${state.id}] Trial ${state.trial} start`);
+    const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(state.trial);
+    console.log(
+        `[${side}][${state.id}] Task ${taskNumber} trial ${trialNumber}/${totalTrials} start`
+    );
 }
 
 /**
  * Logs trial end
  */
 export function logTrialEnd(state: TaskState, side: "2D" | "3D" = "2D") {
-    console.log(
-        `[${side}][Task ${state.id}] Trial ${state.trial} end (completed=${state.completed}, feedback=${state.feedback})`
-    );
+    const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(state.trial);
+    if (state.trial === 7 && state.trial7Assignments) {
+        const totalPairs = state.trial7Assignments.length;
+        const solvedPairs = state.trial7Assignments.filter((a) => a.done2D && a.done3D).length;
+        const activeIndex = state.colorPairIndex ?? 0;
+        const active = state.trial7Assignments[activeIndex];
+        const colorLabel = active?.key ?? "pair";
+        console.log(
+            `[${side}][${state.id}] Task ${taskNumber} trial ${trialNumber}/${totalTrials} completed ${colorLabel} (${solvedPairs}/${totalPairs} pairs solved)`
+        );
+    } else {
+        const status = state.feedback === "success" ? "success" : "end";
+        console.log(
+            `[${side}][${state.id}] Task ${taskNumber} trial ${trialNumber}/${totalTrials} ${status} (completed=${state.completed}, feedback=${state.feedback})`
+        );
+    }
+}
+
+/**
+ * Logs key lifecycle events so both 2D and 3D consoles stay in sync.
+ */
+export function logTaskLifecycle(
+    prevState: TaskState | null,
+    nextState: TaskState | null,
+    side: "2D" | "3D"
+) {
+    if (!nextState) return;
+
+    const prevInfo = prevState ? getTaskAndTrial(prevState.trial) : null;
+    const nextInfo = getTaskAndTrial(nextState.trial);
+    const taskChanged = !prevInfo || prevInfo.taskNumber !== nextInfo.taskNumber;
+    const trialChanged = prevState ? prevState.trial !== nextState.trial : true;
+
+    if (taskChanged) {
+        console.log(`[${side}][${nextState.id}] Task ${nextInfo.taskNumber} start`);
+    }
+
+    if (trialChanged) {
+        logTrialStart(nextState, side);
+    }
+
+    const completedSuccessfully =
+        nextState.feedback === "success" && nextState.completed && !prevState?.completed;
+
+    if (completedSuccessfully) {
+        logTrialEnd(nextState, side);
+        const action = determineNextAction(nextState);
+        if (action.action === "next-task" || action.action === "all-complete") {
+            console.log(`[${side}][${nextState.id}] Task ${nextInfo.taskNumber} success`);
+        }
+        if (action.action === "all-complete") {
+            console.log(`[${side}][${nextState.id}] All tasks finished 🎉🎉🎉`);
+        }
+    }
 }
