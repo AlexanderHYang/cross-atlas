@@ -48,7 +48,7 @@ export class SyncManager2D implements PointIdProvider {
     private taskMetaMap: Y.Map<TaskMeta>;
     private syncedPCADataMap: Y.Map<PlaneSyncData>;
 
-    private projectionManager = new ProjectionManager();
+    private projectionManager = new ProjectionManager("equirectangular");
     private currentTask: TaskState | null = null;
     private lastLoggedTask: TaskState | null = null;
     private taskListeners: Set<(task: TaskState | null) => void> = new Set();

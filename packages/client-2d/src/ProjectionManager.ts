@@ -71,8 +71,8 @@ export class VerticalPlaneProjection implements IProjection {
     private normal = new Vector3(0, 0, 1);
     private u = new Vector3(1, 0, 0);
     private v = new Vector3(0, 1, 0);
-    private scaleU = 2;
-    private scaleV = 2;
+    private scaleU = 5;
+    private scaleV = 5;
 
     project(point: Vector3): [number, number] {
         const relative = point.subtract(this.origin);
@@ -107,8 +107,8 @@ export class HorizontalPlaneProjection implements IProjection {
     private normal = new Vector3(0, 1, 0);
     private u = new Vector3(1, 0, 0);
     private v = new Vector3(0, 0, 1);
-    private scaleU = 2;
-    private scaleV = 2;
+    private scaleU = 5;
+    private scaleV = 5;
 
     project(point: Vector3): [number, number] {
         const relative = point.subtract(this.origin);
@@ -140,38 +140,61 @@ export class HorizontalPlaneProjection implements IProjection {
 
 
 export class ProjectionManager {
-    private projections: IProjection[] = [
-        new EquirectangularProjection(),
-        new PCAProjection(new PCAManager()),
-        new VerticalPlaneProjection(),
-        new HorizontalPlaneProjection()
-    ]
-    private currentIndex: number = 0;
+    private equirectangularProjection = new EquirectangularProjection();
+    private pcaProjection = new PCAProjection(new PCAManager);
+    private verticalPlaneProjection = new VerticalPlaneProjection();
+    private horizontalPlaneProjection = new HorizontalPlaneProjection();
+
+    private currentProjectionType: "equirectangular" | "pca" | "vertical" | "horizontal"
+
+    constructor (projectionType: "equirectangular" | "pca" | "vertical" | "horizontal") {
+        this.currentProjectionType = projectionType;
+    }
+
+    getCurrentProjection() : IProjection {
+        if (this.currentProjectionType == "equirectangular") {
+            return this.equirectangularProjection;
+        } else if (this.currentProjectionType == "pca") {
+            return this.pcaProjection;
+        } else if (this.currentProjectionType == "vertical") {
+            return this.verticalPlaneProjection;
+        } else {
+            return this.horizontalPlaneProjection;
+        }
+    }
+
+    setCurrentProjectionType(projectionType: "equirectangular" | "pca" | "vertical" | "horizontal") {
+        this.currentProjectionType = projectionType;
+    }
 
     cycleProjection(syncManager: SyncManager2D) {
-        this.currentIndex = (this.currentIndex + 1) % this.projections.length;
-
-        // update PCA if switching to it
-        const currentProjection = this.projections[this.currentIndex];
-        if (currentProjection instanceof PCAProjection) {
-            const pcaProjection = currentProjection as PCAProjection;
+        if (this.currentProjectionType == "equirectangular") {
+            this.currentProjectionType = "pca";
+            // update PCA if switching to it
+            const pcaProjection = this.getCurrentProjection() as PCAProjection;
             pcaProjection.getPcaManager().update(
                 syncManager.getRemotePoints()
                 .map(d => new Vector3(d.position.x, d.position.y, d.position.z))
             )
+        } else if (this.currentProjectionType == "pca") {
+            this.currentProjectionType = "vertical";
+        } else if (this.currentProjectionType == "vertical") {
+            this.currentProjectionType = "horizontal"
+        } else {
+            this.currentProjectionType = "equirectangular"
         }
 
-        const planeData = currentProjection.getPlaneSyncData();
+        const planeData = this.getCurrentProjection().getPlaneSyncData();
         if (planeData) {
             syncManager.updatePlaneSyncData(planeData);
         }
     }
 
     project(v: Vector3): [number, number] {
-        return this.projections[this.currentIndex].project(v);
+        return this.getCurrentProjection().project(v);
     }
 
     inverse(nx: number, ny: number, existing: Vector3): Vector3 {
-        return this.projections[this.currentIndex].inverse(nx, ny, existing);
+        return this.getCurrentProjection().inverse(nx, ny, existing);
     }
 }

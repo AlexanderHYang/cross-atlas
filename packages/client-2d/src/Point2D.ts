@@ -1,15 +1,6 @@
 import { PointSyncData, Vector3SyncData } from "../../shared/src/sync";
 import { Vector3 } from "@babylonjs/core";
 import { SyncManager2D } from "./SyncManager2D";
-import {
-    clamp,
-    equirectangularNormalizedXY,
-    inverseEquirectangularNormalizedXY,
-    latLonToVec3,
-    vec3ToLatLon,
-} from "../../shared/src/projection";
-import { getProjectionMode } from "./main-2d";
-import { PCAManager } from "./PCAManager";
 import { DefaultPointConfig, getDefaultPointConfig } from "../../shared/src/defaultPoints";
 import { ProjectionManager } from "./ProjectionManager";
 
