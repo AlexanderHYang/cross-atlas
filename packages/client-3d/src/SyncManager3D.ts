@@ -1,6 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
 import * as Y from "yjs";
-import { PCASyncData, PointSyncData } from "../../shared/src/sync";
+import { PlaneSyncData, PointSyncData } from "../../shared/src/sync";
 import { Point3D } from "./Point3D";
 import { WebsocketProvider } from "y-websocket";
 import {
@@ -43,7 +43,7 @@ export class SyncManager3D implements PointIdProvider {
     private currentTask: TaskState | null = null;
     private lastLoggedTask: TaskState | null = null;
     private taskListeners: Set<(task: TaskState | null) => void> = new Set();
-    private syncedPCADataMap: Y.Map<PCASyncData>;
+    private syncedPCADataMap: Y.Map<PlaneSyncData>;
     private transitionTimeout: number | null = null;
     private activeTaskId: TaskId = TASK1_ID;
     private updatingMeta = false;
@@ -71,7 +71,7 @@ export class SyncManager3D implements PointIdProvider {
         this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
         this.taskMap = this.ydoc.getMap(TASK_COLLECTION) as Y.Map<TaskState>;
         this.taskMetaMap = this.ydoc.getMap(TASK_META_COLLECTION) as Y.Map<TaskMeta>;
-        this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PCASyncData>;
+        this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PlaneSyncData>;
 
         // this might be unneeded?
         // 3) initialize existing remote charts
@@ -231,7 +231,7 @@ export class SyncManager3D implements PointIdProvider {
         if (!manager.currentTask) {
             manager.taskMap.set(manager.activeTaskId, {
                 id: manager.activeTaskId,
-                targetPointId: null,
+                targetPointId2D: null, // todo: is this right?
                 trial: 1,
                 hintSide: "2d",
                 feedback: "none",
@@ -566,7 +566,7 @@ export class SyncManager3D implements PointIdProvider {
         this.applyPCADataToPlane(plane, existing);
     }
 
-    private applyPCADataToPlane(plane: BABYLON.Mesh, data: PCASyncData | undefined) {
+    private applyPCADataToPlane(plane: BABYLON.Mesh, data: PlaneSyncData | undefined) {
         if (!data) {
             return;
         }

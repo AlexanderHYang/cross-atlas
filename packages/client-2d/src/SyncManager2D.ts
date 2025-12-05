@@ -1,5 +1,5 @@
 import * as Y from "yjs";
-import { PCASyncData, PointSyncData } from "../../shared/src/sync";
+import { PlaneSyncData, PointSyncData } from "../../shared/src/sync";
 import { Point2D } from "./Point2D";
 import { WebsocketProvider } from "y-websocket";
 import { PCAManager } from "./PCAManager";
@@ -33,6 +33,7 @@ import {
 } from "../../shared/src/tasks";
 import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
 import { Vector3 } from "@babylonjs/core";
+import { ProjectionManager } from "./ProjectionManager";
 
 const TASK3_NEUTRAL_COLOR = new Vector3(1, 1, 1);
 
@@ -45,9 +46,9 @@ export class SyncManager2D implements PointIdProvider {
     private syncedPointDataMap: Y.Map<PointSyncData>;
     private taskMap: Y.Map<TaskState>;
     private taskMetaMap: Y.Map<TaskMeta>;
-    private syncedPCADataMap: Y.Map<PCASyncData>;
+    private syncedPCADataMap: Y.Map<PlaneSyncData>;
 
-    private pcaManager = new PCAManager(3);
+    private projectionManager = new ProjectionManager();
     private currentTask: TaskState | null = null;
     private lastLoggedTask: TaskState | null = null;
     private taskListeners: Set<(task: TaskState | null) => void> = new Set();
@@ -79,7 +80,7 @@ export class SyncManager2D implements PointIdProvider {
         this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
         this.taskMap = this.ydoc.getMap(TASK_COLLECTION) as Y.Map<TaskState>;
         this.taskMetaMap = this.ydoc.getMap(TASK_META_COLLECTION) as Y.Map<TaskMeta>;
-        this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PCASyncData>;
+        this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PlaneSyncData>;
     }
 
     private normalizeTaskState(task: TaskState | null | undefined): TaskState | null {
@@ -139,8 +140,8 @@ export class SyncManager2D implements PointIdProvider {
                 for (const c of this.syncedPointDataMap.values()) {
                     const p = new Point2D(c.id, this);
                     p.applyDefaultConfig();
-                    p.applyRemoteData(c, this.pcaManager);
-                    console.debug("Initializing point from remote:", c);
+                    p.applyRemoteData(c, this.projectionManager);
+                    console.log("initializing point from remote:", c);
                     if (p.hasLockedColor() || p.hasPositionLock()) {
                         this.transactPointUpdate(p);
                     }
@@ -174,7 +175,7 @@ export class SyncManager2D implements PointIdProvider {
                 }
 
                 // apply remote data to local point
-                point.applyRemoteData(remoteData, this.pcaManager);
+                point.applyRemoteData(remoteData, this.projectionManager);
                 if (point.hasLockedColor() || point.hasPositionLock()) {
                     this.transactPointUpdate(point);
                 }
@@ -235,7 +236,7 @@ export class SyncManager2D implements PointIdProvider {
         console.debug("Transacting point update for", point.id);
         this.ydoc.transact(() => {
             const existing = this.syncedPointDataMap.get(point.id);
-            this.syncedPointDataMap.set(point.id, point.getLocalData(existing, this.pcaManager));
+            this.syncedPointDataMap.set(point.id, point.getLocalData(existing, this.projectionManager));
         }, point);
     }
 
@@ -252,8 +253,8 @@ export class SyncManager2D implements PointIdProvider {
         // if remote exists, apply it without re-emitting
         const remote = this.syncedPointDataMap.get(point.id);
         if (remote) {
-            console.debug("applying existing remote data to newly registered point", point.id);
-            point.applyRemoteData(remote, this.pcaManager);
+            console.log("applying existing remote data to newly registered point", point.id);
+            point.applyRemoteData(remote, this.projectionManager);
             if (point.hasLockedColor() || point.hasPositionLock()) {
                 this.transactPointUpdate(point);
             }
@@ -264,20 +265,9 @@ export class SyncManager2D implements PointIdProvider {
         }
     }
 
-    public updatePCA() {
-        // first update PCA based on all remote points
-        this.pcaManager.update(
-            this.getRemotePoints().map((d) => new Vector3(d.position.x, d.position.y, d.position.z))
-        );
-
-        // then transact PCA data
-        const mean = this.pcaManager.getMean();
-        const normal = this.pcaManager.getNormal();
+    public updatePlaneSyncData(planeData: PlaneSyncData) {
         this.ydoc.transact(() => {
-            this.syncedPCADataMap.set("pca", {
-                mean: { x: mean.x, y: mean.y, z: mean.z },
-                normal: { x: normal.x, y: normal.y, z: normal.z },
-            });
+            this.syncedPCADataMap.set("pca", planeData);
         }, this);
     }
 
@@ -290,8 +280,8 @@ export class SyncManager2D implements PointIdProvider {
     public getRemotePointById(id: string): PointSyncData | undefined {
         return this.syncedPointDataMap.get(id);
     }
-    public getPCAManager(): PCAManager {
-        return this.pcaManager;
+    public getProjectionManager(): ProjectionManager {
+        return this.projectionManager;
     }
 
     // PointIdProvider interface implementation

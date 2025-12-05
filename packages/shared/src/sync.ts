@@ -9,7 +9,7 @@ export type PointSyncData = {
     color: Vector3SyncData;
 };
 
-export type PCASyncData = {
+export type PlaneSyncData = {
     mean: Vector3SyncData;
     normal: Vector3SyncData;
 }
