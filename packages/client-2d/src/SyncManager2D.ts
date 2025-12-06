@@ -33,7 +33,7 @@ import {
 } from "../../shared/src/tasks";
 import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
 import { Vector3 } from "@babylonjs/core";
-import { ProjectionManager } from "./ProjectionManager";
+import { PCAProjection, ProjectionManager } from "./ProjectionManager";
 
 const TASK3_NEUTRAL_COLOR = new Vector3(1, 1, 1);
 
@@ -48,7 +48,7 @@ export class SyncManager2D implements PointIdProvider {
     private taskMetaMap: Y.Map<TaskMeta>;
     private syncedPCADataMap: Y.Map<PlaneSyncData>;
 
-    private projectionManager = new ProjectionManager("equirectangular");
+    private projectionManager;
     private currentTask: TaskState | null = null;
     private lastLoggedTask: TaskState | null = null;
     private taskListeners: Set<(task: TaskState | null) => void> = new Set();
@@ -81,6 +81,19 @@ export class SyncManager2D implements PointIdProvider {
         this.taskMap = this.ydoc.getMap(TASK_COLLECTION) as Y.Map<TaskState>;
         this.taskMetaMap = this.ydoc.getMap(TASK_META_COLLECTION) as Y.Map<TaskMeta>;
         this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PlaneSyncData>;
+
+        // 3) initialize projection manager
+        const projectionOption = import.meta.env.VITE_PROJECTION;
+        let projectionType: "equirectangular" | "pca" | "vertical" | "horizontal" = "equirectangular";
+        if (projectionOption === "pca") {
+            projectionType = "pca";
+        } else if (projectionOption === "vertical") {
+            projectionType = "vertical";
+        } else if (projectionOption === "horizontal") {
+            projectionType = "horizontal";
+        }
+        this.projectionManager = new ProjectionManager(projectionType);
+
     }
 
     private normalizeTaskState(task: TaskState | null | undefined): TaskState | null {
@@ -142,7 +155,10 @@ export class SyncManager2D implements PointIdProvider {
                     p.applyDefaultConfig();
                     p.applyRemoteData(c, this.projectionManager);
                     console.log("initializing point from remote:", c);
-                    if (p.hasLockedColor() || p.hasPositionLock()) {
+                    // if (p.hasLockedColor() || p.hasPositionLock()) {
+                    //     this.transactPointUpdate(p);
+                    // }
+                    if (p.hasLockedColor()) {
                         this.transactPointUpdate(p);
                     }
                     this.localPointsById.set(p.id, p);
@@ -176,7 +192,10 @@ export class SyncManager2D implements PointIdProvider {
 
                 // apply remote data to local point
                 point.applyRemoteData(remoteData, this.projectionManager);
-                if (point.hasLockedColor() || point.hasPositionLock()) {
+                // if (point.hasLockedColor() || point.hasPositionLock()) {
+                //     this.transactPointUpdate(point);
+                // }
+                if (point.hasLockedColor()) {
                     this.transactPointUpdate(point);
                 }
             }
@@ -210,6 +229,23 @@ export class SyncManager2D implements PointIdProvider {
         });
     }
 
+    private initializeProjection() {
+        // if PCA then update it with any remote points
+        if (this.projectionManager.getCurrentProjectionType() === "pca") {
+            const pcaProjection = this.projectionManager.getCurrentProjection() as PCAProjection;
+            pcaProjection.getPcaManager().update(
+                this.getRemotePoints()
+                .map(d => new Vector3(d.position.x, d.position.y, d.position.z))
+            );
+        }
+
+        // update PCA plane data if applicable
+        const pcaPlaneData = this.projectionManager.getCurrentProjection().getPlaneSyncData();
+        if (pcaPlaneData) {
+            this.updatePlaneSyncData(pcaPlaneData);
+        }
+    }
+
     public static async create(): Promise<SyncManager2D> {
         const manager = new SyncManager2D();
         await manager.waitForInitialSync();
@@ -229,6 +265,9 @@ export class SyncManager2D implements PointIdProvider {
             manager.setNeutralColorsForTask3(manager.currentTask.trial7Assignments);
         }
         manager.notifyTaskListeners();
+
+        manager.initializeProjection();
+
         return manager;
     }
 
@@ -255,7 +294,10 @@ export class SyncManager2D implements PointIdProvider {
         if (remote) {
             console.log("applying existing remote data to newly registered point", point.id);
             point.applyRemoteData(remote, this.projectionManager);
-            if (point.hasLockedColor() || point.hasPositionLock()) {
+            // if (point.hasLockedColor() || point.hasPositionLock()) {
+            //     this.transactPointUpdate(point);
+            // }
+            if (point.hasLockedColor()) {
                 this.transactPointUpdate(point);
             }
         } else {

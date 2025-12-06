@@ -88,7 +88,6 @@ const syncManager: SyncManager2D = await SyncManager2D.create();
 if (syncManager.getLocalPoints().length === 0) {
     for (const cfg of DEFAULT_POINT_CONFIGS) {
         const point = new Point2D(cfg.id, syncManager);
-        point.setRadiusHint(DEFAULT_SPHERE_RADIUS);
         point.applyDefaultConfig(cfg);
         const direction = new Vector3(cfg.direction.x, cfg.direction.y, cfg.direction.z);
         if (direction.lengthSquared() === 0) {

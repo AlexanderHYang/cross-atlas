@@ -19,11 +19,6 @@ export type DefaultPointConfig = {
    * Whether this point can be selected/clicked. Defaults to true.
    */
   selectable?: boolean;
-  /**
-   * Optional normalized 2D coordinates ([-1,1]) where this point should be locked
-   * in the dashboard UI.
-   */
-  locked2dPosition?: { nx: number; ny: number };
 };
 
 export const DEFAULT_SPHERE_RADIUS = 3;
@@ -31,7 +26,7 @@ export const DEFAULT_SPHERE_RADIUS = 3;
 export const DEFAULT_POINT_CONFIGS: DefaultPointConfig[] = [
   { id: "point1", direction: { x: 0, y: 1, z: 0 }, draggable: false },   // north pole
   { id: "point2", direction: { x: 0, y: -1, z: 0 }, draggable: false },  // south pole
-  { id: "point3", direction: { x: 1, y: 0, z: 0 }, color: { x: 0, y: 0, z: 1 }, draggable: false, selectable: false, locked2dPosition: { nx: 0, ny: 0 } },   // landmark (centered, non-interactable)
+  { id: "point3", direction: { x: 1, y: 0, z: 0 }, color: { x: 0, y: 0, z: 1 }, draggable: false, selectable: false },   // landmark (centered, non-interactable)
   { id: "point4", direction: { x: -1, y: 0, z: 0 }, draggable: false },
   { id: "point5", direction: { x: 0, y: 0, z: 1 }, draggable: false },
   { id: "point6", direction: { x: 0, y: 0, z: -1 }, draggable: false },

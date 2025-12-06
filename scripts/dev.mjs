@@ -58,7 +58,7 @@ async function runOneOff(command, args, label) {
   });
 }
 
-function startService(label, command, args) {
+function startService(label, command, args, extraEnv = {}) {
   console.log(`Starting ${label}...`);
 
   let resolveExit;
@@ -68,7 +68,7 @@ function startService(label, command, args) {
 
   const child = spawn(command, args, {
     stdio: "inherit",
-    env: process.env,
+    env: { ...process.env, ...extraEnv },
     shell: false,
   });
 
@@ -140,6 +140,37 @@ function shutdown(trigger, exitCode = 0) {
 process.on("SIGINT", () => shutdown("SIGINT", 0));
 process.on("SIGTERM", () => shutdown("SIGTERM", 0));
 
+function parseArguments() {
+  const args = process.argv.slice(2);
+  const envVars = {};
+
+  const allowedProjections = new Set([
+    "spherical",
+    "pca",
+    "vertical",
+    "horizontal",
+  ]);
+
+  for (const arg of args) {
+    // parse --projection option
+    if (arg.startsWith("--projection=")) {
+      const projection = arg.split("=")[1];
+      if (allowedProjections.has(projection)) {
+        envVars["VITE_PROJECTION"] = projection;
+      } else {
+        console.error(
+          `Invalid --projection=${projection}. Allowed: ${[...allowedProjections].join(
+            ", "
+          )}`
+        );
+        process.exit(1);
+      }
+    }
+  }
+
+  return envVars;
+}
+
 async function main() {
   try {
     await ensureCertificates();
@@ -147,6 +178,8 @@ async function main() {
     console.error("Failed to ensure certificates:", error);
     process.exit(1);
   }
+
+  const additionalEnv = parseArguments();
 
   startService("yjs", process.execPath, [yjsScript]);
 
@@ -156,14 +189,16 @@ async function main() {
   startService("client-2d", process.execPath, [
     viteBin,
     "--config",
-    vite2dConfig,
-  ]);
+    vite2dConfig],
+    additionalEnv
+  );
 
   startService("client-3d", process.execPath, [
     viteBin,
     "--config",
-    vite3dConfig,
-  ]);
+    vite3dConfig],
+    additionalEnv
+  );
 
   console.log("\nAll services launched. Press Ctrl+C to stop them all together.\n");
 

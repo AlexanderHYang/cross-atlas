@@ -13,11 +13,9 @@ export class Point2D {
     // 2d specific state
     nx: number = 0;
     ny: number = 0;
-    private radiusHint: number = 1;
     private draggable: boolean = true;
     private selectable: boolean = true;
     private colorLock: Vector3 | null = null;
-    private positionLock: { nx: number; ny: number } | null = null;
     private flashHandle: number | null = null;
     private flashing: boolean = false;
 
@@ -26,12 +24,6 @@ export class Point2D {
         this.onLocalChange = () => {
             syncManager.transactPointUpdate(this);
         };
-    }
-
-    public setRadiusHint(radius: number) {
-        if (Number.isFinite(radius) && radius > 0) {
-            this.radiusHint = radius;
-        }
     }
 
     public setDraggable(value: boolean) {
@@ -113,20 +105,6 @@ export class Point2D {
         return this.colorLock !== null;
     }
 
-    public setPositionLock(nx: number, ny: number) {
-        this.positionLock = { nx, ny };
-        this.nx = nx;
-        this.ny = ny;
-    }
-
-    public clearPositionLock() {
-        this.positionLock = null;
-    }
-
-    public hasPositionLock(): boolean {
-        return this.positionLock !== null;
-    }
-
     public applyDefaultConfig(config?: DefaultPointConfig) {
         const resolved = config ?? getDefaultPointConfig(this.id);
         if (!resolved) {
@@ -146,12 +124,6 @@ export class Point2D {
             this.setBaseColor(this.color);
         }
         this.clearLockedColor();
-
-        if (resolved.locked2dPosition) {
-            this.setPositionLock(resolved.locked2dPosition.nx, resolved.locked2dPosition.ny);
-        } else {
-            this.clearPositionLock();
-        }
     }
 
     public applyRemoteData(remoteData: PointSyncData, projectionManager: ProjectionManager) {
@@ -161,9 +133,6 @@ export class Point2D {
         const remoteVec = new Vector3(x, y, z);
 
         const remoteLen = remoteVec.length();
-        if (remoteLen > 0) {
-            this.radiusHint = remoteLen;
-        }
 
         // Skip applying remote color if we're currently flashing
         if (this.flashHandle === null) {
@@ -173,22 +142,12 @@ export class Point2D {
         const [ nx, ny ] = projectionManager.project(remoteVec);
         this.nx = nx;
         this.ny = ny;
-
-        if (this.positionLock) {
-            this.nx = this.positionLock.nx;
-            this.ny = this.positionLock.ny;
-        }
     }
 
     public getLocalData(existing: PointSyncData | undefined, projectionManager: ProjectionManager): PointSyncData {
         const existingVec = existing
             ? new Vector3(existing.position.x, existing.position.y, existing.position.z)
             : new Vector3(0, 0, 0);
-
-        if (this.positionLock) {
-            this.nx = this.positionLock.nx;
-            this.ny = this.positionLock.ny;
-        }
         
         const v = projectionManager.inverse(this.nx, this.ny, existingVec);
 
@@ -244,7 +203,7 @@ export class Point2D {
     }
 
     setFromPixel(px: number, py: number, width: number, height: number) {
-        if (!this.draggable || this.positionLock) {
+        if (!this.draggable) {
             return;
         }
         this.nx = (px / width) * 2 - 1;

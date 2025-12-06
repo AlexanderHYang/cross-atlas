@@ -39,6 +39,7 @@ export class PCAProjection implements IProjection {
 
     constructor(pcaManager: PCAManager) {
         this.pcaManager = pcaManager;
+        pcaManager.update([[0,0,0]]); // initialize to valid state
     }
 
     getPcaManager(): PCAManager {
@@ -148,6 +149,7 @@ export class ProjectionManager {
     private currentProjectionType: "equirectangular" | "pca" | "vertical" | "horizontal"
 
     constructor (projectionType: "equirectangular" | "pca" | "vertical" | "horizontal") {
+        console.log("Initializing ProjectionManager with type:", projectionType);
         this.currentProjectionType = projectionType;
     }
 
@@ -161,6 +163,10 @@ export class ProjectionManager {
         } else {
             return this.horizontalPlaneProjection;
         }
+    }
+
+    getCurrentProjectionType(): "equirectangular" | "pca" | "vertical" | "horizontal" {
+        return this.currentProjectionType;
     }
 
     setCurrentProjectionType(projectionType: "equirectangular" | "pca" | "vertical" | "horizontal") {
