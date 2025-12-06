@@ -5,7 +5,6 @@ export type Vector3SyncData = {
 };
 export type PointSyncData = {
     id: string;
-    position: Vector3SyncData;
     color: Vector3SyncData;
 };
 

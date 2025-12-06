@@ -152,7 +152,7 @@ export class SyncManager2D implements PointIdProvider {
                 for (const c of this.syncedPointDataMap.values()) {
                     const p = new Point2D(c.id, this);
                     p.applyDefaultConfig();
-                    p.applyRemoteData(c, this.projectionManager);
+                    p.applyRemoteData(c);
                     console.log("initializing point from remote:", c);
                     // if (p.hasLockedColor() || p.hasPositionLock()) {
                     //     this.transactPointUpdate(p);
@@ -190,7 +190,7 @@ export class SyncManager2D implements PointIdProvider {
                 }
 
                 // apply remote data to local point
-                point.applyRemoteData(remoteData, this.projectionManager);
+                point.applyRemoteData(remoteData);
                 // if (point.hasLockedColor() || point.hasPositionLock()) {
                 //     this.transactPointUpdate(point);
                 // }
@@ -233,8 +233,8 @@ export class SyncManager2D implements PointIdProvider {
         if (this.projectionManager.getCurrentProjectionType() === "pca") {
             const pcaProjection = this.projectionManager.getCurrentProjection() as PCAProjection;
             pcaProjection.updatePCA(
-                this.getRemotePoints()
-                .map(d => new Vector3(d.position.x, d.position.y, d.position.z))
+                this.getLocalPoints()
+                .map(d => d.pos3d)
             );
         }
 
@@ -273,29 +273,19 @@ export class SyncManager2D implements PointIdProvider {
     public transactPointUpdate(point: Point2D) {
         console.debug("Transacting point update for", point.id);
         this.ydoc.transact(() => {
-            const existing = this.syncedPointDataMap.get(point.id);
-            this.syncedPointDataMap.set(point.id, point.getLocalData(existing, this.projectionManager));
+            this.syncedPointDataMap.set(point.id, point.getLocalData());
         }, point);
     }
 
     public registerPoint(point: Point2D) {
         console.debug("registering point", point.id);
-
-        if (this.localPointsById.has(point.id)) {
-            console.warn("Point with id", point.id, "is already registered.");
-            return;
-        }
         this.localPointsById.set(point.id, point);
-        point.applyDefaultConfig();
 
         // if remote exists, apply it without re-emitting
         const remote = this.syncedPointDataMap.get(point.id);
         if (remote) {
             console.log("applying existing remote data to newly registered point", point.id);
-            point.applyRemoteData(remote, this.projectionManager);
-            // if (point.hasLockedColor() || point.hasPositionLock()) {
-            //     this.transactPointUpdate(point);
-            // }
+            point.applyRemoteData(remote);
             if (point.hasLockedColor()) {
                 this.transactPointUpdate(point);
             }

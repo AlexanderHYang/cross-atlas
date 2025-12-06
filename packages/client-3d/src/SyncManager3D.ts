@@ -253,8 +253,7 @@ export class SyncManager3D implements PointIdProvider {
     public transactPointUpdate(point: Point3D) {
         console.debug("Transacting point update for", point.id);
         this.ydoc.transact(() => {
-            const existing = this.syncedPointDataMap.get(point.id);
-            this.syncedPointDataMap.set(point.id, point.getLocalData(existing));
+            this.syncedPointDataMap.set(point.id, point.getLocalData());
         }, point);
     }
 

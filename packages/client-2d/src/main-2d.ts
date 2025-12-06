@@ -84,23 +84,26 @@ document.body.appendChild(instructionBox);
 // create SyncManager
 const syncManager: SyncManager2D = await SyncManager2D.create();
 
-// If no points exist, create defaults that match the 3D scene
-if (syncManager.getLocalPoints().length === 0) {
-    for (const cfg of DEFAULT_POINT_CONFIGS) {
-        const point = new Point2D(cfg.id, syncManager);
-        point.applyDefaultConfig(cfg);
-        const direction = new Vector3(cfg.direction.x, cfg.direction.y, cfg.direction.z);
-        if (direction.lengthSquared() === 0) {
-            continue;
-        }
-        const normalized = direction.normalize();
-        const { lat, lon } = vec3ToLatLon(normalized);
-        const { nx, ny } = equirectangularNormalizedXY(lat, lon);
-        point.nx = nx;
-        point.ny = ny;
-        syncManager.registerPoint(point);
-    }
+// Create defaults that match the 3D scene
+for (const cfg of DEFAULT_POINT_CONFIGS) {
+    const point = new Point2D(cfg.id, syncManager);
+    point.applyDefaultConfig(cfg);
+
+    // note: apply default config already sets pos3d, however the pos3d in DEFAULT_POINT_CONFIGS
+    // is actually incorrect and is un-normalized, so I'm manually applying that here.
+    // In the future we should consider streamlining the point initialization process
+
+    const direction = new Vector3(cfg.direction.x, cfg.direction.y, cfg.direction.z);
+    const normalized = direction.normalize();
+    point.pos3d = normalized;
+    console.log(point.pos3d.length());
+
+    const [nx, ny] = syncManager.getProjectionManager().project(point.pos3d);
+    point.nx = nx;
+    point.ny = ny;
+    syncManager.registerPoint(point);
 }
+
 
 syncManager.ensureTaskTarget();
 syncManager.onTaskStateChange(handleTaskStateChange);
@@ -109,11 +112,9 @@ window.addEventListener("keydown", (ev) => {
     if (ev.key === "p" || ev.key === "P") {
         syncManager.getProjectionManager().cycleProjection(syncManager)
 		for (const p of syncManager.getLocalPoints()) {
-			// re-apply local data to update nx,ny based on new PCA
-			const remoteData = syncManager.getRemotePointById(p.id)
-			if (remoteData) {
-				p.applyRemoteData(remoteData, syncManager.getProjectionManager())
-			}
+            const [nx, ny] = syncManager.getProjectionManager().project(p.pos3d);
+			p.nx = nx;
+            p.ny = ny;
 		}
     }
 });
@@ -207,19 +208,6 @@ canvas.addEventListener("pointerdown", (ev) => {
             break;
         }
     }
-});
-
-canvas.addEventListener("pointermove", (ev) => {
-    if (!dragging) return;
-    dragMoved = true;
-    const rect = canvas.getBoundingClientRect();
-    let px = ev.clientX - rect.left;
-    let py = ev.clientY - rect.top;
-    const c = clampToBounds(px, py);
-    px = c.x;
-    py = c.y;
-    dragging.setFromPixel(px, py, width, height);
-    drawAll();
 });
 
 canvas.addEventListener("pointerup", (ev) => {

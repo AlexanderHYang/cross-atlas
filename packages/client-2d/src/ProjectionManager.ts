@@ -1,14 +1,12 @@
 import { Vector3 } from '@babylonjs/core'
 import { getNormal } from './pca'
-import { clamp, equirectangularNormalizedXY, inverseEquirectangularNormalizedXY, latLonToVec3, vec3ToLatLon } from '../../shared/src/projection'
+import { clamp, equirectangularNormalizedXY, vec3ToLatLon } from '../../shared/src/projection'
 import { SyncManager2D } from './SyncManager2D'
 import { PlaneSyncData } from '@shared/src/sync'
 
 export interface IProjection {
     // project 3D -> normalized 2D
     project(v: Vector3): [number, number]
-    // inverse 2D -> 3D
-    inverse(nx: number, ny: number, existing: Vector3): Vector3
     getPlaneSyncData(): PlaneSyncData | null
 }
 
@@ -17,16 +15,6 @@ export class EquirectangularProjection implements IProjection {
         const { lat, lon } = vec3ToLatLon(v);
         const { nx, ny } =  equirectangularNormalizedXY(lat , lon);
         return [nx, ny];
-    }
-
-    inverse(nx: number, ny: number, existing: Vector3): Vector3 {
-        const { lat, lon } = inverseEquirectangularNormalizedXY(nx, ny);
-        let len = 1;
-        if (existing.length() > 0) {
-            len = existing.length();
-        }
-        const v = latLonToVec3(lat, lon, len);
-        return v;
     }
 
     getPlaneSyncData(): PlaneSyncData | null {
@@ -40,10 +28,6 @@ export class PCAProjection implements IProjection {
 
     project(v: Vector3): [number, number] {
         return this.planarProjection.project(v);
-    }
-
-    inverse(nx: number, ny: number, existing: Vector3): Vector3 {
-        return this.planarProjection.inverse(nx, ny, existing);
     }
 
     getPlaneSyncData(): PlaneSyncData | null {
@@ -64,7 +48,7 @@ export class PCAProjection implements IProjection {
                 u.normalize();
                 v = Vector3.Cross(normal, u).normalize();
             }
-            this.planarProjection = new PlanarProjection(u, v, 5);
+            this.planarProjection = new PlanarProjection(u, v, 2);
         } else {
             console.warn("PCAProjection.updatePCA: could not compute normal from points");
         }
@@ -103,18 +87,6 @@ export class PlanarProjection implements IProjection {
         return [uCoord, vCoord];
     }
 
-    inverse(nx: number, ny: number, existing: Vector3): Vector3 {
-        const uComp = this.u.scale(nx * this.scale);
-        const vComp = this.v.scale(ny * this.scale);
-        const pointOnPlane = this.origin.add(uComp).add(vComp);
-        // Preserve distance from plane
-        const existingRelative = existing.subtract(this.origin);
-        const normal = this.getNormal();
-        const distToPlane = Vector3.Dot(existingRelative, normal);
-        const finalPoint = pointOnPlane.add(normal.scale(distToPlane));
-        return finalPoint;
-    }
-
     getPlaneSyncData(): PlaneSyncData | null {
         const normal = this.getNormal();
         return {
@@ -128,8 +100,8 @@ export class PlanarProjection implements IProjection {
 export class ProjectionManager {
     private equirectangularProjection = new EquirectangularProjection();
     private pcaProjection = new PCAProjection();
-    private verticalPlaneProjection = new PlanarProjection(new Vector3(0, 0, 1), new Vector3(0, 1, 0), 5);
-    private horizontalPlaneProjection = new PlanarProjection(new Vector3(1, 0, 0), new Vector3(0, 0, 1), 5);
+    private verticalPlaneProjection = new PlanarProjection(new Vector3(0, 0, 1), new Vector3(0, 1, 0), 2);
+    private horizontalPlaneProjection = new PlanarProjection(new Vector3(1, 0, 0), new Vector3(0, 0, 1), 2);
 
     private currentProjectionType: "equirectangular" | "pca" | "vertical" | "horizontal"
 
@@ -164,8 +136,8 @@ export class ProjectionManager {
             // update PCA if switching to it
             const pcaProjection = this.getCurrentProjection() as PCAProjection;
             pcaProjection.updatePCA(
-                syncManager.getRemotePoints()
-                .map(d => new Vector3(d.position.x, d.position.y, d.position.z))
+                syncManager.getLocalPoints()
+                .map(d => d.pos3d)
             )
         } else if (this.currentProjectionType == "pca") {
             this.currentProjectionType = "vertical";
@@ -183,9 +155,5 @@ export class ProjectionManager {
 
     project(v: Vector3): [number, number] {
         return this.getCurrentProjection().project(v);
-    }
-
-    inverse(nx: number, ny: number, existing: Vector3): Vector3 {
-        return this.getCurrentProjection().inverse(nx, ny, existing);
     }
 }

@@ -81,12 +81,6 @@ export class Point3D {
     }
 
     public applyRemoteData(remoteData: PointSyncData) {
-        const pos = new Vector3(
-            remoteData.position.x,
-            remoteData.position.y,
-            remoteData.position.z
-        );
-        this.mesh.position.copyFrom(pos);
         // Skip applying remote color if we're currently flashing or showing a local override
         if (remoteData.color && this.flashHandle === null && !this.localOverrideColor) {
             this.material.diffuseColor.set(
@@ -97,15 +91,13 @@ export class Point3D {
         }
     }
 
-    public getLocalData(existing?: PointSyncData): PointSyncData {
-        const pos = this.mesh.position;
-        const vectorData: Vector3SyncData = { x: pos.x, y: pos.y, z: pos.z };
+    public getLocalData(): PointSyncData {
         const color = {
             x: this.material.diffuseColor.r,
             y: this.material.diffuseColor.g,
             z: this.material.diffuseColor.b,
         };
-        return { id: this.id, position: vectorData, color: color };
+        return { id: this.id, color: color };
     }
 
     private applyColor(color: Color3) {

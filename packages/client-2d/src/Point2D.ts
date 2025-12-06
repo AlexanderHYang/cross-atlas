@@ -9,6 +9,7 @@ export class Point2D {
     onLocalChange: () => void;
     color: Vector3 = new Vector3(1, 1, 1);
     private baseColor: Vector3 = new Vector3(1, 1, 1);
+    pos3d: Vector3 = new Vector3(0, 0, 0)
 
     // 2d specific state
     nx: number = 0;
@@ -124,36 +125,20 @@ export class Point2D {
             this.setBaseColor(this.color);
         }
         this.clearLockedColor();
+
+        this.pos3d = new Vector3(resolved.direction.x, resolved.direction.y, resolved.direction.z);
     }
 
-    public applyRemoteData(remoteData: PointSyncData, projectionManager: ProjectionManager) {
-        const x = remoteData.position.x;
-        const y = remoteData.position.y;
-        const z = remoteData.position.z;
-        const remoteVec = new Vector3(x, y, z);
-
-        const remoteLen = remoteVec.length();
-
+    public applyRemoteData(remoteData: PointSyncData) {
         // Skip applying remote color if we're currently flashing
         if (this.flashHandle === null) {
             this.color.set(remoteData.color.x, remoteData.color.y, remoteData.color.z);
         }
-
-        const [ nx, ny ] = projectionManager.project(remoteVec);
-        this.nx = nx;
-        this.ny = ny;
     }
 
-    public getLocalData(existing: PointSyncData | undefined, projectionManager: ProjectionManager): PointSyncData {
-        const existingVec = existing
-            ? new Vector3(existing.position.x, existing.position.y, existing.position.z)
-            : new Vector3(0, 0, 0);
-        
-        const v = projectionManager.inverse(this.nx, this.ny, existingVec);
-
-        const pos: Vector3SyncData = { x: v.x, y: v.y, z: v.z };
+    public getLocalData(): PointSyncData {
         const color = { x: this.color.x, y: this.color.y, z: this.color.z };
-        return { id: this.id, position: pos, color };
+        return { id: this.id, color };
     }
 
     // draw a simple point on canvas
@@ -202,12 +187,12 @@ export class Point2D {
         return dx * dx + dy * dy <= radius * radius;
     }
 
-    setFromPixel(px: number, py: number, width: number, height: number) {
-        if (!this.draggable) {
-            return;
-        }
-        this.nx = (px / width) * 2 - 1;
-        this.ny = ((height - py) / height) * 2 - 1;
-        this.onLocalChange();
-    }
+    // setFromPixel(px: number, py: number, width: number, height: number) {
+    //     if (!this.draggable) {
+    //         return;
+    //     }
+    //     this.nx = (px / width) * 2 - 1;
+    //     this.ny = ((height - py) / height) * 2 - 1;
+    //     this.onLocalChange();
+    // }
 }

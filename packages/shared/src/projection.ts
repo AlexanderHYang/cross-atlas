@@ -1,16 +1,4 @@
 import { Vector3 } from '@babylonjs/core'
-import { PCA } from 'ml-pca'
-import { Matrix } from 'ml-matrix'
-
-export type ProjectionType = 'equirectangular' | 'pca'
-let _projectionType: ProjectionType = 'equirectangular'
-
-export function getProjectionType(): ProjectionType {
-  return _projectionType
-}
-export function setProjectionType(newType: ProjectionType) {
-  _projectionType = newType
-}
 
 export const maxLat = 89 * Math.PI / 180 // radians
 export const maxY = Math.log(Math.tan(Math.PI / 4 + maxLat / 2))
@@ -30,20 +18,20 @@ export function equirectangularNormalizedXY(latRad: number, lonRad: number) {
 }
 
 // Inverse Equirectangular: normalized XY [-1,1] -> lat/lon (radians)
-export function inverseEquirectangularNormalizedXY(nx: number, ny: number) {
-  // inverse of the equirectangular mapping
-  const lon = -nx * Math.PI
-    const lat = clamp(ny, -1, 1) * (Math.PI / 2)
-    return { lat, lon }
-}
+// export function inverseEquirectangularNormalizedXY(nx: number, ny: number) {
+//   // inverse of the equirectangular mapping
+//   const lon = -nx * Math.PI
+//     const lat = clamp(ny, -1, 1) * (Math.PI / 2)
+//     return { lat, lon }
+// }
 
-export function latLonToVec3(lat: number, lon: number, radius: number) {
-  const y = Math.sin(lat) * radius
-  const r = Math.cos(lat) * radius
-  const x = Math.cos(lon) * r
-  const z = Math.sin(lon) * r
-  return new Vector3(x, y, z)
-}
+// export function latLonToVec3(lat: number, lon: number, radius: number) {
+//   const y = Math.sin(lat) * radius
+//   const r = Math.cos(lat) * radius
+//   const x = Math.cos(lon) * r
+//   const z = Math.sin(lon) * r
+//   return new Vector3(x, y, z)
+// }
 
 export function projectOntoSphere(point: Vector3, radius: number) {
   const dir = point.clone()
