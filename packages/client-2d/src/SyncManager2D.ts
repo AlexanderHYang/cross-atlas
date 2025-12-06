@@ -2,7 +2,6 @@ import * as Y from "yjs";
 import { PlaneSyncData, PointSyncData } from "../../shared/src/sync";
 import { Point2D } from "./Point2D";
 import { WebsocketProvider } from "y-websocket";
-import { PCAManager } from "./PCAManager";
 import {
     TaskState,
     TASK_COLLECTION,
@@ -233,7 +232,7 @@ export class SyncManager2D implements PointIdProvider {
         // if PCA then update it with any remote points
         if (this.projectionManager.getCurrentProjectionType() === "pca") {
             const pcaProjection = this.projectionManager.getCurrentProjection() as PCAProjection;
-            pcaProjection.getPcaManager().update(
+            pcaProjection.updatePCA(
                 this.getRemotePoints()
                 .map(d => new Vector3(d.position.x, d.position.y, d.position.z))
             );
