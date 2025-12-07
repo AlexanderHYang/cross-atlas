@@ -1,4 +1,4 @@
-import { Vector3 } from "@babylonjs/core";
+import { Logger, Vector3 } from "@babylonjs/core";
 import { Point2D } from "./Point2D";
 import { SyncManager2D } from "./SyncManager2D";
 import { equirectangularNormalizedXY, vec3ToLatLon } from "../../shared/src/projection";
@@ -12,6 +12,7 @@ import {
     getTaskAndTrial,
     processTrial7ErrorFlash2D,
 } from "../../shared/src/tasks";
+import { Logger2D } from "./Logger2d";
 
 const DASHBOARD_BG = "#828485ff";
 
@@ -83,6 +84,9 @@ document.body.appendChild(instructionBox);
 
 // create SyncManager
 const syncManager: SyncManager2D = await SyncManager2D.create();
+
+// create logger
+const logger2d = new Logger2D(syncManager);
 
 // Create defaults that match the 3D scene
 for (const cfg of DEFAULT_POINT_CONFIGS) {

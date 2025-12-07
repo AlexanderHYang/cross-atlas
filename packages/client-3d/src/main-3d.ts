@@ -15,6 +15,7 @@ import {
     evaluateSelection3D,
     processTrial7ErrorFlash3D,
 } from "../../shared/src/tasks";
+import { Logger3D } from "./Logger3d";
 
 // initialize scene
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
@@ -33,6 +34,9 @@ const sphereCenter = new Vector3(0, liftOffset, 0);
 const pointsByMeshId = new Map<string, Point3D>();
 const pointsById = new Map<string, Point3D>();
 const syncManager3D = await SyncManager3D.create(plane);
+
+// create Logger3D
+const logger3D = new Logger3D(syncManager3D, xrExperience!);
 
 // create simple 3D points and add them to sync manager
 for (const cfg of DEFAULT_POINT_CONFIGS) {
@@ -142,12 +146,14 @@ function handlePointSelection(point: Point3D) {
 
 function setupXRTaskInteractions(xr: WebXRDefaultExperience | null) {
     const pointerSelection = xr?.pointerSelection;
+    // @ts-ignore
     const selectionObservable = pointerSelection?.onSelectionObservable;
     if (!selectionObservable) {
         console.warn("XR pointer selection not available; task interactions disabled");
         return;
     }
 
+    // @ts-ignore
     selectionObservable.add((event) => {
         const pickInfo = (event as any)?.pickInfo ?? (event as any)?.pointerInfo?.pickInfo;
         if (!pickInfo?.hit || !pickInfo.pickedMesh) {

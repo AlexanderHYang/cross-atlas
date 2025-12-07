@@ -29,6 +29,7 @@ import {
     type PointIdProvider,
 } from "../../shared/src/tasks";
 import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
+import { TimedLogEvent } from "../../shared/src/logging";
 
 const TASK3_NEUTRAL_COLOR = new BABYLON.Color3(0.82, 0.82, 0.82);
 
@@ -38,6 +39,7 @@ export class SyncManager3D implements PointIdProvider {
 
     private localPointsById: Map<string, Point3D>;
     private syncedPointDataMap: Y.Map<PointSyncData>;
+    private logArray: Y.Array<TimedLogEvent>;
     private taskMap: Y.Map<TaskState>;
     private taskMetaMap: Y.Map<TaskMeta>;
     private currentTask: TaskState | null = null;
@@ -69,6 +71,7 @@ export class SyncManager3D implements PointIdProvider {
         // 2) create local state maps
         this.localPointsById = new Map<string, Point3D>();
         this.syncedPointDataMap = this.ydoc.getMap("charts") as Y.Map<PointSyncData>;
+        this.logArray = this.ydoc.getArray("logArray") as Y.Array<TimedLogEvent>;
         this.taskMap = this.ydoc.getMap(TASK_COLLECTION) as Y.Map<TaskState>;
         this.taskMetaMap = this.ydoc.getMap(TASK_META_COLLECTION) as Y.Map<TaskMeta>;
         this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PlaneSyncData>;
@@ -95,6 +98,10 @@ export class SyncManager3D implements PointIdProvider {
                 resolve();
             });
         });
+    }
+
+    public getLogArray(): Y.Array<TimedLogEvent> {
+        return this.logArray;
     }
 
     private logLifecycle(next: TaskState | null) {
