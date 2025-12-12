@@ -3,16 +3,9 @@ import { Point2D } from "./Point2D";
 import { SyncManager2D } from "./SyncManager2D";
 import { equirectangularNormalizedXY, vec3ToLatLon } from "../../shared/src/projection";
 import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from "../../shared/src/defaultPoints";
-import {
-    TaskColorConfig2D,
-    applyTaskVisuals2D,
-    evaluateSelection2D,
-    getInstructionForTask,
-    getPointVisual2D,
-    getTaskAndTrial,
-    processTrial7ErrorFlash2D,
-} from "../../shared/src/tasks";
+import { TaskColorConfig2D, getPointVisual2D } from "../../shared/src/tasks";
 import { Logger2D } from "./Logger2d";
+import { TaskController2D } from "./tasks/taskController2D";
 
 const DASHBOARD_BG = "#828485ff";
 
@@ -66,7 +59,6 @@ document.head.appendChild(style);
 const ctx = canvas.getContext("2d")!;
 const SUCCESS_COLOR_VEC = new Vector3(0x2e / 255, 0xcc / 255, 0x71 / 255);
 const ERROR_COLOR_VEC = new Vector3(0xc0 / 255, 0x39 / 255, 0x2b / 255);
-let lastProcessedErrorPointId3D: string | null = null;
 const colorConfig2D: TaskColorConfig2D = {
     success: SUCCESS_COLOR_VEC,
     error: ERROR_COLOR_VEC,
@@ -88,6 +80,15 @@ const syncManager: SyncManager2D = await SyncManager2D.create();
 // create logger
 const logger2d = new Logger2D(syncManager);
 
+const taskController2D = new TaskController2D({
+    syncManager,
+    colorConfig: colorConfig2D,
+    successColor: SUCCESS_COLOR_VEC,
+    errorColor: ERROR_COLOR_VEC,
+    ui: { trialBox, instructionBox },
+    drawAll,
+});
+
 // Create defaults that match the 3D scene
 for (const cfg of DEFAULT_POINT_CONFIGS) {
     const point = new Point2D(cfg.id, syncManager);
@@ -108,18 +109,20 @@ for (const cfg of DEFAULT_POINT_CONFIGS) {
     syncManager.registerPoint(point);
 }
 
-
 syncManager.ensureTaskTarget();
-syncManager.onTaskStateChange(handleTaskStateChange);
+syncManager.onTaskStateChange(taskController2D.handleTaskStateChange);
 
 window.addEventListener("keydown", (ev) => {
     if (ev.key === "p" || ev.key === "P") {
-        syncManager.getProjectionManager().cycleProjection(syncManager)
-		for (const p of syncManager.getLocalPoints()) {
+        syncManager.getProjectionManager().cycleProjection(syncManager);
+        for (const p of syncManager.getLocalPoints()) {
             const [nx, ny] = syncManager.getProjectionManager().project(p.pos3d);
-			p.nx = nx;
+            p.nx = nx;
             p.ny = ny;
-		}
+        }
+
+        const projectionType = syncManager.getProjectionManager().getCurrentProjectionType();
+        console.log(`[2D] Projection switched to: ${projectionType}`);
     }
 });
 
@@ -236,39 +239,7 @@ canvas.addEventListener("pointerup", (ev) => {
 });
 
 function tryHandle2DSelection(px: number, py: number) {
-    const taskState = syncManager.getCurrentTask();
-    const points = syncManager.getLocalPoints();
-    let clicked: Point2D | null = null;
-    for (let i = points.length - 1; i >= 0; i--) {
-        const p = points[i];
-        if (p.hitTest(px, py, width, height)) {
-            clicked = p;
-            break;
-        }
-    }
-
-    if (!clicked) return;
-
-    const selection = evaluateSelection2D(taskState, clicked.id, colorConfig2D);
-    if (!selection.handled) {
-        return;
-    }
-
-    if (selection.isCorrect) {
-        const color = selection.successColor ?? SUCCESS_COLOR_VEC;
-        clicked.setDisplayColor(color);
-        if (selection.lockOnSuccess) {
-            clicked.setSelectable(false);
-        }
-        drawAll();
-    } else {
-        const errorColor = selection.errorColor ?? ERROR_COLOR_VEC;
-        const duration = selection.errorFlashDurationMs ?? 800;
-
-        clicked.flashColorSync(errorColor, duration);
-    }
-
-    syncManager.handleSelection2D(clicked.id);
+    taskController2D.tryHandleSelection(px, py, width, height);
 }
 
 // animate
@@ -277,42 +248,3 @@ function loop() {
     requestAnimationFrame(loop);
 }
 loop();
-
-function handleTaskStateChange(taskState: ReturnType<typeof syncManager.getCurrentTask>) {
-    const trial = taskState?.trial ?? 1;
-    const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(trial);
-    const label = `Task ${taskNumber}: Trial ${trialNumber}/${totalTrials}`;
-    trialBox.textContent = label;
-    const instruction = getInstructionForTask(taskState);
-    if (instruction.visible) {
-        instructionBox.style.display = "block";
-        if (instruction.html) {
-            instructionBox.innerHTML = instruction.html;
-        } else {
-            instructionBox.textContent = instruction.text ?? "";
-        }
-    } else {
-        instructionBox.textContent = "";
-        instructionBox.style.display = "none";
-    }
-    console.debug("2D Task state changed:", {
-        trial,
-        targetPointId2D: taskState?.targetPointId2D,
-        targetPointId3D: taskState?.targetPointId3D,
-        clicked2D: taskState?.clicked2D,
-        clicked3D: taskState?.clicked3D,
-    });
-
-    if (trial === 7) {
-        lastProcessedErrorPointId3D = processTrial7ErrorFlash2D(
-            taskState,
-            syncManager.getLocalPoints(),
-            ERROR_COLOR_VEC,
-            lastProcessedErrorPointId3D
-        );
-    } else {
-        lastProcessedErrorPointId3D = null;
-    }
-
-    applyTaskVisuals2D(taskState, syncManager.getLocalPoints());
-}
