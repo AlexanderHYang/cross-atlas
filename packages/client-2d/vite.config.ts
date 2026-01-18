@@ -1,7 +1,76 @@
 import { defineConfig } from 'vite'
 import path from 'path'
 import os from 'node:os'
+import fs from 'node:fs'
 import basicSsl from '@vitejs/plugin-basic-ssl'
+
+function logWriterPlugin() {
+  const logsDir = path.resolve(__dirname, '../../logs')
+
+  return {
+    name: 'log-writer',
+    configureServer(server: any) {
+      server.middlewares.use('/api/logs', (req: any, res: any) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end('Method Not Allowed')
+          return
+        }
+
+        let body = ''
+        let tooLarge = false
+        req.on('data', (chunk: any) => {
+          body += chunk.toString()
+          if (body.length > 5_000_000) {
+            res.statusCode = 413
+            res.end('Payload Too Large')
+            tooLarge = true
+            req.destroy()
+          }
+        })
+
+        req.on('end', () => {
+          if (tooLarge) {
+            return
+          }
+          let payload: { sessionId?: string; text?: string }
+          try {
+            payload = JSON.parse(body || '{}')
+          } catch {
+            res.statusCode = 400
+            res.end('Invalid JSON')
+            return
+          }
+
+          const text = typeof payload.text === 'string' ? payload.text : ''
+          if (!text) {
+            res.statusCode = 400
+            res.end('Missing log text')
+            return
+          }
+
+          const sessionIdRaw =
+            typeof payload.sessionId === 'string' && payload.sessionId.length > 0
+              ? payload.sessionId
+              : 'study'
+          const safeSessionId = sessionIdRaw.replace(/[^a-zA-Z0-9_-]/g, '')
+          const filename = safeSessionId ? `study-${safeSessionId}.txt` : 'study-log.txt'
+
+          try {
+            fs.mkdirSync(logsDir, { recursive: true })
+            fs.appendFileSync(path.join(logsDir, filename), text)
+            res.statusCode = 200
+            res.end('ok')
+          } catch (error) {
+            console.error('[2D log] Failed to write log file:', error)
+            res.statusCode = 500
+            res.end('Failed to write log')
+          }
+        })
+      })
+    },
+  }
+}
 
 function resolveHost(): string {
   const override = process.env.VITE_HOST?.trim()
@@ -39,7 +108,7 @@ export default defineConfig({
       '@jpmorganchase/anu',
     ],
   },
-  plugins: [basicSsl()],
+  plugins: [basicSsl(), logWriterPlugin()],
   server: {
     host,
     // @ts-ignore

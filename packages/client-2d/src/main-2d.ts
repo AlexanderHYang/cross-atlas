@@ -3,7 +3,13 @@ import { Point2D } from "./Point2D";
 import { SyncManager2D } from "./SyncManager2D";
 import { equirectangularNormalizedXY, vec3ToLatLon } from "../../shared/src/projection";
 import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from "../../shared/src/defaultPoints";
-import { TaskColorConfig2D, getPointVisual2D } from "../../shared/src/tasks";
+import {
+    TaskColorConfig2D,
+    TaskState,
+    determineNextAction,
+    getPointVisual2D,
+    getTaskAndTrial,
+} from "../../shared/src/tasks";
 import { Logger2D } from "./Logger2d";
 import { TaskController2D } from "./tasks/taskController2D";
 
@@ -111,6 +117,32 @@ for (const cfg of DEFAULT_POINT_CONFIGS) {
 
 syncManager.ensureTaskTarget();
 syncManager.onTaskStateChange(taskController2D.handleTaskStateChange);
+
+let lastTaskState: TaskState | null = null;
+syncManager.onTaskStateChange((taskState) => {
+    if (!taskState) {
+        lastTaskState = taskState;
+        return;
+    }
+
+    const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(taskState.trial);
+    logger2d.setTrialContext(taskNumber, trialNumber, totalTrials);
+
+    const completedSuccessfully =
+        taskState.feedback === "success" && taskState.completed && !lastTaskState?.completed;
+
+    if (completedSuccessfully) {
+        const action = determineNextAction(taskState);
+        if (taskState.trial !== 7 || action.action === "all-complete") {
+            logger2d.logTrialEnd(taskNumber, trialNumber, totalTrials);
+        }
+        if (action.action === "all-complete") {
+            logger2d.finalizeStudy();
+        }
+    }
+
+    lastTaskState = taskState;
+});
 
 window.addEventListener("keydown", (ev) => {
     if (ev.key === "p" || ev.key === "P") {

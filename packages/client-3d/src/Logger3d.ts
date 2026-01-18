@@ -2,7 +2,7 @@ import { Quaternion, WebXRDefaultExperience } from "@babylonjs/core";
 import { SyncManager3D } from "./SyncManager3D";
 import { LogEvent, TimedLogEvent } from "../../shared/src/logging"
 
-const ROTATION_UPDATE_INTERVAL = 1000;
+const ROTATION_UPDATE_INTERVAL = 2000;
 const LOG_SEND_INTERVAL = 1000;
 
 export type LogEvent3D = {
@@ -15,6 +15,7 @@ export class Logger3D {
     private xr: WebXRDefaultExperience
 
     private localLogs: TimedLogEvent[] = []
+    private lastTrial: number | null = null;
 
     // rotation-specific fields
     private prevCameraQuaternion: Quaternion | null = null;
@@ -26,6 +27,7 @@ export class Logger3D {
         this.xr = xr
 
         this.beginSendingLogs();
+        this.syncManager.onTaskStateChange(this.handleTaskStateChange);
         this.initializeHeadTracking();
     }
 
@@ -48,17 +50,23 @@ export class Logger3D {
         // add observable to camera xr camera motion
         const xrCamera = this.xr.baseExperience.camera;
         xrCamera.onViewMatrixChangedObservable.add(() => {
-            const currentQuaternion = xrCamera.rotationQuaternion;
+            const currentQuaternion =
+                xrCamera.rotationQuaternion ?? xrCamera.absoluteRotationQuaternion;
+            if (!currentQuaternion) {
+                return;
+            }
             if (!this.prevCameraQuaternion) {
-                this.prevCameraQuaternion = currentQuaternion
+                this.prevCameraQuaternion = currentQuaternion.clone();
             } else {
                 const delta = this.prevCameraQuaternion.conjugate().multiply(currentQuaternion);
                 const euler = delta.toEulerAngles();
-                const deltaPitch = euler.x;
-                const deltaYaw = euler.y;
+                const deltaPitch = Math.abs(euler.x);
+                const deltaYaw = Math.abs(euler.y);
+                const toDegrees = 180 / Math.PI;
 
-                this.cumulativePitch += deltaPitch;
-                this.cumulativeYaw += deltaYaw;
+                this.cumulativePitch += deltaPitch * toDegrees;
+                this.cumulativeYaw += deltaYaw * toDegrees;
+                this.prevCameraQuaternion = currentQuaternion.clone();
             }
         })
 
@@ -74,6 +82,28 @@ export class Logger3D {
             }
             this.addLogEvent(logEvent);
         }, ROTATION_UPDATE_INTERVAL)
+    }
+
+    private handleTaskStateChange = (taskState: { trial?: number } | null) => {
+        const trial = taskState?.trial ?? null;
+        if (trial === null) {
+            this.lastTrial = null;
+            return;
+        }
+        if (this.lastTrial === null) {
+            this.lastTrial = trial;
+            return;
+        }
+        if (trial !== this.lastTrial) {
+            this.resetCumulativeRotation();
+            this.lastTrial = trial;
+        }
+    };
+
+    private resetCumulativeRotation() {
+        this.cumulativePitch = 0;
+        this.cumulativeYaw = 0;
+        this.prevCameraQuaternion = null;
     }
 
     public addLogEvent(logEvent: LogEvent3D) {
