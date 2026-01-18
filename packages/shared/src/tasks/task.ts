@@ -223,7 +223,11 @@ export { TASK2_ID } from "./task2";
 export { TASK3_ID } from "./task3";
 
 export type TaskMeta = {
-    activeTaskId: TaskId;
+    activeTaskId?: TaskId;
+    studyStarted?: boolean;
+    calibrationPending?: boolean;
+    calibrationTaskId?: TaskId;
+    calibrationTrial?: TaskTrial;
 };
 
 export function createTaskState(

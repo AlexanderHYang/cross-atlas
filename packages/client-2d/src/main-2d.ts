@@ -115,12 +115,77 @@ for (const cfg of DEFAULT_POINT_CONFIGS) {
     syncManager.registerPoint(point);
 }
 
-syncManager.ensureTaskTarget();
-syncManager.onTaskStateChange(taskController2D.handleTaskStateChange);
+let studyStarted = syncManager.isStudyStarted();
+let calibrationPending = syncManager.isCalibrationPending();
+function setWaitingUI() {
+    trialBox.textContent = "Waiting for 3D user to initialize the study";
+    instructionBox.textContent = "";
+    instructionBox.style.display = "none";
+}
+function setCalibrationUI() {
+    trialBox.textContent = "Waiting for 3D user to recalibrate";
+    instructionBox.textContent = "";
+    instructionBox.style.display = "none";
+}
+
+if (!studyStarted) {
+    setWaitingUI();
+    logger2d.addLogEvent({
+        eventName: "awaiting_start_sequence",
+        eventDetails: { status: "waiting" },
+    });
+}
+
+syncManager.onStudyStartedChange((started) => {
+    studyStarted = started;
+    if (!started) {
+        setWaitingUI();
+        return;
+    }
+    logger2d.addLogEvent({
+        eventName: "start_sequence_completed",
+        eventDetails: { status: "started" },
+    });
+    syncManager.ensureTaskTarget();
+    const currentTask = syncManager.getCurrentTask();
+    if (currentTask) {
+        const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(currentTask.trial);
+        logger2d.setTrialContext(taskNumber, trialNumber, totalTrials);
+        taskController2D.handleTaskStateChange(currentTask);
+    }
+});
+
+syncManager.onCalibrationPendingChange((pending) => {
+    calibrationPending = pending;
+    if (!studyStarted) {
+        return;
+    }
+    if (pending) {
+        setCalibrationUI();
+        return;
+    }
+    syncManager.resetForNextTrial();
+    const currentTask = syncManager.getCurrentTask();
+    if (currentTask) {
+        taskController2D.handleTaskStateChange(currentTask);
+    }
+});
+
+syncManager.onTaskStateChange((taskState) => {
+    if (!studyStarted || calibrationPending) {
+        return;
+    }
+    taskController2D.handleTaskStateChange(taskState);
+});
 
 let lastTaskState: TaskState | null = null;
 syncManager.onTaskStateChange((taskState) => {
     if (!taskState) {
+        lastTaskState = taskState;
+        return;
+    }
+
+    if (!studyStarted || calibrationPending) {
         lastTaskState = taskState;
         return;
     }
@@ -203,7 +268,7 @@ function drawAll() {
 
     // draw points
     const points = syncManager.getLocalPoints();
-    const taskState = syncManager.getCurrentTask();
+    const taskState = studyStarted && !calibrationPending ? syncManager.getCurrentTask() : null;
     for (const p of points) {
         const visuals = getPointVisual2D(taskState, p.id, colorConfig2D);
         const isCompleted = !!taskState?.completed;
@@ -229,6 +294,9 @@ function clampToBounds(px: number, py: number) {
 }
 
 canvas.addEventListener("pointerdown", (ev) => {
+    if (!studyStarted || calibrationPending) {
+        return;
+    }
     const rect = canvas.getBoundingClientRect();
     const px = ev.clientX - rect.left;
     const py = ev.clientY - rect.top;
@@ -250,6 +318,9 @@ canvas.addEventListener("pointerdown", (ev) => {
 });
 
 canvas.addEventListener("pointerup", (ev) => {
+    if (!studyStarted || calibrationPending) {
+        return;
+    }
     const wasDragging = !!dragging;
     if (dragging) {
         try {
@@ -271,6 +342,9 @@ canvas.addEventListener("pointerup", (ev) => {
 });
 
 function tryHandle2DSelection(px: number, py: number) {
+    if (!studyStarted || calibrationPending) {
+        return;
+    }
     taskController2D.tryHandleSelection(px, py, width, height);
 }
 

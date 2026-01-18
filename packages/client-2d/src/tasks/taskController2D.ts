@@ -97,7 +97,7 @@ export class TaskController2D {
             this.deps.drawAll();
         } else {
             const errorColor = selection.errorColor ?? this.deps.errorColor;
-            const duration = selection.errorFlashDurationMs ?? 800;
+            const duration = selection.errorFlashDurationMs ?? 1000;
 
             clicked.flashColorSync(errorColor, duration);
         }

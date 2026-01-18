@@ -47,6 +47,7 @@ export class Logger2D {
     private trialSamples: Map<string, RotationSample[]> = new Map();
     private trialSummaries: Map<string, TrialSummary> = new Map();
     private pendingRotationLogs: TimedLogEvent[] = [];
+    private suppressRotationLogs = false;
     private finalized = false;
 
     private syncManager: SyncManager2D;
@@ -180,6 +181,9 @@ export class Logger2D {
         if (logEvent.eventName !== "cumulativeRotation") {
             return;
         }
+        if (this.suppressRotationLogs) {
+            return;
+        }
 
         const context = this.ensureTrialContext();
         if (!context) {
@@ -263,6 +267,7 @@ export class Logger2D {
             return;
         }
         this.currentTrial = { key, taskNumber, trialNumber, totalTrials };
+        this.suppressRotationLogs = false;
         if (!this.trialSummaries.has(key)) {
             this.createTrialSummary(taskNumber, trialNumber, totalTrials);
         }
@@ -295,6 +300,7 @@ export class Logger2D {
             summary.endPitch = summary.endPitch ?? lastSample.pitch;
             this.trialSummaries.set(key, summary);
         }
+        this.suppressRotationLogs = true;
     }
 
     public finalizeStudy() {

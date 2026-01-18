@@ -23,6 +23,7 @@ export class TaskController3D {
     private lastColorPairIndex: number | null = null;
     private lastProcessedErrorPointId2D: string | null = null;
     private flashingPointId3D: string | null = null;
+    private suppressVisuals = false;
 
     constructor(private readonly deps: TaskController3DDeps) {}
 
@@ -45,7 +46,7 @@ export class TaskController3D {
             }
         } else {
             const flashColor = selection.errorColor ?? this.deps.errorColor;
-            const duration = selection.flashDurationMs ?? 800;
+            const duration = selection.flashDurationMs ?? 1000;
             if (selection.stateUpdate === "task3") {
                 this.flashingPointId3D = point.id;
             }
@@ -78,6 +79,9 @@ export class TaskController3D {
     };
 
     public handleTaskStateChange = (task: ReturnType<SyncManager3D["getCurrentTask"]>) => {
+        if (this.suppressVisuals) {
+            return;
+        }
         const trial = task?.trial ?? 1;
         console.debug("3D Task state changed:", {
             trial,
@@ -131,6 +135,18 @@ export class TaskController3D {
         }
     };
 
+    public setCalibrationActive(active: boolean) {
+        if (this.suppressVisuals === active) {
+            return;
+        }
+        this.suppressVisuals = active;
+        if (active) {
+            this.clearLocalHints();
+            this.flashingPointId3D = null;
+            this.resetAllPointColors();
+        }
+    }
+
     private clearLocalHints() {
         for (const p of this.deps.pointsById.values()) {
             p.clearLocalOverrideColor();
@@ -154,11 +170,17 @@ export class TaskController3D {
     }
 
     private scheduleNextTrialFrom3D(currentTrial: number, taskId: string) {
+        if (this.deps.syncManager.isCalibrationPending()) {
+            return;
+        }
         if (this.trialTransitionHandle !== null) {
             window.clearTimeout(this.trialTransitionHandle);
         }
         this.trialTransitionHandle = window.setTimeout(() => {
             this.trialTransitionHandle = null;
+            if (this.deps.syncManager.isCalibrationPending()) {
+                return;
+            }
             if (currentTrial === 1) {
                 this.deps.syncManager.setTrial(2, taskId);
             } else if (currentTrial === 3) {

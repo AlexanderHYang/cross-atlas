@@ -36,6 +36,7 @@ import { PCAProjection, ProjectionManager } from "./ProjectionManager";
 import { TimedLogEvent } from "../../shared/src/logging";
 
 const TASK3_NEUTRAL_COLOR = new Vector3(1, 1, 1);
+const CALIBRATION_DELAY_MS = 1000;
 
 export class SyncManager2D implements PointIdProvider {
     private ydoc: Y.Doc;
@@ -53,9 +54,13 @@ export class SyncManager2D implements PointIdProvider {
     private currentTask: TaskState | null = null;
     private lastLoggedTask: TaskState | null = null;
     private taskListeners: Set<(task: TaskState | null) => void> = new Set();
+    private studyListeners: Set<(started: boolean) => void> = new Set();
+    private calibrationListeners: Set<(pending: boolean) => void> = new Set();
     private activeTaskId: TaskId = TASK1_ID;
     private transitionTimeout: number | null = null;
     private updatingMeta = false;
+    private studyStarted = false;
+    private calibrationPending = false;
 
     private constructor() {
         // 1) connect to websocket provider
@@ -221,6 +226,12 @@ export class SyncManager2D implements PointIdProvider {
                 this.logLifecycle(this.currentTask);
                 this.notifyTaskListeners();
             }
+
+            const studyMeta = this.taskMetaMap.get("study");
+            this.updateStudyStarted(!!studyMeta?.studyStarted);
+
+            const calibrationMeta = this.taskMetaMap.get("calibration");
+            this.updateCalibrationPending(!!calibrationMeta?.calibrationPending);
         });
 
         this.taskMap.observe(() => {
@@ -262,12 +273,20 @@ export class SyncManager2D implements PointIdProvider {
             manager.taskMetaMap.set("active", { activeTaskId: manager.activeTaskId });
         }
         manager.currentTask = manager.normalizeTaskState(manager.taskMap.get(manager.activeTaskId));
-        if (!manager.currentTask || !manager.currentTask.targetPointId2D) {
-            manager.ensureTaskTarget(manager.activeTaskId);
-        } else {
-            manager.logLifecycle(manager.currentTask);
+        manager.studyStarted = !!manager.taskMetaMap.get("study")?.studyStarted;
+        manager.calibrationPending = !!manager.taskMetaMap.get("calibration")?.calibrationPending;
+        if (!manager.taskMetaMap.get("calibration")) {
+            manager.taskMetaMap.set("calibration", { calibrationPending: false });
+            manager.calibrationPending = false;
         }
-        if (manager.currentTask?.trial === 7) {
+        if (manager.studyStarted) {
+            if (!manager.currentTask || !manager.currentTask.targetPointId2D) {
+                manager.ensureTaskTarget(manager.activeTaskId);
+            } else {
+                manager.logLifecycle(manager.currentTask);
+            }
+        }
+        if (manager.studyStarted && manager.currentTask?.trial === 7) {
             manager.setNeutralColorsForTask3(manager.currentTask.trial7Assignments);
         }
         manager.notifyTaskListeners();
@@ -363,6 +382,9 @@ export class SyncManager2D implements PointIdProvider {
     }
 
     public ensureTaskTarget(taskId: TaskId = this.activeTaskId) {
+        if (!this.studyStarted) {
+            return this.currentTask;
+        }
         const meta = this.taskMetaMap.get("active");
         if (meta?.activeTaskId) {
             this.activeTaskId = meta.activeTaskId;
@@ -505,7 +527,7 @@ export class SyncManager2D implements PointIdProvider {
                 this.taskMap.set(this.activeTaskId, cleared);
                 this.currentTask = cleared;
                 this.notifyTaskListeners();
-            }, result.updated.errorPointId2D ? 850 : 850);
+            }, result.updated.errorPointId2D ? 1000 : 1000);
         }
 
         return { isCorrect: result.isCorrect };
@@ -592,7 +614,7 @@ export class SyncManager2D implements PointIdProvider {
                 this.taskMap.set(taskId, cleared);
                 this.currentTask = cleared;
                 this.notifyTaskListeners();
-            }, 850);
+            }, 1000);
         }
 
         if (updated.completed) {
@@ -615,6 +637,10 @@ export class SyncManager2D implements PointIdProvider {
             p.resetToBaseColor();
             p.setSelectable(true);
         }
+    }
+
+    public resetForNextTrial() {
+        this.resetAllPointColors();
     }
 
     private setNeutralColorsForTask3(assignments?: TaskState["trial7Assignments"] | null) {
@@ -669,6 +695,19 @@ export class SyncManager2D implements PointIdProvider {
         if (this.transitionTimeout !== null) {
             window.clearTimeout(this.transitionTimeout);
             this.transitionTimeout = null;
+        }
+
+        const preAction = determineNextAction(completedTask);
+        if (preAction.action !== "advance-pair") {
+            if (!this.calibrationPending) {
+                window.setTimeout(() => {
+                    if (this.calibrationPending) {
+                        return;
+                    }
+                    this.setCalibrationPending(true, completedTask);
+                }, CALIBRATION_DELAY_MS);
+            }
+            return;
         }
 
         this.transitionTimeout = window.setTimeout(() => {
@@ -733,12 +772,71 @@ export class SyncManager2D implements PointIdProvider {
         }
     }
 
+    private updateStudyStarted(started: boolean) {
+        if (this.studyStarted === started) {
+            return;
+        }
+        this.studyStarted = started;
+        for (const listener of this.studyListeners) {
+            listener(started);
+        }
+    }
+
+    private updateCalibrationPending(pending: boolean) {
+        if (this.calibrationPending === pending) {
+            return;
+        }
+        this.calibrationPending = pending;
+        for (const listener of this.calibrationListeners) {
+            listener(pending);
+        }
+    }
+
     public onTaskStateChange(listener: (task: TaskState | null) => void) {
         this.taskListeners.add(listener);
         listener(this.currentTask);
         return () => {
             this.taskListeners.delete(listener);
         };
+    }
+
+    public onStudyStartedChange(listener: (started: boolean) => void) {
+        this.studyListeners.add(listener);
+        listener(this.studyStarted);
+        return () => {
+            this.studyListeners.delete(listener);
+        };
+    }
+
+    public isStudyStarted(): boolean {
+        return this.studyStarted;
+    }
+
+    public onCalibrationPendingChange(listener: (pending: boolean) => void) {
+        this.calibrationListeners.add(listener);
+        listener(this.calibrationPending);
+        return () => {
+            this.calibrationListeners.delete(listener);
+        };
+    }
+
+    public isCalibrationPending(): boolean {
+        return this.calibrationPending;
+    }
+
+    public setCalibrationPending(pending: boolean, taskState?: TaskState) {
+        if (this.calibrationPending === pending) {
+            return;
+        }
+        const payload: TaskMeta = { calibrationPending: pending };
+        if (pending && taskState) {
+            payload.calibrationTaskId = taskState.id as TaskId;
+            payload.calibrationTrial = taskState.trial;
+        }
+        this.updatingMeta = true;
+        this.taskMetaMap.set("calibration", payload);
+        this.updatingMeta = false;
+        this.updateCalibrationPending(pending);
     }
 
     public getCurrentTask(): TaskState | null {

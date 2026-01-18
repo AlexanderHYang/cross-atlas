@@ -340,7 +340,7 @@ export function evaluateTask3Selection2D(
         errorColor: colors.error,
         lockOnSuccess: isCorrect,
         revertToBaseAfterError: true,
-        errorFlashDurationMs: 800,
+        errorFlashDurationMs: 1000,
     };
 }
 
@@ -373,7 +373,7 @@ export function evaluateTask3Selection3D(
         successColor: ownColor,
         errorColor: colors.error,
         lockOnSuccess: isCorrect,
-        flashDurationMs: 800,
+        flashDurationMs: 1000,
         stateUpdate: "task3",
     };
 }
@@ -560,7 +560,7 @@ export function processTrial7ErrorFlash2D(
     const pointMap = createPointMap(points);
     if (taskState.errorPointId3D && taskState.errorPointId3D !== lastProcessedErrorPointId) {
         const errorPoint = pointMap.get(taskState.errorPointId3D);
-        errorPoint?.flashColorSync(errorColor, 800);
+        errorPoint?.flashColorSync(errorColor, 1000);
         return taskState.errorPointId3D;
     }
 
@@ -583,7 +583,7 @@ export function processTrial7ErrorFlash3D(
 
     if (taskState.errorPointId2D && taskState.errorPointId2D !== lastProcessedErrorPointId) {
         const errorPoint = points.get(taskState.errorPointId2D);
-        errorPoint?.flashColorSynced(errorColor, 800);
+        errorPoint?.flashColorSynced(errorColor, 1000);
         return taskState.errorPointId2D;
     }
 

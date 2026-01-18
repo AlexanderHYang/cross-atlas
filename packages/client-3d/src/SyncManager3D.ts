@@ -32,6 +32,7 @@ import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
 import { TimedLogEvent } from "../../shared/src/logging";
 
 const TASK3_NEUTRAL_COLOR = new BABYLON.Color3(0.82, 0.82, 0.82);
+const CALIBRATION_DELAY_MS = 1000;
 
 export class SyncManager3D implements PointIdProvider {
     private ydoc: Y.Doc;
@@ -49,6 +50,9 @@ export class SyncManager3D implements PointIdProvider {
     private transitionTimeout: number | null = null;
     private activeTaskId: TaskId = TASK1_ID;
     private updatingMeta = false;
+    private studyStarted = false;
+    private calibrationPending = false;
+    private calibrationListeners: Set<(pending: boolean) => void> = new Set();
 
     private constructor() {
         // 1) connect to websocket provider
@@ -114,6 +118,20 @@ export class SyncManager3D implements PointIdProvider {
         this.updatingMeta = true;
         this.taskMetaMap.set("active", { activeTaskId: taskId });
         this.updatingMeta = false;
+    }
+
+    private updateStudyStarted(started: boolean) {
+        this.studyStarted = started;
+    }
+
+    private updateCalibrationPending(pending: boolean) {
+        if (this.calibrationPending === pending) {
+            return;
+        }
+        this.calibrationPending = pending;
+        for (const listener of this.calibrationListeners) {
+            listener(pending);
+        }
     }
 
     private normalizeTaskState(task: TaskState | null | undefined): TaskState | null {
@@ -202,6 +220,12 @@ export class SyncManager3D implements PointIdProvider {
                 this.logLifecycle(this.currentTask);
                 this.notifyTaskListeners();
             }
+
+            const studyMeta = this.taskMetaMap.get("study");
+            this.updateStudyStarted(!!studyMeta?.studyStarted);
+
+            const calibrationMeta = this.taskMetaMap.get("calibration");
+            this.updateCalibrationPending(!!calibrationMeta?.calibrationPending);
         });
 
         this.taskMap.observe(() => {
@@ -235,6 +259,16 @@ export class SyncManager3D implements PointIdProvider {
             manager.taskMetaMap.set("active", { activeTaskId: manager.activeTaskId });
         }
         manager.currentTask = manager.normalizeTaskState(manager.taskMap.get(manager.activeTaskId));
+        manager.studyStarted = !!manager.taskMetaMap.get("study")?.studyStarted;
+        if (!manager.taskMetaMap.get("study")) {
+            manager.taskMetaMap.set("study", { studyStarted: false });
+            manager.studyStarted = false;
+        }
+        manager.calibrationPending = !!manager.taskMetaMap.get("calibration")?.calibrationPending;
+        if (!manager.taskMetaMap.get("calibration")) {
+            manager.taskMetaMap.set("calibration", { calibrationPending: false });
+            manager.calibrationPending = false;
+        }
         if (!manager.currentTask) {
             manager.taskMap.set(manager.activeTaskId, {
                 id: manager.activeTaskId,
@@ -298,6 +332,61 @@ export class SyncManager3D implements PointIdProvider {
         return () => {
             this.taskListeners.delete(listener);
         };
+    }
+
+    public onCalibrationPendingChange(listener: (pending: boolean) => void) {
+        this.calibrationListeners.add(listener);
+        listener(this.calibrationPending);
+        return () => {
+            this.calibrationListeners.delete(listener);
+        };
+    }
+
+    public setStudyStarted(started: boolean) {
+        if (this.studyStarted === started) {
+            return;
+        }
+        this.updatingMeta = true;
+        this.taskMetaMap.set("study", { studyStarted: started });
+        this.updatingMeta = false;
+        this.updateStudyStarted(started);
+    }
+
+    public isStudyStarted(): boolean {
+        return this.studyStarted;
+    }
+
+    public isCalibrationPending(): boolean {
+        return this.calibrationPending;
+    }
+
+    public setCalibrationPending(pending: boolean, taskState?: TaskState) {
+        if (this.calibrationPending === pending) {
+            return;
+        }
+        const payload: TaskMeta = { calibrationPending: pending };
+        if (pending && taskState) {
+            payload.calibrationTaskId = taskState.id as TaskId;
+            payload.calibrationTrial = taskState.trial;
+        }
+        this.updatingMeta = true;
+        this.taskMetaMap.set("calibration", payload);
+        this.updatingMeta = false;
+        this.updateCalibrationPending(pending);
+    }
+
+    public completeCalibration() {
+        if (!this.calibrationPending) {
+            return;
+        }
+        this.setCalibrationPending(false);
+        const latest = this.currentTask
+            ? this.normalizeTaskState(this.currentTask)
+            : this.normalizeTaskState(this.taskMap.get(this.activeTaskId));
+        if (!latest || !latest.completed) {
+            return;
+        }
+        this.scheduleNextTransition(latest, { skipCalibration: true });
     }
 
     public getCurrentTask(): TaskState | null {
@@ -414,7 +503,7 @@ export class SyncManager3D implements PointIdProvider {
                 this.taskMap.set(taskId, cleared);
                 this.currentTask = cleared;
                 this.notifyTaskListeners();
-            }, 850);
+            }, 1000);
         }
 
         if (updated.completed) {
@@ -444,10 +533,28 @@ export class SyncManager3D implements PointIdProvider {
     /**
      * Unified transition scheduler - handles all task/trial transitions
      */
-    private scheduleNextTransition(completedTask: TaskState) {
+    private scheduleNextTransition(
+        completedTask: TaskState,
+        options?: { skipCalibration?: boolean }
+    ) {
         if (this.transitionTimeout !== null) {
             window.clearTimeout(this.transitionTimeout);
             this.transitionTimeout = null;
+        }
+
+        if (!options?.skipCalibration) {
+            const action = determineNextAction(completedTask);
+            if (action.action !== "advance-pair") {
+                if (!this.calibrationPending) {
+                    window.setTimeout(() => {
+                        if (this.calibrationPending) {
+                            return;
+                        }
+                        this.setCalibrationPending(true, completedTask);
+                    }, CALIBRATION_DELAY_MS);
+                }
+                return;
+            }
         }
 
         this.transitionTimeout = window.setTimeout(() => {

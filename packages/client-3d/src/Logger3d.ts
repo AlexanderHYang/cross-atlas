@@ -16,6 +16,7 @@ export class Logger3D {
 
     private localLogs: TimedLogEvent[] = []
     private lastTrial: number | null = null;
+    private loggingEnabled = false;
 
     // rotation-specific fields
     private prevCameraQuaternion: Quaternion | null = null;
@@ -58,6 +59,11 @@ export class Logger3D {
             if (!this.prevCameraQuaternion) {
                 this.prevCameraQuaternion = currentQuaternion.clone();
             } else {
+                if (!this.loggingEnabled) {
+                    this.prevCameraQuaternion = currentQuaternion.clone();
+                    return;
+                }
+
                 const delta = this.prevCameraQuaternion.conjugate().multiply(currentQuaternion);
                 const euler = delta.toEulerAngles();
                 const deltaPitch = Math.abs(euler.x);
@@ -72,6 +78,9 @@ export class Logger3D {
 
         // add interval to send log periodically
         setInterval(() => {
+            if (!this.loggingEnabled) {
+                return;
+            }
             const logEvent: LogEvent = {
                 user: "vr",
                 eventName: "cumulativeRotation",
@@ -85,6 +94,9 @@ export class Logger3D {
     }
 
     private handleTaskStateChange = (taskState: { trial?: number } | null) => {
+        if (!this.loggingEnabled) {
+            return;
+        }
         const trial = taskState?.trial ?? null;
         if (trial === null) {
             this.lastTrial = null;
@@ -104,6 +116,17 @@ export class Logger3D {
         this.cumulativePitch = 0;
         this.cumulativeYaw = 0;
         this.prevCameraQuaternion = null;
+    }
+
+    public setLoggingEnabled(enabled: boolean) {
+        if (this.loggingEnabled === enabled) {
+            return;
+        }
+        this.loggingEnabled = enabled;
+        if (enabled) {
+            this.lastTrial = null;
+            this.resetCumulativeRotation();
+        }
     }
 
     public addLogEvent(logEvent: LogEvent3D) {
