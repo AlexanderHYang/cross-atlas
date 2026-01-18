@@ -9,7 +9,7 @@ export class Point2D {
     onLocalChange: () => void;
     color: Vector3 = new Vector3(1, 1, 1);
     private baseColor: Vector3 = new Vector3(1, 1, 1);
-    pos3d: Vector3 = new Vector3(0, 0, 0)
+    pos3d: Vector3 = new Vector3(0, 0, 0);
 
     // 2d specific state
     nx: number = 0;
