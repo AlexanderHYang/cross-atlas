@@ -42,7 +42,7 @@ export class Point3D {
 
         // create a simple primitive to represent the point (landmark is a cube)
         const primitive =
-            id === "point3"
+            id === "landmark"
                 ? MeshBuilder.CreateBox(`point_${id}`, { size: 0.2 }, scene)
                 : MeshBuilder.CreateSphere(`point_${id}`, { diameter: 0.2 }, scene);
         const mat = new StandardMaterial(`pointmat_${id}`, scene);

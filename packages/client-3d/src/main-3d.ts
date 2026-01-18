@@ -14,21 +14,16 @@ const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
 sceneManager.init(canvas);
 const scene = sceneManager.getScene();
 
-const xrExperience = await initWebXR(scene);
-
+const liftOffset = 0.5;
 const env = sceneManager.createEnvironment({ bigRadius: DEFAULT_SPHERE_RADIUS });
 const { bigRadius, plane } = env;
 
-const liftOffset = 0.5;
 const sphereCenter = new Vector3(0, liftOffset, 0);
 
 // create SyncManager
 const pointsByMeshId = new Map<string, Point3D>();
 const pointsById = new Map<string, Point3D>();
 const syncManager3D = await SyncManager3D.create(plane);
-
-// create Logger3D
-const logger3D = new Logger3D(syncManager3D, xrExperience!);
 
 // create simple 3D points and add them to sync manager
 for (const cfg of DEFAULT_POINT_CONFIGS) {
@@ -47,6 +42,15 @@ for (const cfg of DEFAULT_POINT_CONFIGS) {
     pointsByMeshId.set(point.mesh.id, point);
     pointsById.set(point.id, point);
 }
+
+const landmarkPoint = pointsById.get("landmark");
+const landmarkTarget = landmarkPoint?.mesh?.position;
+
+// initialize XR now that we know the landmark target
+const xrExperience = await initWebXR(scene, liftOffset, landmarkTarget);
+
+// create Logger3D
+const logger3D = new Logger3D(syncManager3D, xrExperience!);
 
 const successColor = Color3.FromHexString("#2ecc71");
 const errorColor = Color3.FromHexString("#c0392b");

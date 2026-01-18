@@ -161,7 +161,7 @@ export class Point2D {
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         const radius = 12;
 
-        if (this.id === "point3") {
+        if (this.id === "landmark") {
             ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
         } else {
             ctx.beginPath();
@@ -178,7 +178,7 @@ export class Point2D {
         const y = (1 - (this.ny + 1) / 2) * height;
         const radius = 12;
 
-        if (this.id === "point3") {
+        if (this.id === "landmark") {
             return px >= x - radius && px <= x + radius && py >= y - radius && py <= y + radius;
         }
 
