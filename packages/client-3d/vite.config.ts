@@ -31,6 +31,8 @@ export default defineConfig({
   plugins: [basicSsl()],
   server: {
     host,
+    port: 5174,
+    strictPort: true,
     https: true,
   },
 })

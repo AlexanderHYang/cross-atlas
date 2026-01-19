@@ -111,6 +111,8 @@ export default defineConfig({
   plugins: [basicSsl(), logWriterPlugin()],
   server: {
     host,
+    port: 5173,
+    strictPort: true,
     // @ts-ignore
     https: true,
   },
