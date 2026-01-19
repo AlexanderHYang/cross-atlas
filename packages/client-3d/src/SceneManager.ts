@@ -1,4 +1,13 @@
-import { Engine, Scene, ArcRotateCamera, Vector3, HemisphericLight, MeshBuilder, Color3 } from '@babylonjs/core'
+import {
+    Engine,
+    Scene,
+    ArcRotateCamera,
+    Vector3,
+    HemisphericLight,
+    DirectionalLight,
+    MeshBuilder,
+    Color3,
+} from '@babylonjs/core'
 import { GridMaterial } from '@babylonjs/materials'
 import * as BABYLON from '@babylonjs/core'
 
@@ -14,7 +23,13 @@ export class SceneManager {
         this.camera = new ArcRotateCamera('cam', Math.PI / 2, Math.PI / 3, 10, Vector3.Zero(), this.scene)
         this.camera.attachControl(canvas, true)
         
-        new HemisphericLight('h', new Vector3(0, 1, 0), this.scene)
+        const hemi = new HemisphericLight('h', new Vector3(0, 1, 0), this.scene)
+        hemi.intensity = 0.7
+
+        const keyLight = new DirectionalLight('key', new Vector3(-0.4, -1, -0.3), this.scene)
+        keyLight.position = new Vector3(4, 8, 4)
+        keyLight.intensity = 0.8
+        keyLight.diffuse = new Color3(1, 0.98, 0.92)
         
         this.engine.runRenderLoop(() => this.scene.render())
         window.addEventListener('resize', () => this.engine.resize())

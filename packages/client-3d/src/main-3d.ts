@@ -14,6 +14,10 @@ const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
 sceneManager.init(canvas);
 const scene = sceneManager.getScene();
 const highlighter = new HighlightLayer("highlighter", scene);
+highlighter.innerGlow = true;
+highlighter.outerGlow = true;
+highlighter.blurHorizontalSize = 1.5;
+highlighter.blurVerticalSize = 1.5;
 
 const liftOffset = 0.5;
 const env = sceneManager.createEnvironment({ bigRadius: DEFAULT_SPHERE_RADIUS });
