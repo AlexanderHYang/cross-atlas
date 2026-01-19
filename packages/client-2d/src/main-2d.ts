@@ -88,6 +88,7 @@ const logger2d = new Logger2D(syncManager);
 
 const taskController2D = new TaskController2D({
     syncManager,
+    logger: logger2d,
     colorConfig: colorConfig2D,
     successColor: SUCCESS_COLOR_VEC,
     errorColor: ERROR_COLOR_VEC,

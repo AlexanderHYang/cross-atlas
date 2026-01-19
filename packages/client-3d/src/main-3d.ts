@@ -83,6 +83,7 @@ const colorConfig3D: TaskColorConfig3D = {
 
 const taskController3D = new TaskController3D({
     syncManager: syncManager3D,
+    logger: logger3D,
     pointsById,
     colorConfig: colorConfig3D,
     successColor,

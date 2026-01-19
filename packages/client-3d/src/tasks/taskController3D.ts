@@ -3,14 +3,17 @@ import {
     TaskColorConfig3D,
     applyTaskVisuals3D,
     evaluateSelection3D,
+    getTaskAndTrial,
     processTrial7ErrorFlash3D,
 } from "../../../shared/src/tasks";
 import { getDefaultPointConfig } from "../../../shared/src/defaultPoints";
+import type { Logger3D } from "../Logger3d";
 import type { Point3D } from "../Point3D";
 import type { SyncManager3D } from "../SyncManager3D";
 
 export type TaskController3DDeps = {
     syncManager: SyncManager3D;
+    logger: Logger3D;
     pointsById: Map<string, Point3D>;
     colorConfig: TaskColorConfig3D;
     successColor: Color3;
@@ -45,6 +48,16 @@ export class TaskController3D {
                 point.setSelectable(false);
             }
         } else {
+            const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(task.trial);
+            this.deps.logger.addLogEvent({
+                eventName: "incorrectClick3d",
+                eventDetails: {
+                    taskNumber,
+                    trialNumber,
+                    totalTrials,
+                    pointId: point.id,
+                },
+            });
             const flashColor = selection.errorColor ?? this.deps.errorColor;
             const duration = selection.flashDurationMs ?? 1000;
             if (selection.stateUpdate === "task3") {

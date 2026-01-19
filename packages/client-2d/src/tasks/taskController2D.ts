@@ -7,6 +7,7 @@ import {
     getTaskAndTrial,
     processTrial7ErrorFlash2D,
 } from "../../../shared/src/tasks";
+import type { Logger2D } from "../Logger2d";
 import type { Point2D } from "../Point2D";
 import type { SyncManager2D } from "../SyncManager2D";
 
@@ -17,6 +18,7 @@ export type TaskUIRefs = {
 
 export type TaskController2DDeps = {
     syncManager: SyncManager2D;
+    logger: Logger2D;
     colorConfig: TaskColorConfig2D;
     successColor: Vector3;
     errorColor: Vector3;
@@ -96,6 +98,7 @@ export class TaskController2D {
             }
             this.deps.drawAll();
         } else {
+            this.deps.logger.logIncorrectClick2D(clicked.id);
             const errorColor = selection.errorColor ?? this.deps.errorColor;
             const duration = selection.errorFlashDurationMs ?? 1000;
 

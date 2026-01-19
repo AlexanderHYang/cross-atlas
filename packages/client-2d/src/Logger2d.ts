@@ -30,6 +30,11 @@ type TrialSummary = {
     trialNumber: number;
     totalTrials: number;
     sampleCount: number;
+    incorrectClicks2D: number;
+    incorrectClicks3D: number;
+    trialStartTime?: number;
+    trialEndTime?: number;
+    completionMs?: number;
     startTime?: number;
     endTime?: number;
     startYaw?: number;
@@ -117,6 +122,20 @@ export class Logger2D {
         return value.toFixed(6);
     }
 
+    private static formatCount(value?: number): string {
+        if (value === undefined || !Number.isFinite(value)) {
+            return "-";
+        }
+        return Math.round(value).toString();
+    }
+
+    private static formatDurationMs(value?: number): string {
+        if (value === undefined || !Number.isFinite(value)) {
+            return "-";
+        }
+        return Math.round(value).toString();
+    }
+
     private static formatTimestamp(value?: number): string {
         if (!value) {
             return "-";
@@ -176,6 +195,10 @@ export class Logger2D {
 
     private handleIncomingLog(logEvent: TimedLogEvent) {
         if (this.finalized) {
+            return;
+        }
+        if (logEvent.eventName === "incorrectClick3d") {
+            this.handleIncorrectClickLog(logEvent, "vr");
             return;
         }
         if (logEvent.eventName !== "cumulativeRotation") {
@@ -244,6 +267,66 @@ export class Logger2D {
         this.lastRotationSample = sample;
     }
 
+    private handleIncorrectClickLog(logEvent: TimedLogEvent, user: "pc" | "vr") {
+        const details = logEvent.eventDetails ?? {};
+        const context = this.extractTrialContext(details) ?? this.ensureTrialContext();
+        const pointId = typeof details["pointId"] === "string" ? details["pointId"] : undefined;
+        if (!context) {
+            const timestamp = new Date(logEvent.time).toISOString();
+            const label = "task=unknown trial=unknown";
+            this.queueText(
+                `[${timestamp}] ${label} user=${user} event=incorrect_click pointId=${pointId ?? "-"}\n`
+            );
+            return;
+        }
+        this.recordIncorrectClick(context, user, logEvent.time, pointId);
+    }
+
+    private extractTrialContext(details: Record<string, unknown>): TrialContext | null {
+        const taskNumber = typeof details["taskNumber"] === "number" ? details["taskNumber"] : null;
+        const trialNumber = typeof details["trialNumber"] === "number" ? details["trialNumber"] : null;
+        const totalTrials = typeof details["totalTrials"] === "number" ? details["totalTrials"] : null;
+        if (
+            taskNumber === null ||
+            trialNumber === null ||
+            totalTrials === null ||
+            !Number.isFinite(taskNumber) ||
+            !Number.isFinite(trialNumber) ||
+            !Number.isFinite(totalTrials)
+        ) {
+            return null;
+        }
+        const key = Logger2D.buildTrialKey(taskNumber, trialNumber, totalTrials);
+        return { key, taskNumber, trialNumber, totalTrials };
+    }
+
+    private recordIncorrectClick(
+        context: TrialContext,
+        user: "pc" | "vr",
+        time: number,
+        pointId?: string
+    ) {
+        const summary =
+            this.trialSummaries.get(context.key) ??
+            this.createTrialSummary(context.taskNumber, context.trialNumber, context.totalTrials);
+        if (user === "pc") {
+            summary.incorrectClicks2D += 1;
+        } else {
+            summary.incorrectClicks3D += 1;
+        }
+        this.trialSummaries.set(context.key, summary);
+
+        const trialLabel = Logger2D.formatTrialLabel(
+            context.taskNumber,
+            context.trialNumber,
+            context.totalTrials
+        );
+        const line =
+            `[${new Date(time).toISOString()}] ${trialLabel} ` +
+            `user=${user} event=incorrect_click pointId=${pointId ?? "-"}`;
+        this.queueText(`${line}\n`);
+    }
+
     private createTrialSummary(
         taskNumber: number,
         trialNumber: number,
@@ -256,6 +339,8 @@ export class Logger2D {
             trialNumber,
             totalTrials,
             sampleCount: 0,
+            incorrectClicks2D: 0,
+            incorrectClicks3D: 0,
         };
         this.trialSummaries.set(key, summary);
         return summary;
@@ -268,8 +353,11 @@ export class Logger2D {
         }
         this.currentTrial = { key, taskNumber, trialNumber, totalTrials };
         this.suppressRotationLogs = false;
-        if (!this.trialSummaries.has(key)) {
-            this.createTrialSummary(taskNumber, trialNumber, totalTrials);
+        const summary =
+            this.trialSummaries.get(key) ?? this.createTrialSummary(taskNumber, trialNumber, totalTrials);
+        if (!summary.trialStartTime) {
+            summary.trialStartTime = Date.now();
+            this.trialSummaries.set(key, summary);
         }
         if (this.pendingRotationLogs.length > 0 && this.currentTrial) {
             const pending = this.pendingRotationLogs;
@@ -280,20 +368,42 @@ export class Logger2D {
         }
     }
 
+    public logIncorrectClick2D(pointId: string) {
+        const context = this.ensureTrialContext();
+        const time = Date.now();
+        if (!context) {
+            const timestamp = new Date(time).toISOString();
+            this.queueText(
+                `[${timestamp}] task=unknown trial=unknown user=pc event=incorrect_click pointId=${pointId}\n`
+            );
+            return;
+        }
+        this.recordIncorrectClick(context, "pc", time, pointId);
+    }
+
     public logTrialEnd(taskNumber: number, trialNumber: number, totalTrials: number) {
         const key = Logger2D.buildTrialKey(taskNumber, trialNumber, totalTrials);
         const trialLabel = Logger2D.formatTrialLabel(taskNumber, trialNumber, totalTrials);
-        const timestamp = new Date().toISOString();
+        const endTime = Date.now();
+        const timestamp = new Date(endTime).toISOString();
         const samples = this.trialSamples.get(key);
         const lastSample = samples ? samples[samples.length - 1] : this.lastRotationSample;
+
+        const summary =
+            this.trialSummaries.get(key) ?? this.createTrialSummary(taskNumber, trialNumber, totalTrials);
+        summary.trialEndTime = endTime;
+        summary.completionMs = summary.trialStartTime ? endTime - summary.trialStartTime : undefined;
+        this.trialSummaries.set(key, summary);
 
         const line =
             `[${timestamp}] ${trialLabel} event=trial_end final=true ` +
             `cumulativeYaw=${Logger2D.formatNumber(lastSample?.yaw)} ` +
-            `cumulativePitch=${Logger2D.formatNumber(lastSample?.pitch)}`;
+            `cumulativePitch=${Logger2D.formatNumber(lastSample?.pitch)} ` +
+            `incorrectClicks2D=${summary.incorrectClicks2D} ` +
+            `incorrectClicks3D=${summary.incorrectClicks3D} ` +
+            `completionMs=${Logger2D.formatDurationMs(summary.completionMs)}`;
         this.queueText(`${line}\n`);
 
-        const summary = this.trialSummaries.get(key);
         if (summary && lastSample) {
             summary.endTime = summary.endTime ?? lastSample.time;
             summary.endYaw = summary.endYaw ?? lastSample.yaw;
@@ -359,6 +469,9 @@ export class Logger2D {
             "task",
             "trial",
             "samples",
+            "incorrect2D",
+            "incorrect3D",
+            "completionMs",
             "startTime",
             "endTime",
             "startYaw",
@@ -371,6 +484,9 @@ export class Logger2D {
             String(summary.taskNumber),
             `${summary.trialNumber}/${summary.totalTrials}`,
             String(summary.sampleCount),
+            Logger2D.formatCount(summary.incorrectClicks2D),
+            Logger2D.formatCount(summary.incorrectClicks3D),
+            Logger2D.formatDurationMs(summary.completionMs),
             Logger2D.formatTimestamp(summary.startTime),
             Logger2D.formatTimestamp(summary.endTime),
             Logger2D.formatNumber(summary.startYaw),
