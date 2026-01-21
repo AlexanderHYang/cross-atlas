@@ -4,7 +4,7 @@ import { clamp, equirectangularNormalizedXY, vec3ToLatLon } from '../../shared/s
 import { SyncManager2D } from './SyncManager2D'
 import { PlaneSyncData } from '@shared/src/sync'
 
-const DEFAULT_PLANAR_SCALE = 1.1;
+const DEFAULT_PLANAR_SCALE = 1.0;
 
 export interface IProjection {
     // project 3D -> normalized 2D

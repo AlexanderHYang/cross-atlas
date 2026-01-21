@@ -24,9 +24,8 @@ const __dirname = path.dirname(__filename);
 
 // Configuration
 const NUM_POINTS = 30;
-const MIN_2D_DISTANCE_SPHERICAL = 0.06;
-const MIN_2D_DISTANCE_HALF_SPHERICAL = 0.06;
-const MIN_2D_DISTANCE_PLANAR = 0.023;
+const MIN_2D_DISTANCE = 0.06;
+const MIN_2D_DISTANCE_PLANAR_HORIZONTAL = 0.023; // For planar layout with horizontal projection (points appear on a line)
 const MAX_ATTEMPTS_PER_POINT = 50000;
 const SPHERE_RADIUS = 3;
 
@@ -42,7 +41,8 @@ function distance2D(p1: [number, number], p2: [number, number]): number {
 function checkAllProjections(
     newPoint: Vector3,
     existingPoints: Vector3[],
-    minDistance: number
+    minDistance: number,
+    minDistanceHorizontal?: number
 ): boolean {
     if (existingPoints.length === 0) return true;
 
@@ -53,21 +53,28 @@ function checkAllProjections(
         'horizontal',
     ];
 
+    // Clone points to avoid mutation from projection (vec3ToLatLon calls normalize() in place)
+    const newPointClone = newPoint.clone();
+    const existingPointsClones = existingPoints.map(p => p.clone());
+
     for (const type of projectionTypes) {
         projectionManager.setCurrentProjectionType(type);
 
         if (type === 'pca') {
             const pcaProjection = projectionManager.getCurrentProjection() as PCAProjection;
-            pcaProjection.updatePCA([...existingPoints, newPoint]);
+            pcaProjection.updatePCA([...existingPointsClones, newPointClone]);
         }
 
-        const newPoint2D = projectionManager.project(newPoint);
+        const newPoint2D = projectionManager.project(newPointClone.clone());
+        const effectiveMinDistance = (type === 'horizontal' && minDistanceHorizontal !== undefined)
+            ? minDistanceHorizontal
+            : minDistance;
 
-        for (const existingPoint of existingPoints) {
-            const existingPoint2D = projectionManager.project(existingPoint);
+        for (const existingPointClone of existingPointsClones) {
+            const existingPoint2D = projectionManager.project(existingPointClone.clone());
             const dist = distance2D(newPoint2D, existingPoint2D);
 
-            if (dist < minDistance) {
+            if (dist < effectiveMinDistance) {
                 return false;
             }
         }
@@ -104,9 +111,10 @@ function randomPointOnHalfSphere(radius: number): Vector3 {
 }
 
 function randomPointOnVerticalPlane(size: number): Vector3 {
+    // Random point uniformly distributed within a square on the x=1 vertical plane
     const y = (Math.random() * 2 - 1) * size;
     const z = (Math.random() * 2 - 1) * size;
-    return new Vector3(0, y, z);
+    return new Vector3(1, y, z);
 }
 
 function generateConfiguration(
@@ -116,20 +124,10 @@ function generateConfiguration(
     const points: Vector3[] = [new Vector3(1,0,0)]; // start with landmark as first point
     let consecutiveFailures = 0;
 
-    let minDistance: number;
-    switch (distributionType) {
-        case 'spherical':
-            minDistance = MIN_2D_DISTANCE_SPHERICAL;
-            break;
-        case 'half-spherical':
-            minDistance = MIN_2D_DISTANCE_HALF_SPHERICAL;
-            break;
-        case 'planar':
-            minDistance = MIN_2D_DISTANCE_PLANAR;
-            break;
-    }
+    // For planar layout with horizontal projection, points appear on a line so use smaller min distance
+    const minDistanceHorizontal = distributionType === 'planar' ? MIN_2D_DISTANCE_PLANAR_HORIZONTAL : undefined;
 
-    console.log(`\n${distributionType}: placing ${numPoints} points (min 2D distance: ${minDistance})`);
+    console.log(`\n${distributionType}: placing ${numPoints} points (min 2D distance: ${MIN_2D_DISTANCE}${minDistanceHorizontal ? `, horizontal: ${minDistanceHorizontal}` : ''})`);
     const startTime = Date.now();
 
     while (points.length < numPoints) {
@@ -147,7 +145,7 @@ function generateConfiguration(
                 break;
         }
 
-        if (checkAllProjections(candidate, points, minDistance)) {
+        if (checkAllProjections(candidate, points, MIN_2D_DISTANCE, minDistanceHorizontal)) {
             points.push(candidate);
             console.log(`  ${points.length}/${numPoints} (${consecutiveFailures} attempts)`);
             consecutiveFailures = 0;
@@ -157,7 +155,7 @@ function generateConfiguration(
 
         if (consecutiveFailures > MAX_ATTEMPTS_PER_POINT) {
             console.error(`\nFailed after ${MAX_ATTEMPTS_PER_POINT} attempts with ${points.length} points placed.`);
-            console.error(`Try reducing NUM_POINTS or MIN_2D_DISTANCE_${distributionType.toUpperCase().replace('-', '_')}`);
+            console.error(`Try reducing NUM_POINTS or MIN_2D_DISTANCE`);
             process.exit(1);
         }
 
