@@ -31,6 +31,11 @@ export const DEFAULT_POINT_CONFIGS: DefaultPointConfig[] = generatedConfigs[layo
     draggable: false,
 }));
 
+// adjust landmark
+DEFAULT_POINT_CONFIGS[0].id = "landmark";
+DEFAULT_POINT_CONFIGS[0].color = { x: 0, y: 0, z: 1 };
+DEFAULT_POINT_CONFIGS[0].selectable = false;
+
 const CONFIG_MAP = new Map(DEFAULT_POINT_CONFIGS.map((cfg) => [cfg.id, cfg]));
 
 export function getDefaultPointConfig(id: string): DefaultPointConfig | undefined {

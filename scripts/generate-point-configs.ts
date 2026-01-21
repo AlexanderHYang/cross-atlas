@@ -113,7 +113,7 @@ function generateConfiguration(
     distributionType: 'spherical' | 'half-spherical' | 'planar',
     numPoints: number
 ): Vector3[] {
-    const points: Vector3[] = [];
+    const points: Vector3[] = [new Vector3(1,0,0)]; // start with landmark as first point
     let consecutiveFailures = 0;
 
     let minDistance: number;
