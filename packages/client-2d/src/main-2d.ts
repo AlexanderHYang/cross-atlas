@@ -1,7 +1,6 @@
 import { Logger, Vector3 } from "@babylonjs/core";
 import { Point2D } from "./Point2D";
 import { SyncManager2D } from "./SyncManager2D";
-import { equirectangularNormalizedXY, vec3ToLatLon } from "../../shared/src/projection";
 import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from "../../shared/src/defaultPoints";
 import {
     TaskColorConfig2D,
@@ -103,7 +102,8 @@ for (const cfg of DEFAULT_POINT_CONFIGS) {
 
     // Use raw coordinates from config, scaled uniformly to match 3D
     const direction = new Vector3(cfg.direction.x, cfg.direction.y, cfg.direction.z);
-    point.pos3d = direction.scale(DEFAULT_SPHERE_RADIUS);
+    // point.pos3d = direction.scale(DEFAULT_SPHERE_RADIUS);
+    point.pos3d = direction;
 
     const [nx, ny] = syncManager.getProjectionManager().project(point.pos3d.clone());
     point.nx = nx;
@@ -212,6 +212,7 @@ window.addEventListener("keydown", (ev) => {
             const [nx, ny] = syncManager.getProjectionManager().project(p.pos3d);
             p.nx = nx;
             p.ny = ny;
+            console.log(p.pos3d);
         }
 
         const projectionType = syncManager.getProjectionManager().getCurrentProjectionType();

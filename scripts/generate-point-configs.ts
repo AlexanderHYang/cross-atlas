@@ -24,8 +24,8 @@ const __dirname = path.dirname(__filename);
 
 // Configuration
 const NUM_POINTS = 30;
-const MIN_2D_DISTANCE = 0.06;
-const MIN_2D_DISTANCE_PLANAR_HORIZONTAL = 0.023; // For planar layout with horizontal projection (points appear on a line)
+const MIN_2D_DISTANCE = 0.08;
+const MIN_2D_DISTANCE_PLANAR_HORIZONTAL = 0.04; // For planar layout with horizontal projection (points appear on a line)
 const MAX_ATTEMPTS_PER_POINT = 50000;
 const SPHERE_RADIUS = 3;
 

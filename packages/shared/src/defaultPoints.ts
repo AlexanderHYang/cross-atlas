@@ -24,7 +24,7 @@ export type DefaultPointConfig = {
 
 export const DEFAULT_SPHERE_RADIUS = 3;
 
-const layoutType: "spherical" | "halfSpherical" | "planar" = "planar";
+const layoutType: "spherical" | "halfSpherical" | "planar" = "halfSpherical";
 export const DEFAULT_POINT_CONFIGS: DefaultPointConfig[] = generatedConfigs[layoutType].map((point, index) => ({
     id: `point${index + 1}`,
     direction: point,
