@@ -1,7 +1,6 @@
 import { Logger, Vector3 } from "@babylonjs/core";
 import { Point2D } from "./Point2D";
 import { SyncManager2D } from "./SyncManager2D";
-import { equirectangularNormalizedXY, vec3ToLatLon } from "../../shared/src/projection";
 import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from "../../shared/src/defaultPoints";
 import {
     TaskColorConfig2D,
@@ -101,16 +100,12 @@ for (const cfg of DEFAULT_POINT_CONFIGS) {
     const point = new Point2D(cfg.id, syncManager);
     point.applyDefaultConfig(cfg);
 
-    // note: apply default config already sets pos3d, however the pos3d in DEFAULT_POINT_CONFIGS
-    // is actually incorrect and is un-normalized, so I'm manually applying that here.
-    // In the future we should consider streamlining the point initialization process
-
+    // Use raw coordinates from config, scaled uniformly to match 3D
     const direction = new Vector3(cfg.direction.x, cfg.direction.y, cfg.direction.z);
-    const normalized = direction.normalize();
-    point.pos3d = normalized;
-    console.log(point.pos3d.length());
+    // point.pos3d = direction.scale(DEFAULT_SPHERE_RADIUS);
+    point.pos3d = direction;
 
-    const [nx, ny] = syncManager.getProjectionManager().project(point.pos3d);
+    const [nx, ny] = syncManager.getProjectionManager().project(point.pos3d.clone());
     point.nx = nx;
     point.ny = ny;
     syncManager.registerPoint(point);
@@ -217,6 +212,7 @@ window.addEventListener("keydown", (ev) => {
             const [nx, ny] = syncManager.getProjectionManager().project(p.pos3d);
             p.nx = nx;
             p.ny = ny;
+            console.log(p.pos3d);
         }
 
         const projectionType = syncManager.getProjectionManager().getCurrentProjectionType();

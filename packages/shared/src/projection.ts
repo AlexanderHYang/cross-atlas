@@ -44,7 +44,7 @@ export function projectOntoSphere(point: Vector3, radius: number) {
 export function vec3ToLatLon(v: Vector3) {
     const r = v.length()
     if (r === 0) return { lat: 0, lon: 0 }
-    const p = v.normalize()
+    const p = v.clone().normalize()
     const lat = Math.asin(clamp(p.y, -1, 1))
     const lon = Math.atan2(p.z, p.x)
     return { lat, lon, radius: r }
