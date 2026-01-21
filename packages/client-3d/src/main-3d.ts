@@ -1,7 +1,7 @@
 import { sceneManager } from "./SceneManager";
 import { SyncManager3D } from "./SyncManager3D";
 import { Point3D } from "./Point3D";
-import { Vector3, Color3, HighlightLayer, PointerEventTypes } from "@babylonjs/core";
+import { Vector3, Color3, HighlightLayer, PointerEventTypes, PointLight } from "@babylonjs/core";
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience";
 import { initWebXR } from "./xr/webxrExperience";
 import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from "../../shared/src/defaultPoints";
@@ -24,6 +24,10 @@ const env = sceneManager.createEnvironment({ bigRadius: DEFAULT_SPHERE_RADIUS })
 const { bigRadius, plane } = env;
 
 const sphereCenter = new Vector3(0, liftOffset, 0);
+const centerLight = new PointLight("centerLight", sphereCenter.clone(), scene);
+centerLight.intensity = 1.1;
+centerLight.range = bigRadius * 3;
+centerLight.diffuse = new Color3(1, 1, 1);
 
 // create SyncManager
 const pointsByMeshId = new Map<string, Point3D>();
@@ -54,6 +58,7 @@ const STUDY_START_CLICKS = 1;
 const STUDY_SUCCESS_GLOW_MS = 1000;
 const CALIBRATION_CLICKS = 1;
 const CALIBRATION_ANGLE_DEG = 10;
+const REQUIRE_CALIBRATION_ORIENTATION = true;
 const CALIBRATION_FEEDBACK_MS = 1000;
 let studyStarted = syncManager3D.isStudyStarted();
 let studyActivated = false;
@@ -144,6 +149,9 @@ function showCalibrationError() {
 }
 
 function isLookingAtLandmark(): boolean {
+    if (!REQUIRE_CALIBRATION_ORIENTATION) {
+        return true;
+    }
     if (!landmarkPoint) {
         return false;
     }
