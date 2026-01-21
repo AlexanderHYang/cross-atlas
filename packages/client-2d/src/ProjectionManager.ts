@@ -4,6 +4,8 @@ import { clamp, equirectangularNormalizedXY, vec3ToLatLon } from '../../shared/s
 import { SyncManager2D } from './SyncManager2D'
 import { PlaneSyncData } from '@shared/src/sync'
 
+const DEFAULT_PLANAR_SCALE = 1.1;
+
 export interface IProjection {
     // project 3D -> normalized 2D
     project(v: Vector3): [number, number]
@@ -24,7 +26,7 @@ export class EquirectangularProjection implements IProjection {
 
 export class PCAProjection implements IProjection {
     // default to horizontal plane
-    private planarProjection: PlanarProjection = new PlanarProjection(new Vector3(1,0,0), new Vector3(0,0,1), 5);
+    private planarProjection: PlanarProjection = new PlanarProjection(new Vector3(1,0,0), new Vector3(0,0,1));
 
     project(v: Vector3): [number, number] {
         return this.planarProjection.project(v);
@@ -48,7 +50,7 @@ export class PCAProjection implements IProjection {
                 u.normalize();
                 v = Vector3.Cross(normal, u).normalize();
             }
-            this.planarProjection = new PlanarProjection(u, v, 2);
+            this.planarProjection = new PlanarProjection(u, v);
         } else {
             console.warn("PCAProjection.updatePCA: could not compute normal from points");
         }
@@ -65,10 +67,10 @@ export class PlanarProjection implements IProjection {
 
     private readonly origin: Vector3 = new Vector3(0, 0, 0);
 
-    constructor(u: Vector3, v: Vector3, scale: number) {
+    constructor(u: Vector3, v: Vector3) {
         this.u = u;
         this.v = v;
-        this.scale = scale;
+        this.scale = DEFAULT_PLANAR_SCALE;
     }
 
     getNormal(): Vector3 {
@@ -100,8 +102,8 @@ export class PlanarProjection implements IProjection {
 export class ProjectionManager {
     private equirectangularProjection = new EquirectangularProjection();
     private pcaProjection = new PCAProjection();
-    private verticalPlaneProjection = new PlanarProjection(new Vector3(0, 0, 1), new Vector3(0, 1, 0), 2);
-    private horizontalPlaneProjection = new PlanarProjection(new Vector3(1, 0, 0), new Vector3(0, 0, 1), 2);
+    private verticalPlaneProjection = new PlanarProjection(new Vector3(0, 0, 1), new Vector3(0, 1, 0));
+    private horizontalPlaneProjection = new PlanarProjection(new Vector3(1, 0, 0), new Vector3(0, 0, 1));
 
     private currentProjectionType: "equirectangular" | "pca" | "vertical" | "horizontal"
 

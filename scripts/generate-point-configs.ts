@@ -99,7 +99,7 @@ function randomPointOnHalfSphere(radius: number): Vector3 {
     let point: Vector3;
     do {
         point = randomPointOnSphere(radius);
-    } while (point.z < 0);
+    } while (point.x < 0);
     return point;
 }
 
