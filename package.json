@@ -8,7 +8,8 @@
     "dev:2d": "vite --config packages/client-2d/vite.config.ts",
     "dev:3d": "vite --config packages/client-3d/vite.config.ts",
     "dev:yjs": "node ./scripts/yws-ssl-server.mjs",
-    "generate-certs": "node ./scripts/generate-certs.mjs"
+    "generate-certs": "node ./scripts/generate-certs.mjs",
+    "generate-points": "tsx scripts/generate-point-configs.ts"
   },
   "dependencies": {
     "@babylonjs/core": "8.26.0",
@@ -17,22 +18,23 @@
     "@jpmorganchase/anu": "^0.6.3",
     "@y/websocket-server": "^0.1.1",
     "d3": "^7.9.0",
+    "lib0": "^0.2.97",
     "ml-pca": "^4.1.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "y-websocket": "^3.0.0",
+    "ws": "^8.14.2",
     "y-protocols": "^1.0.6",
-    "yjs": "^13.6.27",
-    "lib0": "^0.2.97",
-    "ws": "^8.14.2"
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.27"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
     "@types/node": "^24.7.2",
     "@types/react": "^19.2.2",
+    "@vitejs/plugin-basic-ssl": "^1.2.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.1.6",
     "vite": "^5.0.0",
-    "vite-tsconfig-paths": "^5.1.4",
-    "@vitejs/plugin-basic-ssl": "^1.2.0"
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }
