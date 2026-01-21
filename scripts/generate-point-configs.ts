@@ -114,14 +114,14 @@ function randomPointOnVerticalPlane(size: number): Vector3 {
     // Random point uniformly distributed within a square on the x=1 vertical plane
     const y = (Math.random() * 2 - 1) * size;
     const z = (Math.random() * 2 - 1) * size;
-    return new Vector3(1, y, z);
+    return new Vector3(SPHERE_RADIUS, y, z);
 }
 
 function generateConfiguration(
     distributionType: 'spherical' | 'half-spherical' | 'planar',
     numPoints: number
 ): Vector3[] {
-    const points: Vector3[] = [new Vector3(1,0,0)]; // start with landmark as first point
+    const points: Vector3[] = [ new Vector3(SPHERE_RADIUS, 0, 0) ]; // start with landmark as first point
     let consecutiveFailures = 0;
 
     // For planar layout with horizontal projection, points appear on a line so use smaller min distance

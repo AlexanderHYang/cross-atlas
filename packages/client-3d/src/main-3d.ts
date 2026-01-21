@@ -36,7 +36,8 @@ for (const cfg of DEFAULT_POINT_CONFIGS) {
     if (direction.lengthSquared() === 0) {
         continue;
     }
-    const initialPosition = direction.normalize().scale(bigRadius).add(sphereCenter);
+    // Use raw coordinates from config, scaled uniformly by bigRadius
+    const initialPosition = direction.scale(1.0).add(sphereCenter);
     const color = cfg.color ? new Color3(cfg.color.x, cfg.color.y, cfg.color.z) : undefined;
     const point = new Point3D(cfg.id, scene, syncManager3D, initialPosition, {
         color,
