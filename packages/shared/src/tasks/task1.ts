@@ -15,7 +15,7 @@ import type {
     TaskSelection2DEffect,
     TaskSelection3DEffect,
     TaskPoint3D,
-} from "./task";
+} from "./tasks";
 
 export const TASK1_ID = "task1";
 export const TASK1_TRIALS: TaskTrial[] = [1, 2, 3, 4];
@@ -62,7 +62,7 @@ export function isTask1Complete(trial: Task1Trial): boolean {
  */
 export function handleTask1Selection3D(
     currentState: TaskState,
-    selectedPointId: string
+    selectedPointId: string,
 ): { updated: TaskState; isCorrect: boolean; shouldTransition: boolean } {
     const trial = currentState.trial as Task1Trial;
 
@@ -91,7 +91,7 @@ export function handleTask1Selection3D(
  */
 export function handleTask1Selection2D(
     currentState: TaskState,
-    selectedPointId: string
+    selectedPointId: string,
 ): { updated: TaskState; isCorrect: boolean; shouldTransition: boolean } {
     const trial = currentState.trial as Task1Trial;
 
@@ -120,7 +120,7 @@ const DEFAULT_VISUAL_2D: TaskPointVisual2D = {
 export function getTask1PointVisual2D(
     taskState: TaskState | null,
     pointId: string,
-    colors: TaskColorConfig2D
+    colors: TaskColorConfig2D,
 ): TaskPointVisual2D {
     if (!taskState || !isTask1Trial(taskState.trial)) {
         return DEFAULT_VISUAL_2D;
@@ -151,7 +151,7 @@ export function getTask1PointVisual2D(
 export function evaluateTask1Selection2D(
     taskState: TaskState | null,
     selectedPointId: string,
-    colors: TaskColorConfig2D
+    colors: TaskColorConfig2D,
 ): TaskSelection2DEffect {
     if (!taskState || !isTask1Trial(taskState.trial) || taskState.completed) {
         return { handled: false };
@@ -167,14 +167,14 @@ export function evaluateTask1Selection2D(
         isCorrect,
         successColor: colors.success,
         errorColor: colors.error,
-        errorFlashDurationMs: 1000,
+        errorFlashDurationMs: 2000,
     };
 }
 
 export function evaluateTask1Selection3D(
     taskState: TaskState | null,
     selectedPointId: string,
-    colors: TaskColorConfig3D
+    colors: TaskColorConfig3D,
 ): TaskSelection3DEffect {
     if (!taskState || !isTask1Trial(taskState.trial) || taskState.completed) {
         return { handled: false };
@@ -191,7 +191,7 @@ export function evaluateTask1Selection3D(
         successColor: colors.success,
         errorColor: colors.error,
         advanceTrial: isCorrect,
-        flashDurationMs: isCorrect ? undefined : 1000,
+        flashDurationMs: isCorrect ? undefined : 2000,
         stateUpdate: "task1",
     };
 }
@@ -200,7 +200,7 @@ export function applyTask1Visuals3D(
     taskState: TaskState | null,
     pointsById: Map<string, TaskPoint3D>,
     colors: TaskColorConfig3D,
-    resetAllPointColors: () => void
+    resetAllPointColors: () => void,
 ) {
     const trial = taskState?.trial ?? 1;
     if (!taskState || (trial !== 2 && trial !== 4) || !taskState.targetPointId2D) {

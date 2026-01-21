@@ -6,7 +6,7 @@
  * Both must click their correct colored targets to advance.
  */
 
-import type { TaskState, TaskTrial, Trial7Assignment } from "./task";
+import type { TaskState, TaskTrial, Trial7Assignment } from "./tasks";
 import type {
     TaskColorConfig2D,
     TaskColorConfig3D,
@@ -16,7 +16,7 @@ import type {
     TaskPointVisual2D,
     TaskSelection2DEffect,
     TaskSelection3DEffect,
-} from "./task";
+} from "./tasks";
 import { Color3, Vector3 } from "@babylonjs/core";
 
 export type Trial7ColorPair = {
@@ -52,7 +52,7 @@ export function isTask3Trial(trial: TaskTrial): trial is Task3Trial {
 
 export function createTask3Assignments(
     pointIds: string[],
-    pairCount: number = 5
+    pairCount: number = 5,
 ): Trial7Assignment[] {
     const pairs = TRIAL7_COLOR_PAIRS.slice(0, pairCount);
 
@@ -119,7 +119,7 @@ export function isTask3Complete(currentState: TaskState): boolean {
  */
 export function handleTask3Selection2D(
     currentState: TaskState,
-    selectedPointId: string
+    selectedPointId: string,
 ): { updated: TaskState; isCorrect: boolean; shouldAdvancePair: boolean } {
     if (currentState.trial !== 7 || !currentState.trial7Assignments) {
         return { updated: currentState, isCorrect: false, shouldAdvancePair: false };
@@ -146,7 +146,8 @@ export function handleTask3Selection2D(
         done3D: currentAssignment.done3D,
     };
 
-    const pairSolved = updatedAssignments[activeIndex].done2D && updatedAssignments[activeIndex].done3D;
+    const pairSolved =
+        updatedAssignments[activeIndex].done2D && updatedAssignments[activeIndex].done3D;
 
     const updated: TaskState = {
         ...currentState,
@@ -168,7 +169,7 @@ export function handleTask3Selection2D(
  */
 export function handleTask3Selection3D(
     currentState: TaskState,
-    selectedPointId: string
+    selectedPointId: string,
 ): { updated: TaskState; isCorrect: boolean; shouldAdvancePair: boolean } {
     if (currentState.trial !== 7 || !currentState.trial7Assignments) {
         return { updated: currentState, isCorrect: false, shouldAdvancePair: false };
@@ -194,7 +195,8 @@ export function handleTask3Selection3D(
         done3D: isCorrect || currentAssignment.done3D,
     };
 
-    const pairSolved = updatedAssignments[activeIndex].done2D && updatedAssignments[activeIndex].done3D;
+    const pairSolved =
+        updatedAssignments[activeIndex].done2D && updatedAssignments[activeIndex].done3D;
 
     const updated: TaskState = {
         ...currentState,
@@ -258,12 +260,48 @@ function hexToVector3(hex: string): Vector3 {
     return new Vector3(
         ((bigint >> 16) & 255) / 255,
         ((bigint >> 8) & 255) / 255,
-        (bigint & 255) / 255
+        (bigint & 255) / 255,
     );
 }
 
 function hexToColor3(hex: string): Color3 {
     return Color3.FromHexString(hex);
+}
+
+const TASK3_LIGHTEN_AMOUNT = 0.2;
+const TASK3_DARKEN_AMOUNT = 0.2;
+
+function lightenColor(color: Color3, amount: number): Color3 {
+    return new Color3(
+        Math.min(1, color.r + (1 - color.r) * amount),
+        Math.min(1, color.g + (1 - color.g) * amount),
+        Math.min(1, color.b + (1 - color.b) * amount)
+    );
+}
+
+function darkenColor(color: Color3, amount: number): Color3 {
+    const factor = 1 - amount;
+    return new Color3(color.r * factor, color.g * factor, color.b * factor);
+}
+
+function darkenVector(color: Vector3, amount: number): Vector3 {
+    const factor = 1 - amount;
+    return new Vector3(color.x * factor, color.y * factor, color.z * factor);
+}
+
+function lightenVector(color: Vector3, amount: number): Vector3 {
+    return new Vector3(
+        Math.min(1, color.x + (1 - color.x) * amount),
+        Math.min(1, color.y + (1 - color.y) * amount),
+        Math.min(1, color.z + (1 - color.z) * amount)
+    );
+}
+
+function vectorToCssRgb(color: Vector3): string {
+    const r = Math.round(Math.min(1, Math.max(0, color.x)) * 255);
+    const g = Math.round(Math.min(1, Math.max(0, color.y)) * 255);
+    const b = Math.round(Math.min(1, Math.max(0, color.z)) * 255);
+    return `rgb(${r}, ${g}, ${b})`;
 }
 
 function getActiveAssignment(taskState: TaskState | null) {
@@ -274,7 +312,7 @@ function getActiveAssignment(taskState: TaskState | null) {
 
 export function getTask3PointVisual2D(
     taskState: TaskState | null,
-    pointId: string
+    pointId: string,
 ): TaskPointVisual2D {
     if (!taskState || taskState.trial !== 7) {
         return DEFAULT_VISUAL_2D;
@@ -288,7 +326,7 @@ export function getTask3PointVisual2D(
         return {
             isTarget: taskState.targetPointId2D === pointId,
             hideColor: false,
-            overrideColor: hexToVector3(pair.hex3D),
+            overrideColor: darkenVector(hexToVector3(pair.hex3D), TASK3_DARKEN_AMOUNT),
         };
     }
 
@@ -302,7 +340,7 @@ export function getTask3PointVisual2D(
 export function evaluateTask3Selection2D(
     taskState: TaskState | null,
     selectedPointId: string,
-    colors: TaskColorConfig2D
+    colors: TaskColorConfig2D,
 ): TaskSelection2DEffect {
     if (!taskState || taskState.trial !== 7 || taskState.completed) {
         return { handled: false };
@@ -321,7 +359,7 @@ export function evaluateTask3Selection2D(
             (entry) =>
                 entry.done2D &&
                 entry.done3D &&
-                (entry.point2D === selectedPointId || entry.point3D === selectedPointId)
+                (entry.point2D === selectedPointId || entry.point3D === selectedPointId),
         ) ?? false;
     if (alreadySolved) {
         return { handled: false };
@@ -330,7 +368,8 @@ export function evaluateTask3Selection2D(
     const { activeAssignment } = getActiveAssignment(taskState);
     const pairKey = activeAssignment?.key ?? taskState.colorPairKey;
     const pair = pairKey ? getColorPairByKey(pairKey) : null;
-    const ownColor = pair ? hexToVector3(pair.hex2D) : colors.success;
+    const baseColor = pair ? hexToVector3(pair.hex2D) : colors.success;
+    const ownColor = lightenVector(baseColor, TASK3_LIGHTEN_AMOUNT);
 
     const isCorrect = selectedPointId === taskState.targetPointId2D;
     return {
@@ -340,14 +379,14 @@ export function evaluateTask3Selection2D(
         errorColor: colors.error,
         lockOnSuccess: isCorrect,
         revertToBaseAfterError: true,
-        errorFlashDurationMs: 1000,
+        errorFlashDurationMs: 2000,
     };
 }
 
 export function evaluateTask3Selection3D(
     taskState: TaskState | null,
     selectedPointId: string,
-    colors: TaskColorConfig3D
+    colors: TaskColorConfig3D,
 ): TaskSelection3DEffect {
     if (!taskState || taskState.trial !== 7 || taskState.completed) {
         return { handled: false };
@@ -364,7 +403,8 @@ export function evaluateTask3Selection3D(
     const { activeAssignment } = getActiveAssignment(taskState);
     const pairKey = activeAssignment?.key ?? taskState.colorPairKey;
     const pair = pairKey ? getColorPairByKey(pairKey) : null;
-    const ownColor = pair ? hexToColor3(pair.hex3D) : colors.success;
+    const baseColor = pair ? hexToColor3(pair.hex3D) : colors.success;
+    const ownColor = darkenColor(baseColor, TASK3_DARKEN_AMOUNT);
 
     const isCorrect = selectedPointId === taskState.targetPointId3D;
     return {
@@ -373,7 +413,7 @@ export function evaluateTask3Selection3D(
         successColor: ownColor,
         errorColor: colors.error,
         lockOnSuccess: isCorrect,
-        flashDurationMs: 1000,
+        flashDurationMs: 2000,
         stateUpdate: "task3",
     };
 }
@@ -386,7 +426,8 @@ export function getTask3Instruction(taskState: TaskState | null): TaskInstructio
     const { activeAssignment } = getActiveAssignment(taskState);
     const pair = getColorPairByKey(activeAssignment?.key ?? taskState.colorPairKey);
     if (pair) {
-        const colorWord = `<span style="color:${pair.hex2D};font-weight:bold;">${pair.name2D}</span>`;
+        const lightColor = lightenVector(hexToVector3(pair.hex2D), TASK3_LIGHTEN_AMOUNT);
+        const colorWord = `<span style="color:${vectorToCssRgb(lightColor)};font-weight:bold;">${pair.name2D}</span>`;
         return {
             visible: true,
             html: `Find the ${colorWord} sphere`,
@@ -409,7 +450,7 @@ function createPointMap<T extends { id: string }>(points: Iterable<T>): Map<stri
 
 export function applyCompletedTrial7Pairs2D(
     taskState: TaskState | null,
-    points: Iterable<TaskPoint2D>
+    points: Iterable<TaskPoint2D>,
 ) {
     if (!taskState || taskState.trial !== 7 || !taskState.trial7Assignments) return;
 
@@ -423,13 +464,13 @@ export function applyCompletedTrial7Pairs2D(
         const pair = getColorPairByKey(entry.key);
 
         if (point && pair) {
-            const color = hexToVector3(pair.hex2D);
+            const color = lightenVector(hexToVector3(pair.hex2D), TASK3_LIGHTEN_AMOUNT);
             point.setBaseColor(color);
             point.setDisplayColor(color);
             point.setSelectable(false);
         }
         if (partnerPoint && pair) {
-            const partnerColor = hexToVector3(pair.hex3D);
+            const partnerColor = darkenVector(hexToVector3(pair.hex3D), TASK3_DARKEN_AMOUNT);
             partnerPoint.setBaseColor(partnerColor);
             partnerPoint.setDisplayColor(partnerColor);
             partnerPoint.setSelectable(false);
@@ -439,7 +480,7 @@ export function applyCompletedTrial7Pairs2D(
 
 export function applyCompletedTrial7Pairs3D(
     taskState: TaskState | null,
-    points: Iterable<TaskPoint3D>
+    points: Iterable<TaskPoint3D>,
 ) {
     if (!taskState || taskState.trial !== 7 || !taskState.trial7Assignments) return;
 
@@ -453,13 +494,13 @@ export function applyCompletedTrial7Pairs3D(
         const pair = getColorPairByKey(entry.key);
         if (point && pair) {
             point.clearLocalOverrideColor();
-            const color = hexToColor3(pair.hex3D);
+            const color = darkenColor(hexToColor3(pair.hex3D), TASK3_DARKEN_AMOUNT);
             point.setPermanentColor(color);
             point.setSelectable(false);
         }
         if (partnerPoint && pair) {
             partnerPoint.clearLocalOverrideColor();
-            const partnerColor = hexToColor3(pair.hex2D);
+            const partnerColor = lightenColor(hexToColor3(pair.hex2D), TASK3_LIGHTEN_AMOUNT);
             partnerPoint.setPermanentColor(partnerColor);
             partnerPoint.setSelectable(false);
         }
@@ -468,7 +509,7 @@ export function applyCompletedTrial7Pairs3D(
 
 export function setTrial7Selectability2D(
     taskState: TaskState | null,
-    points: Iterable<TaskPoint2D>
+    points: Iterable<TaskPoint2D>,
 ) {
     if (!taskState || taskState.trial !== 7 || !taskState.trial7Assignments) return;
 
@@ -490,7 +531,7 @@ export function setTrial7Selectability2D(
 
 export function setTrial7Selectability3D(
     taskState: TaskState | null,
-    points: Iterable<TaskPoint3D>
+    points: Iterable<TaskPoint3D>,
 ) {
     if (!taskState || taskState.trial !== 7 || !taskState.trial7Assignments) return;
 
@@ -511,10 +552,7 @@ function clearLocalHints(pointsById: Map<string, TaskPoint3D>) {
     }
 }
 
-export function applyTask3Visuals2D(
-    taskState: TaskState | null,
-    points: Iterable<TaskPoint2D>
-) {
+export function applyTask3Visuals2D(taskState: TaskState | null, points: Iterable<TaskPoint2D>) {
     applyCompletedTrial7Pairs2D(taskState, points);
     setTrial7Selectability2D(taskState, points);
 }
@@ -523,7 +561,7 @@ export function applyTask3Visuals3D(
     taskState: TaskState | null,
     pointsById: Map<string, TaskPoint3D>,
     colors: TaskColorConfig3D,
-    flashingPointId: string | null
+    flashingPointId: string | null,
 ) {
     if (!taskState || taskState.trial !== 7) {
         return;
@@ -541,7 +579,8 @@ export function applyTask3Visuals3D(
 
     if (activeAssignment && activePair && !activeSolved) {
         const partnerPoint = pointsById.get(activeAssignment.point2D);
-        partnerPoint?.setLocalOverrideColor(hexToColor3(activePair.hex2D));
+        const lightHint = lightenColor(hexToColor3(activePair.hex2D), TASK3_LIGHTEN_AMOUNT);
+        partnerPoint?.setLocalOverrideColor(lightHint);
     }
 
     applyCompletedTrial7Pairs3D(taskState, pointsById.values());
@@ -551,7 +590,7 @@ export function processTrial7ErrorFlash2D(
     taskState: TaskState | null,
     points: Iterable<TaskPoint2D>,
     errorColor: Vector3,
-    lastProcessedErrorPointId: string | null
+    lastProcessedErrorPointId: string | null,
 ): string | null {
     if (!taskState || taskState.trial !== 7) {
         return lastProcessedErrorPointId;
@@ -560,7 +599,7 @@ export function processTrial7ErrorFlash2D(
     const pointMap = createPointMap(points);
     if (taskState.errorPointId3D && taskState.errorPointId3D !== lastProcessedErrorPointId) {
         const errorPoint = pointMap.get(taskState.errorPointId3D);
-        errorPoint?.flashColorSync(errorColor, 1000);
+        errorPoint?.flashColorSync(errorColor, 2000);
         return taskState.errorPointId3D;
     }
 
@@ -575,7 +614,7 @@ export function processTrial7ErrorFlash3D(
     taskState: TaskState | null,
     points: Map<string, TaskPoint3D>,
     errorColor: Color3,
-    lastProcessedErrorPointId: string | null
+    lastProcessedErrorPointId: string | null,
 ): string | null {
     if (!taskState || taskState.trial !== 7) {
         return lastProcessedErrorPointId;
@@ -583,7 +622,7 @@ export function processTrial7ErrorFlash3D(
 
     if (taskState.errorPointId2D && taskState.errorPointId2D !== lastProcessedErrorPointId) {
         const errorPoint = points.get(taskState.errorPointId2D);
-        errorPoint?.flashColorSynced(errorColor, 1000);
+        errorPoint?.flashColorSynced(errorColor, 2000);
         return taskState.errorPointId2D;
     }
 

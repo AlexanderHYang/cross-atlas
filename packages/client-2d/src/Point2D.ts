@@ -73,7 +73,7 @@ export class Point2D {
         this.onLocalChange();
     }
 
-    public flashColorSync(color: Vector3, durationMs: number = 1000) {
+    public flashColorSync(color: Vector3, durationMs: number = 2000) {
         if (this.flashHandle !== null) {
             window.clearTimeout(this.flashHandle);
             this.flashHandle = null;

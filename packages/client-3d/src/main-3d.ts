@@ -25,8 +25,8 @@ const { bigRadius, plane } = env;
 
 const sphereCenter = new Vector3(0, liftOffset, 0);
 const centerLight = new PointLight("centerLight", sphereCenter.clone(), scene);
-centerLight.intensity = 1.1;
-centerLight.range = bigRadius * 3;
+centerLight.intensity = 0.35;
+centerLight.range = bigRadius * 2.5;
 centerLight.diffuse = new Color3(1, 1, 1);
 
 // create SyncManager

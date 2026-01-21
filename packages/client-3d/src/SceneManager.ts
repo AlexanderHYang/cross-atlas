@@ -24,7 +24,7 @@ export class SceneManager {
         this.camera.attachControl(canvas, true)
         
         const hemi = new HemisphericLight('h', new Vector3(0, 1, 0), this.scene)
-        hemi.intensity = 0.35
+        hemi.intensity = 0.8
 
         const keyLight = new DirectionalLight('key', new Vector3(-0.4, -1, -0.3), this.scene)
         keyLight.position = new Vector3(4, 8, 4)

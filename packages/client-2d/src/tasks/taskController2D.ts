@@ -100,7 +100,7 @@ export class TaskController2D {
         } else {
             this.deps.logger.logIncorrectClick2D(clicked.id);
             const errorColor = selection.errorColor ?? this.deps.errorColor;
-            const duration = selection.errorFlashDurationMs ?? 1000;
+            const duration = selection.errorFlashDurationMs ?? 2000;
 
             clicked.flashColorSync(errorColor, duration);
         }

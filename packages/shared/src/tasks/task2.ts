@@ -14,7 +14,8 @@ import type {
     TaskSelection2DEffect,
     TaskSelection3DEffect,
     TaskPoint3D,
-} from "./task";
+} from "./tasks";
+import { Color3, Vector3 } from "@babylonjs/core";
 
 export const TASK2_ID = "task2";
 export const TASK2_TRIALS: TaskTrial[] = [5, 6];
@@ -28,7 +29,7 @@ export function isTask2Trial(trial: TaskTrial): trial is Task2Trial {
 export function createTask2State(
     targetPointId2D: string,
     targetPointId3D: string,
-    trial: Task2Trial = 5
+    trial: Task2Trial = 5,
 ): TaskState {
     return {
         id: TASK2_ID,
@@ -58,7 +59,7 @@ export function isTask2Complete(trial: Task2Trial): boolean {
  */
 export function handleTask2Selection2D(
     currentState: TaskState,
-    selectedPointId: string
+    selectedPointId: string,
 ): { updated: TaskState; isCorrect: boolean; shouldTransition: boolean } {
     if (!isTask2Trial(currentState.trial)) {
         return { updated: currentState, isCorrect: false, shouldTransition: false };
@@ -88,7 +89,7 @@ export function handleTask2Selection2D(
  */
 export function handleTask2Selection3D(
     currentState: TaskState,
-    selectedPointId: string
+    selectedPointId: string,
 ): { updated: TaskState; isCorrect: boolean; shouldTransition: boolean } {
     if (!isTask2Trial(currentState.trial)) {
         return { updated: currentState, isCorrect: false, shouldTransition: false };
@@ -121,7 +122,7 @@ const DEFAULT_VISUAL_2D: TaskPointVisual2D = {
 export function getTask2PointVisual2D(
     taskState: TaskState | null,
     pointId: string,
-    colors: TaskColorConfig2D
+    colors: TaskColorConfig2D,
 ): TaskPointVisual2D {
     if (!taskState || !isTask2Trial(taskState.trial)) {
         return DEFAULT_VISUAL_2D;
@@ -130,11 +131,13 @@ export function getTask2PointVisual2D(
     const partnerTargetId = taskState.targetPointId3D;
     const ownTargetId = taskState.targetPointId2D;
     let overrideColor: TaskPointVisual2D["overrideColor"] = null;
+    const darkSuccess = darkenVector(colors.success, TASK2_DARKEN_AMOUNT);
+    const lightSuccess = lightenVector(colors.success, TASK2_LIGHTEN_AMOUNT);
 
     if (partnerTargetId && partnerTargetId === pointId) {
-        overrideColor = colors.success;
+        overrideColor = darkSuccess;
     } else if (taskState.clicked2D && ownTargetId === pointId) {
-        overrideColor = colors.success;
+        overrideColor = lightSuccess;
     }
 
     return {
@@ -147,7 +150,7 @@ export function getTask2PointVisual2D(
 export function evaluateTask2Selection2D(
     taskState: TaskState | null,
     selectedPointId: string,
-    colors: TaskColorConfig2D
+    colors: TaskColorConfig2D,
 ): TaskSelection2DEffect {
     if (!taskState || !isTask2Trial(taskState.trial) || taskState.completed) {
         return { handled: false };
@@ -158,19 +161,20 @@ export function evaluateTask2Selection2D(
     }
 
     const isCorrect = selectedPointId === taskState.targetPointId2D;
+    const lightSuccess = lightenVector(colors.success, TASK2_LIGHTEN_AMOUNT);
     return {
         handled: true,
         isCorrect,
-        successColor: colors.success,
+        successColor: lightSuccess,
         errorColor: colors.error,
-        errorFlashDurationMs: 1000,
+        errorFlashDurationMs: 2000,
     };
 }
 
 export function evaluateTask2Selection3D(
     taskState: TaskState | null,
     selectedPointId: string,
-    colors: TaskColorConfig3D
+    colors: TaskColorConfig3D,
 ): TaskSelection3DEffect {
     if (!taskState || !isTask2Trial(taskState.trial) || taskState.completed) {
         return { handled: false };
@@ -181,12 +185,13 @@ export function evaluateTask2Selection3D(
     }
 
     const isCorrect = selectedPointId === taskState.targetPointId3D;
+    const darkSuccess = darkenColor(colors.success, TASK2_DARKEN_AMOUNT);
     return {
         handled: true,
         isCorrect,
-        successColor: colors.success,
+        successColor: darkSuccess,
         errorColor: colors.error,
-        flashDurationMs: 1000,
+        flashDurationMs: 2000,
         stateUpdate: "task2",
     };
 }
@@ -194,19 +199,50 @@ export function evaluateTask2Selection3D(
 export function applyTask2Visuals3D(
     taskState: TaskState | null,
     pointsById: Map<string, TaskPoint3D>,
-    colors: TaskColorConfig3D
+    colors: TaskColorConfig3D,
 ) {
     if (!taskState || !isTask2Trial(taskState.trial)) {
         return;
     }
 
+    const lightSuccess = lightenColor(colors.success, TASK2_LIGHTEN_AMOUNT);
+    const darkSuccess = darkenColor(colors.success, TASK2_DARKEN_AMOUNT);
     if (taskState.targetPointId2D) {
         const partnerTarget = pointsById.get(taskState.targetPointId2D);
-        partnerTarget?.setLocalOverrideColor(colors.success);
+        partnerTarget?.setLocalOverrideColor(lightSuccess);
     }
 
     if (taskState.clicked3D && taskState.targetPointId3D) {
         const targetPoint = pointsById.get(taskState.targetPointId3D);
-        targetPoint?.setDisplayColor(colors.success);
+        targetPoint?.setDisplayColor(darkSuccess);
     }
+}
+
+const TASK2_LIGHTEN_AMOUNT = 0.2;
+const TASK2_DARKEN_AMOUNT = 0.2;
+
+function lightenColor(color: Color3, amount: number): Color3 {
+    return new Color3(
+        Math.min(1, color.r + (1 - color.r) * amount),
+        Math.min(1, color.g + (1 - color.g) * amount),
+        Math.min(1, color.b + (1 - color.b) * amount)
+    );
+}
+
+function darkenColor(color: Color3, amount: number): Color3 {
+    const factor = 1 - amount;
+    return new Color3(color.r * factor, color.g * factor, color.b * factor);
+}
+
+function lightenVector(color: Vector3, amount: number): Vector3 {
+    return new Vector3(
+        Math.min(1, color.x + (1 - color.x) * amount),
+        Math.min(1, color.y + (1 - color.y) * amount),
+        Math.min(1, color.z + (1 - color.z) * amount)
+    );
+}
+
+function darkenVector(color: Vector3, amount: number): Vector3 {
+    const factor = 1 - amount;
+    return new Vector3(color.x * factor, color.y * factor, color.z * factor);
 }

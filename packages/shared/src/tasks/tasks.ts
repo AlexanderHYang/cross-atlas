@@ -58,8 +58,8 @@ export type TaskFlowConfig = {
 
 /*-------- Task switch --------*/
 let taskFlowConfig: TaskFlowConfig = {
-    task1: true,
-    task2: true,
+    task1: false,
+    task2: false,
     task3: true,
 };
 

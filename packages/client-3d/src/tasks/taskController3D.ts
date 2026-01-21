@@ -59,7 +59,7 @@ export class TaskController3D {
                 },
             });
             const flashColor = selection.errorColor ?? this.deps.errorColor;
-            const duration = selection.flashDurationMs ?? 1000;
+            const duration = selection.flashDurationMs ?? 2000;
             if (selection.stateUpdate === "task3") {
                 this.flashingPointId3D = point.id;
             }

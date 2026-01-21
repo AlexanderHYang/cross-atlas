@@ -7,8 +7,8 @@
  * - State management for the overall task flow
  */
 
-import type { TaskState, TaskId, TaskTrial, Trial7Assignment } from "./tasks/task";
-import { getTaskFlowConfig, getTaskAndTrial } from "./tasks/task";
+import type { TaskState, TaskId, TaskTrial, Trial7Assignment } from "./tasks/tasks";
+import { getTaskFlowConfig, getTaskAndTrial } from "./tasks/tasks";
 import {
     TASK1_ID,
     createTask1State,
@@ -126,7 +126,7 @@ export function createInitialTask1State(provider: PointIdProvider): TaskState | 
  */
 export function createNextTask1TrialState(
     currentState: TaskState,
-    provider: PointIdProvider
+    provider: PointIdProvider,
 ): TaskState | null {
     const currentTrial = currentState.trial as Task1Trial;
     const nextTrial = getNextTask1Trial(currentTrial);
@@ -155,7 +155,7 @@ export function createInitialTask2State(provider: PointIdProvider): TaskState | 
  */
 export function createNextTask2TrialState(
     currentState: TaskState,
-    provider: PointIdProvider
+    provider: PointIdProvider,
 ): TaskState | null {
     const currentTrial = currentState.trial as Task2Trial;
     const nextTrial = getNextTask2Trial(currentTrial);
@@ -174,7 +174,7 @@ export function createNextTask2TrialState(
  */
 export function createInitialTask3State(
     provider: PointIdProvider,
-    pairCount = 5
+    pairCount = 5,
 ): TaskState | null {
     const pointIds = provider.pickDistinctTargetIds(pairCount * 2);
 
@@ -234,7 +234,7 @@ export function determineNextAction(currentState: TaskState): {
 export function createNextState(
     currentState: TaskState,
     action: ReturnType<typeof determineNextAction>,
-    provider: PointIdProvider
+    provider: PointIdProvider,
 ): TaskState | null {
     switch (action.action) {
         case "next-trial": {
@@ -273,7 +273,7 @@ export function createNextState(
 export function logTrialStart(state: TaskState, side: "2D" | "3D" = "2D") {
     const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(state.trial);
     console.log(
-        `[${side}][${state.id}] Task ${taskNumber} trial ${trialNumber}/${totalTrials} start`
+        `[${side}][${state.id}] Task ${taskNumber} trial ${trialNumber}/${totalTrials} start`,
     );
 }
 
@@ -289,12 +289,12 @@ export function logTrialEnd(state: TaskState, side: "2D" | "3D" = "2D") {
         const active = state.trial7Assignments[activeIndex];
         const colorLabel = active?.key ?? "pair";
         console.log(
-            `[${side}][${state.id}] Task ${taskNumber} trial ${trialNumber}/${totalTrials} completed ${colorLabel} (${solvedPairs}/${totalPairs} pairs solved)`
+            `[${side}][${state.id}] Task ${taskNumber} trial ${trialNumber}/${totalTrials} completed ${colorLabel} (${solvedPairs}/${totalPairs} pairs solved)`,
         );
     } else {
         const status = state.feedback === "success" ? "success" : "end";
         console.log(
-            `[${side}][${state.id}] Task ${taskNumber} trial ${trialNumber}/${totalTrials} ${status} (completed=${state.completed}, feedback=${state.feedback})`
+            `[${side}][${state.id}] Task ${taskNumber} trial ${trialNumber}/${totalTrials} ${status} (completed=${state.completed}, feedback=${state.feedback})`,
         );
     }
 }
@@ -305,7 +305,7 @@ export function logTrialEnd(state: TaskState, side: "2D" | "3D" = "2D") {
 export function logTaskLifecycle(
     prevState: TaskState | null,
     nextState: TaskState | null,
-    side: "2D" | "3D"
+    side: "2D" | "3D",
 ) {
     if (!nextState) return;
 
