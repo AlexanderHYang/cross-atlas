@@ -276,7 +276,8 @@ function drawAll() {
             visuals.isTarget,
             isCompleted,
             visuals.hideColor,
-            visuals.overrideColor
+            visuals.overrideColor,
+            visuals.glowColor
         );
     }
 }

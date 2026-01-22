@@ -18,6 +18,11 @@ highlighter.innerGlow = true;
 highlighter.outerGlow = true;
 highlighter.blurHorizontalSize = 1.5;
 highlighter.blurVerticalSize = 1.5;
+const vrHintGlow = new HighlightLayer("vrHintGlow", scene);
+vrHintGlow.innerGlow = true;
+vrHintGlow.outerGlow = true;
+vrHintGlow.blurHorizontalSize = 1.5;
+vrHintGlow.blurVerticalSize = 1.5;
 
 const liftOffset = 0.5;
 const env = sceneManager.createEnvironment({ bigRadius: DEFAULT_SPHERE_RADIUS });
@@ -98,6 +103,7 @@ const taskController3D = new TaskController3D({
     colorConfig: colorConfig3D,
     successColor,
     errorColor,
+    vrHintGlowLayer: vrHintGlow,
 });
 
 function activateStudy() {

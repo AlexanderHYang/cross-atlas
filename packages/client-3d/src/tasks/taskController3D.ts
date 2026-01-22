@@ -1,11 +1,14 @@
-import { Color3 } from "@babylonjs/core";
+import { Color3, HighlightLayer } from "@babylonjs/core";
 import {
     TaskColorConfig3D,
     applyTaskVisuals3D,
     evaluateSelection3D,
     getTaskAndTrial,
+    isTask2Trial,
+    isTask3Trial,
     processTrial7ErrorFlash3D,
 } from "../../../shared/src/tasks";
+import { getColorPairByKey } from "../../../shared/src/tasks/task3";
 import { getDefaultPointConfig } from "../../../shared/src/defaultPoints";
 import type { Logger3D } from "../Logger3d";
 import type { Point3D } from "../Point3D";
@@ -18,6 +21,7 @@ export type TaskController3DDeps = {
     colorConfig: TaskColorConfig3D;
     successColor: Color3;
     errorColor: Color3;
+    vrHintGlowLayer?: HighlightLayer;
 };
 
 export class TaskController3D {
@@ -27,6 +31,7 @@ export class TaskController3D {
     private lastProcessedErrorPointId2D: string | null = null;
     private flashingPointId3D: string | null = null;
     private suppressVisuals = false;
+    private vrHintMeshes = new Map<string, { mesh: Point3D["mesh"]; colorKey: string }>();
 
     constructor(private readonly deps: TaskController3DDeps) {}
 
@@ -135,6 +140,7 @@ export class TaskController3D {
             flashingPointId: this.flashingPointId3D,
             resetAllPointColors: () => this.resetAllPointColors(),
         });
+        this.applyVrHintGlow(task);
 
         if (trial === 7) {
             this.lastProcessedErrorPointId2D = processTrial7ErrorFlash3D(
@@ -157,6 +163,7 @@ export class TaskController3D {
             this.clearLocalHints();
             this.flashingPointId3D = null;
             this.resetAllPointColors();
+            this.clearVrHintGlow();
         }
     }
 
@@ -200,5 +207,135 @@ export class TaskController3D {
                 this.deps.syncManager.setTrial(4, taskId);
             }
         }, 2000);
+    }
+
+    private clearVrHintGlow() {
+        const layer = this.deps.vrHintGlowLayer;
+        if (!layer) {
+            this.vrHintMeshes.clear();
+            return;
+        }
+        for (const entry of this.vrHintMeshes.values()) {
+            layer.removeMesh(entry.mesh);
+        }
+        this.vrHintMeshes.clear();
+    }
+
+    private applyVrHintGlow(task: ReturnType<SyncManager3D["getCurrentTask"]>) {
+        const layer = this.deps.vrHintGlowLayer;
+        if (!layer) {
+            return;
+        }
+        if (!task) {
+            this.clearVrHintGlow();
+            return;
+        }
+
+        if (isTask3Trial(task.trial)) {
+            this.applyTask3VrHintGlow(task);
+            return;
+        }
+
+        if (isTask2Trial(task.trial)) {
+            this.applyTask2VrHintGlow(task);
+            return;
+        }
+
+        this.clearVrHintGlow();
+    }
+
+    private applyTask2VrHintGlow(task: ReturnType<SyncManager3D["getCurrentTask"]>) {
+        if (!task?.targetPointId3D || !task.clicked3D) {
+            this.syncVrHintGlow(new Map());
+            return;
+        }
+
+        const targetPoint = this.deps.pointsById.get(task.targetPointId3D);
+        if (!targetPoint) {
+            this.syncVrHintGlow(new Map());
+            return;
+        }
+
+        const desired = new Map([
+            [
+                targetPoint.id,
+                {
+                    mesh: targetPoint.mesh,
+                    color: this.deps.successColor,
+                    colorKey: "success",
+                },
+            ],
+        ]);
+        this.syncVrHintGlow(desired);
+    }
+
+    private applyTask3VrHintGlow(task: ReturnType<SyncManager3D["getCurrentTask"]>) {
+        const desired = new Map<
+            string,
+            { mesh: Point3D["mesh"]; color: Color3; colorKey: string }
+        >();
+
+        if (task?.trial7Assignments) {
+            for (const entry of task.trial7Assignments) {
+                if (!entry.done2D || !entry.done3D) {
+                    continue;
+                }
+                const targetPoint = this.deps.pointsById.get(entry.point3D);
+                if (!targetPoint) {
+                    continue;
+                }
+                const pair = getColorPairByKey(entry.key);
+                if (!pair) {
+                    continue;
+                }
+                desired.set(targetPoint.id, {
+                    mesh: targetPoint.mesh,
+                    color: Color3.FromHexString(pair.hex3D),
+                    colorKey: pair.hex3D,
+                });
+            }
+        }
+
+        if (task?.targetPointId3D && task.clicked3D) {
+            const targetPoint = this.deps.pointsById.get(task.targetPointId3D);
+            if (targetPoint) {
+                const pair = getColorPairByKey(task.colorPairKey);
+                const glowColor = pair
+                    ? Color3.FromHexString(pair.hex3D)
+                    : this.deps.successColor;
+                const colorKey = pair?.hex3D ?? "success";
+                desired.set(targetPoint.id, {
+                    mesh: targetPoint.mesh,
+                    color: glowColor,
+                    colorKey,
+                });
+            }
+        }
+
+        this.syncVrHintGlow(desired);
+    }
+
+    private syncVrHintGlow(
+        desired: Map<string, { mesh: Point3D["mesh"]; color: Color3; colorKey: string }>
+    ) {
+        const layer = this.deps.vrHintGlowLayer;
+        if (!layer) {
+            return;
+        }
+
+        for (const [id, existing] of this.vrHintMeshes.entries()) {
+            const next = desired.get(id);
+            if (!next || next.mesh !== existing.mesh || next.colorKey !== existing.colorKey) {
+                layer.removeMesh(existing.mesh);
+                this.vrHintMeshes.delete(id);
+            }
+        }
+
+        for (const [id, next] of desired.entries()) {
+            if (!this.vrHintMeshes.has(id)) {
+                layer.addMesh(next.mesh, next.color);
+                this.vrHintMeshes.set(id, { mesh: next.mesh, colorKey: next.colorKey });
+            }
+        }
     }
 }

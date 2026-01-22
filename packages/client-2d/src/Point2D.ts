@@ -149,7 +149,8 @@ export class Point2D {
         _isTaskTarget: boolean,
         _taskCompleted: boolean,
         hideColor: boolean = false,
-        overrideColor: Vector3 | null = null
+        overrideColor: Vector3 | null = null,
+        glowColor: Vector3 | null = null
     ) {
         const x = ((this.nx + 1) / 2) * width;
         const y = (1 - (this.ny + 1) / 2) * height;
@@ -160,6 +161,22 @@ export class Point2D {
         const b = Math.round(Math.min(1, Math.max(0, sourceColor.z)) * 255);
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         const radius = 12;
+
+        if (glowColor) {
+            const glowR = Math.round(Math.min(1, Math.max(0, glowColor.x)) * 255);
+            const glowG = Math.round(Math.min(1, Math.max(0, glowColor.y)) * 255);
+            const glowB = Math.round(Math.min(1, Math.max(0, glowColor.z)) * 255);
+            const glowRadius = radius * 1.5;
+            ctx.fillStyle = `rgba(${glowR}, ${glowG}, ${glowB}, 0.35)`;
+            if (this.id === "landmark") {
+                ctx.fillRect(x - glowRadius, y - glowRadius, glowRadius * 2, glowRadius * 2);
+            } else {
+                ctx.beginPath();
+                ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        }
 
         if (this.id === "landmark") {
             ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);

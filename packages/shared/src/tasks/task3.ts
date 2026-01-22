@@ -252,6 +252,7 @@ const DEFAULT_VISUAL_2D: TaskPointVisual2D = {
     isTarget: false,
     hideColor: false,
     overrideColor: null,
+    glowColor: null,
 };
 
 function hexToVector3(hex: string): Vector3 {
@@ -266,35 +267,6 @@ function hexToVector3(hex: string): Vector3 {
 
 function hexToColor3(hex: string): Color3 {
     return Color3.FromHexString(hex);
-}
-
-const TASK3_LIGHTEN_AMOUNT = 0.2;
-const TASK3_DARKEN_AMOUNT = 0.2;
-
-function lightenColor(color: Color3, amount: number): Color3 {
-    return new Color3(
-        Math.min(1, color.r + (1 - color.r) * amount),
-        Math.min(1, color.g + (1 - color.g) * amount),
-        Math.min(1, color.b + (1 - color.b) * amount)
-    );
-}
-
-function darkenColor(color: Color3, amount: number): Color3 {
-    const factor = 1 - amount;
-    return new Color3(color.r * factor, color.g * factor, color.b * factor);
-}
-
-function darkenVector(color: Vector3, amount: number): Vector3 {
-    const factor = 1 - amount;
-    return new Vector3(color.x * factor, color.y * factor, color.z * factor);
-}
-
-function lightenVector(color: Vector3, amount: number): Vector3 {
-    return new Vector3(
-        Math.min(1, color.x + (1 - color.x) * amount),
-        Math.min(1, color.y + (1 - color.y) * amount),
-        Math.min(1, color.z + (1 - color.z) * amount)
-    );
 }
 
 function vectorToCssRgb(color: Vector3): string {
@@ -326,14 +298,32 @@ export function getTask3PointVisual2D(
         return {
             isTarget: taskState.targetPointId2D === pointId,
             hideColor: false,
-            overrideColor: darkenVector(hexToVector3(pair.hex3D), TASK3_DARKEN_AMOUNT),
+            overrideColor: hexToVector3(pair.hex3D),
+            glowColor: hexToVector3(pair.hex3D),
         };
+    }
+
+    const solvedAssignment = taskState.trial7Assignments?.find(
+        (entry) => entry.done2D && entry.done3D && entry.point3D === pointId,
+    );
+    if (solvedAssignment) {
+        const solvedPair = getColorPairByKey(solvedAssignment.key);
+        if (solvedPair) {
+            const solvedColor = hexToVector3(solvedPair.hex3D);
+            return {
+                isTarget: taskState.targetPointId2D === pointId,
+                hideColor: false,
+                overrideColor: solvedColor,
+                glowColor: solvedColor,
+            };
+        }
     }
 
     return {
         isTarget: taskState.targetPointId2D === pointId,
         hideColor: false,
         overrideColor: null,
+        glowColor: null,
     };
 }
 
@@ -368,8 +358,7 @@ export function evaluateTask3Selection2D(
     const { activeAssignment } = getActiveAssignment(taskState);
     const pairKey = activeAssignment?.key ?? taskState.colorPairKey;
     const pair = pairKey ? getColorPairByKey(pairKey) : null;
-    const baseColor = pair ? hexToVector3(pair.hex2D) : colors.success;
-    const ownColor = lightenVector(baseColor, TASK3_LIGHTEN_AMOUNT);
+    const ownColor = pair ? hexToVector3(pair.hex2D) : colors.success;
 
     const isCorrect = selectedPointId === taskState.targetPointId2D;
     return {
@@ -403,8 +392,7 @@ export function evaluateTask3Selection3D(
     const { activeAssignment } = getActiveAssignment(taskState);
     const pairKey = activeAssignment?.key ?? taskState.colorPairKey;
     const pair = pairKey ? getColorPairByKey(pairKey) : null;
-    const baseColor = pair ? hexToColor3(pair.hex3D) : colors.success;
-    const ownColor = darkenColor(baseColor, TASK3_DARKEN_AMOUNT);
+    const ownColor = pair ? hexToColor3(pair.hex3D) : colors.success;
 
     const isCorrect = selectedPointId === taskState.targetPointId3D;
     return {
@@ -426,8 +414,8 @@ export function getTask3Instruction(taskState: TaskState | null): TaskInstructio
     const { activeAssignment } = getActiveAssignment(taskState);
     const pair = getColorPairByKey(activeAssignment?.key ?? taskState.colorPairKey);
     if (pair) {
-        const lightColor = lightenVector(hexToVector3(pair.hex2D), TASK3_LIGHTEN_AMOUNT);
-        const colorWord = `<span style="color:${vectorToCssRgb(lightColor)};font-weight:bold;">${pair.name2D}</span>`;
+        const baseColor = hexToVector3(pair.hex2D);
+        const colorWord = `<span style="color:${vectorToCssRgb(baseColor)};font-weight:bold;">${pair.name2D}</span>`;
         return {
             visible: true,
             html: `Find the ${colorWord} sphere`,
@@ -464,13 +452,13 @@ export function applyCompletedTrial7Pairs2D(
         const pair = getColorPairByKey(entry.key);
 
         if (point && pair) {
-            const color = lightenVector(hexToVector3(pair.hex2D), TASK3_LIGHTEN_AMOUNT);
+            const color = hexToVector3(pair.hex2D);
             point.setBaseColor(color);
             point.setDisplayColor(color);
             point.setSelectable(false);
         }
         if (partnerPoint && pair) {
-            const partnerColor = darkenVector(hexToVector3(pair.hex3D), TASK3_DARKEN_AMOUNT);
+            const partnerColor = hexToVector3(pair.hex3D);
             partnerPoint.setBaseColor(partnerColor);
             partnerPoint.setDisplayColor(partnerColor);
             partnerPoint.setSelectable(false);
@@ -494,13 +482,13 @@ export function applyCompletedTrial7Pairs3D(
         const pair = getColorPairByKey(entry.key);
         if (point && pair) {
             point.clearLocalOverrideColor();
-            const color = darkenColor(hexToColor3(pair.hex3D), TASK3_DARKEN_AMOUNT);
+            const color = hexToColor3(pair.hex3D);
             point.setPermanentColor(color);
             point.setSelectable(false);
         }
         if (partnerPoint && pair) {
             partnerPoint.clearLocalOverrideColor();
-            const partnerColor = lightenColor(hexToColor3(pair.hex2D), TASK3_LIGHTEN_AMOUNT);
+            const partnerColor = hexToColor3(pair.hex2D);
             partnerPoint.setPermanentColor(partnerColor);
             partnerPoint.setSelectable(false);
         }
@@ -579,8 +567,7 @@ export function applyTask3Visuals3D(
 
     if (activeAssignment && activePair && !activeSolved) {
         const partnerPoint = pointsById.get(activeAssignment.point2D);
-        const lightHint = lightenColor(hexToColor3(activePair.hex2D), TASK3_LIGHTEN_AMOUNT);
-        partnerPoint?.setLocalOverrideColor(lightHint);
+        partnerPoint?.setLocalOverrideColor(hexToColor3(activePair.hex2D));
     }
 
     applyCompletedTrial7Pairs3D(taskState, pointsById.values());

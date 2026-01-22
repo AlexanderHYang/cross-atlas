@@ -169,6 +169,7 @@ export type TaskPointVisual2D = {
     isTarget: boolean;
     hideColor: boolean;
     overrideColor: Vector3 | null;
+    glowColor: Vector3 | null;
 };
 
 export type TaskSelection2DEffect = {
@@ -281,6 +282,7 @@ const DEFAULT_POINT_VISUAL_2D: TaskPointVisual2D = {
     isTarget: false,
     hideColor: false,
     overrideColor: null,
+    glowColor: null,
 };
 
 export function getPointVisual2D(

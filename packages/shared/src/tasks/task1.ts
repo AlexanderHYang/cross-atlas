@@ -115,6 +115,7 @@ const DEFAULT_VISUAL_2D: TaskPointVisual2D = {
     isTarget: false,
     hideColor: false,
     overrideColor: null,
+    glowColor: null,
 };
 
 export function getTask1PointVisual2D(
@@ -133,6 +134,7 @@ export function getTask1PointVisual2D(
             isTarget,
             hideColor: false,
             overrideColor: isTarget ? colors.success : null,
+            glowColor: null,
         };
     }
 
@@ -142,6 +144,7 @@ export function getTask1PointVisual2D(
             isTarget,
             hideColor,
             overrideColor: null,
+            glowColor: null,
         };
     }
 
