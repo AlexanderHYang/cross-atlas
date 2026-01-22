@@ -1,6 +1,7 @@
 import { SyncManager2D } from "./SyncManager2D";
 import { TimedLogEvent } from "../../shared/src/logging";
 import { getTaskAndTrial } from "../../shared/src/tasks";
+import { layoutType } from "../../shared/src/defaultPoints";
 
 export type LogEvent2D = {
     eventName: string,
@@ -267,6 +268,47 @@ export class Logger2D {
         this.lastRotationSample = sample;
     }
 
+    public logTask3PointSolved(params: {
+        pairKey: string;
+        pairIndex: number;
+        side: "2d" | "3d";
+        solvedCount?: number;
+        totalPairs?: number;
+    }) {
+        if (this.finalized) {
+            return;
+        }
+        const timestamp = new Date().toISOString();
+        const pairLabel = `${params.pairKey} (${params.pairIndex + 1})`;
+        const progress =
+            params.solvedCount !== undefined && params.totalPairs !== undefined
+                ? ` solvedPairs=${params.solvedCount}/${params.totalPairs}`
+                : "";
+        this.queueText(
+            `[${timestamp}] task=3 event=pair_point_solved pair=${pairLabel} side=${params.side}${progress}\n`
+        );
+    }
+
+    public logTask3PairSolved(params: {
+        pairKey: string;
+        pairIndex: number;
+        solvedCount?: number;
+        totalPairs?: number;
+    }) {
+        if (this.finalized) {
+            return;
+        }
+        const timestamp = new Date().toISOString();
+        const pairLabel = `${params.pairKey} (${params.pairIndex + 1})`;
+        const progress =
+            params.solvedCount !== undefined && params.totalPairs !== undefined
+                ? ` solvedPairs=${params.solvedCount}/${params.totalPairs}`
+                : "";
+        this.queueText(
+            `[${timestamp}] task=3 event=pair_solved pair=${pairLabel}${progress}\n`
+        );
+    }
+
     private handleIncorrectClickLog(logEvent: TimedLogEvent, user: "pc" | "vr") {
         const details = logEvent.eventDetails ?? {};
         const context = this.extractTrialContext(details) ?? this.ensureTrialContext();
@@ -448,6 +490,10 @@ export class Logger2D {
             lines.push("");
         }
 
+        const projection = this.syncManager.getProjectionManager().getCurrentProjectionType();
+        lines.push(`Projection: ${projection}`);
+        lines.push(`Layout: ${layoutType}`);
+        lines.push("");
         lines.push("=== SUMMARY TABLE (by task/trial) ===");
         lines.push(...this.buildSummaryTableLines(summaries));
         lines.push("");
@@ -468,29 +514,19 @@ export class Logger2D {
         const header = [
             "task",
             "trial",
-            "samples",
             "incorrect2D",
             "incorrect3D",
             "completionMs",
-            "startTime",
-            "endTime",
-            "startYaw",
-            "startPitch",
-            "endYaw",
-            "endPitch",
+            "cumulativeYaw",
+            "cumulativePitch",
         ];
 
         const rows = summaries.map((summary) => [
             String(summary.taskNumber),
             `${summary.trialNumber}/${summary.totalTrials}`,
-            String(summary.sampleCount),
             Logger2D.formatCount(summary.incorrectClicks2D),
             Logger2D.formatCount(summary.incorrectClicks3D),
             Logger2D.formatDurationMs(summary.completionMs),
-            Logger2D.formatTimestamp(summary.startTime),
-            Logger2D.formatTimestamp(summary.endTime),
-            Logger2D.formatNumber(summary.startYaw),
-            Logger2D.formatNumber(summary.startPitch),
             Logger2D.formatNumber(summary.endYaw),
             Logger2D.formatNumber(summary.endPitch),
         ]);

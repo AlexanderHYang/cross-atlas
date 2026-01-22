@@ -58,8 +58,8 @@ export type TaskFlowConfig = {
 
 /*-------- Task switch --------*/
 let taskFlowConfig: TaskFlowConfig = {
-    task1: false,
-    task2: false,
+    task1: true,
+    task2: true,
     task3: true,
 };
 
@@ -77,6 +77,22 @@ export function setTaskFlowConfig(config: Partial<TaskFlowConfig>) {
  */
 export function getTaskFlowConfig(): TaskFlowConfig {
     return { ...taskFlowConfig };
+}
+
+export function parseTaskSelection(tasksFlag?: string | null): TaskFlowConfig | null {
+    if (!tasksFlag) {
+        return null;
+    }
+    const enabled = new Set(tasksFlag.replace(/[^123]/g, "").split(""));
+    if (enabled.size === 0) {
+        console.warn("[Task] Invalid tasks flag:", tasksFlag);
+        return null;
+    }
+    return {
+        task1: enabled.has("1"),
+        task2: enabled.has("2"),
+        task3: enabled.has("3"),
+    };
 }
 
 export type Trial7Assignment = {

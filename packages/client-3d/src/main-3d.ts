@@ -5,7 +5,12 @@ import { Vector3, Color3, HighlightLayer, PointerEventTypes, PointLight } from "
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience";
 import { initWebXR } from "./xr/webxrExperience";
 import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from "../../shared/src/defaultPoints";
-import { TaskColorConfig3D } from "../../shared/src/tasks";
+import {
+    TaskColorConfig3D,
+    determineNextAction,
+    parseTaskSelection,
+    setTaskFlowConfig,
+} from "../../shared/src/tasks";
 import { Logger3D } from "./Logger3d";
 import { TaskController3D } from "./tasks/taskController3D";
 
@@ -96,6 +101,12 @@ const colorConfig3D: TaskColorConfig3D = {
     error: errorColor,
 };
 
+const tasksFlag = (import.meta.env.VITE_TASKS as string | undefined)?.trim();
+const tasksConfig = parseTaskSelection(tasksFlag);
+if (tasksConfig) {
+    setTaskFlowConfig(tasksConfig);
+}
+
 const taskController3D = new TaskController3D({
     syncManager: syncManager3D,
     logger: logger3D,
@@ -113,6 +124,14 @@ function activateStudy() {
     studyActivated = true;
     logger3D.setLoggingEnabled(true);
     syncManager3D.onTaskStateChange(taskController3D.handleTaskStateChange);
+    syncManager3D.onTaskStateChange((taskState) => {
+        if (!taskState) {
+            return;
+        }
+        if (taskState.completed && determineNextAction(taskState).action === "all-complete") {
+            logger3D.setLoggingEnabled(false);
+        }
+    });
 }
 
 function beginCalibration() {

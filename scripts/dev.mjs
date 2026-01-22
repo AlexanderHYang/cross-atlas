@@ -150,6 +150,7 @@ function parseArguments() {
     "vertical",
     "horizontal",
   ]);
+  let tasksArg;
 
   for (const arg of args) {
     // parse --projection option
@@ -166,6 +167,27 @@ function parseArguments() {
         process.exit(1);
       }
     }
+
+    if (arg.startsWith("--tasks=") || arg.startsWith("tasks=")) {
+      tasksArg = arg.split("=")[1];
+    }
+
+    if (arg.startsWith("--task=") || arg.startsWith("task=")) {
+      tasksArg = arg.split("=")[1];
+    }
+  }
+
+  const envTasks =
+    tasksArg ??
+    process.env.VITE_TASKS ??
+    process.env.TASKS ??
+    process.env.TASK ??
+    process.env.tasks ??
+    process.env.task ??
+    process.env.npm_config_tasks ??
+    process.env.npm_config_task;
+  if (envTasks) {
+    envVars["VITE_TASKS"] = envTasks;
   }
 
   return envVars;

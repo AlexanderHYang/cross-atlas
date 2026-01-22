@@ -8,6 +8,8 @@ import {
     determineNextAction,
     getPointVisual2D,
     getTaskAndTrial,
+    parseTaskSelection,
+    setTaskFlowConfig,
 } from "../../shared/src/tasks";
 import { Logger2D } from "./Logger2d";
 import { TaskController2D } from "./tasks/taskController2D";
@@ -68,6 +70,12 @@ const colorConfig2D: TaskColorConfig2D = {
     success: SUCCESS_COLOR_VEC,
     error: ERROR_COLOR_VEC,
 };
+
+const tasksFlag = (import.meta.env.VITE_TASKS as string | undefined)?.trim();
+const tasksConfig = parseTaskSelection(tasksFlag);
+if (tasksConfig) {
+    setTaskFlowConfig(tasksConfig);
+}
 
 const trialBox = document.createElement("div");
 trialBox.id = "trial-box";
@@ -184,6 +192,57 @@ syncManager.onTaskStateChange((taskState) => {
     if (!studyStarted || calibrationPending) {
         lastTaskState = taskState;
         return;
+    }
+
+    if (taskState.trial === 7 && taskState.trial7Assignments) {
+        const previousAssignments = lastTaskState?.trial7Assignments ?? [];
+        const previousByKey = new Map(previousAssignments.map((entry) => [entry.key, entry]));
+        const totalPairs = taskState.trial7Assignments.length;
+        const solvedCount =
+            taskState.trial7Assignments.filter((entry) => entry.done2D && entry.done3D).length;
+
+        taskState.trial7Assignments.forEach((entry, index) => {
+            const prev = previousByKey.get(entry.key);
+            const prevDone2D = prev?.done2D ?? false;
+            const prevDone3D = prev?.done3D ?? false;
+            const nowDone2D = !!entry.done2D;
+            const nowDone3D = !!entry.done3D;
+
+            if (nowDone2D && !prevDone2D) {
+                logger2d.logTask3PointSolved({
+                    pairKey: entry.key,
+                    pairIndex: index,
+                    side: "2d",
+                    solvedCount,
+                    totalPairs,
+                });
+            }
+
+            if (nowDone3D && !prevDone3D) {
+                logger2d.logTask3PointSolved({
+                    pairKey: entry.key,
+                    pairIndex: index,
+                    side: "3d",
+                    solvedCount,
+                    totalPairs,
+                });
+            }
+
+            if (nowDone2D && nowDone3D && !(prevDone2D && prevDone3D)) {
+                logger2d.logTask3PairSolved({
+                    pairKey: entry.key,
+                    pairIndex: index,
+                    solvedCount,
+                    totalPairs,
+                });
+            }
+        });
+    }
+
+    if (taskState.completed && determineNextAction(taskState).action === "all-complete") {
+        trialBox.textContent = "Session complete";
+        instructionBox.textContent = "Congrats, you have finished all the tasks in this session!";
+        instructionBox.style.display = "block";
     }
 
     const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(taskState.trial);

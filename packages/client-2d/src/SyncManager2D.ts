@@ -698,6 +698,9 @@ export class SyncManager2D implements PointIdProvider {
         }
 
         const preAction = determineNextAction(completedTask);
+        if (preAction.action === "all-complete") {
+            return;
+        }
         if (preAction.action !== "advance-pair") {
             if (!this.calibrationPending) {
                 window.setTimeout(() => {

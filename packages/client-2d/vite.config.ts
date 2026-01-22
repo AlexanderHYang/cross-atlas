@@ -4,6 +4,19 @@ import os from 'node:os'
 import fs from 'node:fs'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 
+const tasksEnv =
+  process.env.VITE_TASKS ??
+  process.env.TASKS ??
+  process.env.TASK ??
+  process.env.tasks ??
+  process.env.task ??
+  process.env.npm_config_tasks ??
+  process.env.npm_config_task
+
+if (tasksEnv && !process.env.VITE_TASKS) {
+  process.env.VITE_TASKS = tasksEnv
+}
+
 function logWriterPlugin() {
   const logsDir = path.resolve(__dirname, '../../logs')
 

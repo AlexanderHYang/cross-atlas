@@ -544,6 +544,9 @@ export class SyncManager3D implements PointIdProvider {
 
         if (!options?.skipCalibration) {
             const action = determineNextAction(completedTask);
+            if (action.action === "all-complete") {
+                return;
+            }
             if (action.action !== "advance-pair") {
                 if (!this.calibrationPending) {
                     window.setTimeout(() => {

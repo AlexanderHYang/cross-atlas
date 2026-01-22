@@ -3,6 +3,19 @@ import path from 'path'
 import os from 'node:os'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 
+const tasksEnv =
+  process.env.VITE_TASKS ??
+  process.env.TASKS ??
+  process.env.TASK ??
+  process.env.tasks ??
+  process.env.task ??
+  process.env.npm_config_tasks ??
+  process.env.npm_config_task
+
+if (tasksEnv && !process.env.VITE_TASKS) {
+  process.env.VITE_TASKS = tasksEnv
+}
+
 function resolveHost(): string {
   const override = process.env.VITE_HOST?.trim()
   if (override) {
