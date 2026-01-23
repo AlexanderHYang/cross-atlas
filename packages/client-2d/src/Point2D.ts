@@ -73,7 +73,7 @@ export class Point2D {
         this.onLocalChange();
     }
 
-    public flashColorSync(color: Vector3, durationMs: number = 2000) {
+    public flashColorSync(color: Vector3, durationMs: number = 1500) {
         if (this.flashHandle !== null) {
             window.clearTimeout(this.flashHandle);
             this.flashHandle = null;
@@ -153,7 +153,7 @@ export class Point2D {
         glowColor: Vector3 | null = null
     ) {
         const x = ((this.nx + 1) / 2) * width;
-        const y = (1 - (this.ny + 1) / 2) * height;
+        const y = (1-(this.ny + 1) / 2) * height;
         // color stored in this.color as Vector3 (r,g,b) in 0..1
         const sourceColor = overrideColor ?? (hideColor ? this.baseColor : this.color);
         const r = Math.round(Math.min(1, Math.max(0, sourceColor.x)) * 255);

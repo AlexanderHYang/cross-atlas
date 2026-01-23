@@ -47,6 +47,16 @@ export class TaskController3D {
         }
 
         if (selection.isCorrect) {
+            const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(task.trial);
+            this.deps.logger.addLogEvent({
+                eventName: "correctClick3d",
+                eventDetails: {
+                    taskNumber,
+                    trialNumber,
+                    totalTrials,
+                    pointId: point.id,
+                },
+            });
             const color = selection.successColor ?? this.deps.successColor;
             point.setDisplayColor(color);
             if (selection.lockOnSuccess) {
@@ -64,7 +74,7 @@ export class TaskController3D {
                 },
             });
             const flashColor = selection.errorColor ?? this.deps.errorColor;
-            const duration = selection.flashDurationMs ?? 2000;
+            const duration = selection.flashDurationMs ?? 1500;
             if (selection.stateUpdate === "task3") {
                 this.flashingPointId3D = point.id;
             }

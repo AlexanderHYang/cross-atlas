@@ -1,12 +1,17 @@
 import { SyncManager2D } from "./SyncManager2D";
 import { TimedLogEvent } from "../../shared/src/logging";
-import { getTaskAndTrial } from "../../shared/src/tasks";
+import {
+    determineNextAction,
+    getTaskAndTrial,
+    TaskState,
+    Trial7Assignment,
+} from "../../shared/src/tasks";
 import { layoutType } from "../../shared/src/defaultPoints";
 
 export type LogEvent2D = {
-    eventName: string,
-    eventDetails: Record<string, unknown>
-}
+    eventName: string;
+    eventDetails: Record<string, unknown>;
+};
 
 type TrialContext = {
     key: string;
@@ -25,6 +30,18 @@ type RotationSample = {
     key: string;
 };
 
+type IncorrectClickSample = {
+    time: number;
+    user: "pc" | "vr";
+    pointId?: string;
+};
+
+type CorrectClickSample = {
+    time: number;
+    user: "pc" | "vr";
+    pointId?: string;
+};
+
 type TrialSummary = {
     key: string;
     taskNumber: number;
@@ -33,6 +50,10 @@ type TrialSummary = {
     sampleCount: number;
     incorrectClicks2D: number;
     incorrectClicks3D: number;
+    incorrectSequence: IncorrectClickSample[];
+    correctClicks2D: number;
+    correctClicks3D: number;
+    correctSequence: CorrectClickSample[];
     trialStartTime?: number;
     trialEndTime?: number;
     completionMs?: number;
@@ -55,21 +76,26 @@ export class Logger2D {
     private pendingRotationLogs: TimedLogEvent[] = [];
     private suppressRotationLogs = false;
     private finalized = false;
+    private lastLifecycleState: TaskState | null = null;
+    private lastClickLogTime = 0;
+    private pendingEndLines: { time: number; line: string }[] = [];
+    private endFlushTimer: ReturnType<typeof setTimeout> | null = null;
+    private static readonly END_LOG_QUIET_MS = 250;
 
     private syncManager: SyncManager2D;
 
-    constructor (syncManager: SyncManager2D) {
+    constructor(syncManager: SyncManager2D) {
         this.syncManager = syncManager;
         this.sessionId = Logger2D.createSessionId();
         this.queueText(
-            `=== [${new Date().toISOString()}] study_start session=${this.sessionId} ===\n`
+            `=== [${new Date().toISOString()}] study_start session=${this.sessionId} ===\n`,
         );
         this.beginReceivingRemoteLogs();
     }
 
     private beginReceivingRemoteLogs() {
         const logArray = this.syncManager.getLogArray();
-        logArray.observe(event => {
+        logArray.observe((event) => {
             const newItems = event.changes.added;
             if (newItems.size > 0) {
                 for (const change of newItems) {
@@ -86,19 +112,19 @@ export class Logger2D {
         const timestamp = new Date().toISOString();
         const trialLabel = this.currentTrial
             ? Logger2D.formatTrialLabel(
-                this.currentTrial.taskNumber,
-                this.currentTrial.trialNumber,
-                this.currentTrial.totalTrials
-            )
+                  this.currentTrial.taskNumber,
+                  this.currentTrial.trialNumber,
+                  this.currentTrial.totalTrials,
+              )
             : "task=unknown trial=unknown";
         let details = "{}";
         try {
             details = JSON.stringify(logEvent.eventDetails ?? {});
         } catch {
-            details = "\"[unserializable]\"";
+            details = '"[unserializable]"';
         }
         this.queueText(
-            `[${timestamp}] ${trialLabel} user=pc event=${logEvent.eventName} details=${details}\n`
+            `[${timestamp}] ${trialLabel} user=pc event=${logEvent.eventName} details=${details}\n`,
         );
     }
 
@@ -108,11 +134,19 @@ export class Logger2D {
         return `${timestamp}-${suffix}`;
     }
 
-    private static buildTrialKey(taskNumber: number, trialNumber: number, totalTrials: number): string {
+    private static buildTrialKey(
+        taskNumber: number,
+        trialNumber: number,
+        totalTrials: number,
+    ): string {
         return `task-${taskNumber}-trial-${trialNumber}-of-${totalTrials}`;
     }
 
-    private static formatTrialLabel(taskNumber: number, trialNumber: number, totalTrials: number): string {
+    private static formatTrialLabel(
+        taskNumber: number,
+        trialNumber: number,
+        totalTrials: number,
+    ): string {
         return `task=${taskNumber} trial=${trialNumber}/${totalTrials}`;
     }
 
@@ -137,6 +171,14 @@ export class Logger2D {
         return Math.round(value).toString();
     }
 
+    private static formatBinary(value: boolean): string {
+        return value ? "1" : "0";
+    }
+
+    private static formatYesNo(value: boolean): string {
+        return value ? "yes" : "no";
+    }
+
     private static formatTimestamp(value?: number): string {
         if (!value) {
             return "-";
@@ -147,6 +189,39 @@ export class Logger2D {
     private queueText(text: string) {
         this.pendingText.push(text);
         void this.sendPending();
+    }
+
+    private queueEndLine(time: number, line: string) {
+        this.pendingEndLines.push({ time, line });
+        this.scheduleEndFlush();
+    }
+
+    private scheduleEndFlush() {
+        if (this.endFlushTimer) {
+            return;
+        }
+        this.endFlushTimer = setTimeout(() => {
+            this.endFlushTimer = null;
+            this.flushEndLines();
+        }, Logger2D.END_LOG_QUIET_MS);
+    }
+
+    private flushEndLines(force = false) {
+        if (this.pendingEndLines.length === 0) {
+            return;
+        }
+
+        const now = Date.now();
+        if (!force && now - this.lastClickLogTime < Logger2D.END_LOG_QUIET_MS) {
+            this.scheduleEndFlush();
+            return;
+        }
+
+        const lines = [...this.pendingEndLines].sort((a, b) => a.time - b.time);
+        this.pendingEndLines = [];
+        for (const entry of lines) {
+            this.queueText(entry.line);
+        }
     }
 
     private async sendPending(): Promise<void> {
@@ -202,7 +277,14 @@ export class Logger2D {
             this.handleIncorrectClickLog(logEvent, "vr");
             return;
         }
-        if (logEvent.eventName !== "cumulativeRotation") {
+        if (logEvent.eventName === "correctClick3d") {
+            this.handleCorrectClickLog(logEvent, "vr");
+            return;
+        }
+        if (
+            logEvent.eventName !== "cumulativeRotation" &&
+            logEvent.eventName !== "rotationSample"
+        ) {
             return;
         }
         if (this.suppressRotationLogs) {
@@ -220,8 +302,18 @@ export class Logger2D {
 
     private processRotationLog(logEvent: TimedLogEvent, context: TrialContext) {
         const details = logEvent.eventDetails ?? {};
-        const yaw = typeof details["cumulativeYaw"] === "number" ? details["cumulativeYaw"] : null;
-        const pitch = typeof details["cumulativePitch"] === "number" ? details["cumulativePitch"] : null;
+        const yaw =
+            typeof details["yaw"] === "number"
+                ? details["yaw"]
+                : typeof details["cumulativeYaw"] === "number"
+                  ? details["cumulativeYaw"]
+                  : null;
+        const pitch =
+            typeof details["pitch"] === "number"
+                ? details["pitch"]
+                : typeof details["cumulativePitch"] === "number"
+                  ? details["cumulativePitch"]
+                  : null;
         if (yaw === null || pitch === null) {
             return;
         }
@@ -235,17 +327,6 @@ export class Logger2D {
             totalTrials: context.totalTrials,
             key: context.key,
         };
-
-        const trialLabel = Logger2D.formatTrialLabel(
-            context.taskNumber,
-            context.trialNumber,
-            context.totalTrials
-        );
-        const line =
-            `[${new Date(sample.time).toISOString()}] ${trialLabel} ` +
-            `cumulativeYaw=${Logger2D.formatNumber(sample.yaw)} ` +
-            `cumulativePitch=${Logger2D.formatNumber(sample.pitch)}`;
-        this.queueText(`${line}\n`);
 
         const samples = this.trialSamples.get(context.key) ?? [];
         samples.push(sample);
@@ -278,14 +359,15 @@ export class Logger2D {
         if (this.finalized) {
             return;
         }
-        const timestamp = new Date().toISOString();
+        const time = Date.now();
+        const timestamp = new Date(time).toISOString();
         const pairLabel = `${params.pairKey} (${params.pairIndex + 1})`;
         const progress =
             params.solvedCount !== undefined && params.totalPairs !== undefined
                 ? ` solvedPairs=${params.solvedCount}/${params.totalPairs}`
                 : "";
         this.queueText(
-            `[${timestamp}] task=3 event=pair_point_solved pair=${pairLabel} side=${params.side}${progress}\n`
+            `[${timestamp}] task=3 event=pair_point_solved pair=${pairLabel} side=${params.side}${progress}\n`,
         );
     }
 
@@ -298,15 +380,14 @@ export class Logger2D {
         if (this.finalized) {
             return;
         }
-        const timestamp = new Date().toISOString();
+        const time = Date.now();
+        const timestamp = new Date(time).toISOString();
         const pairLabel = `${params.pairKey} (${params.pairIndex + 1})`;
         const progress =
             params.solvedCount !== undefined && params.totalPairs !== undefined
                 ? ` solvedPairs=${params.solvedCount}/${params.totalPairs}`
                 : "";
-        this.queueText(
-            `[${timestamp}] task=3 event=pair_solved pair=${pairLabel}${progress}\n`
-        );
+        this.queueText(`[${timestamp}] task=3 event=pair_solved pair=${pairLabel}${progress}\n`);
     }
 
     private handleIncorrectClickLog(logEvent: TimedLogEvent, user: "pc" | "vr") {
@@ -317,8 +398,10 @@ export class Logger2D {
             const timestamp = new Date(logEvent.time).toISOString();
             const label = "task=unknown trial=unknown";
             this.queueText(
-                `[${timestamp}] ${label} user=${user} event=incorrect_click pointId=${pointId ?? "-"}\n`
+                `[${timestamp}] ${label} user=${user} event=incorrect_click pointId=${pointId ?? "-"}\n`,
             );
+            this.lastClickLogTime = Math.max(this.lastClickLogTime, logEvent.time);
+            this.flushEndLines();
             return;
         }
         this.recordIncorrectClick(context, user, logEvent.time, pointId);
@@ -326,8 +409,10 @@ export class Logger2D {
 
     private extractTrialContext(details: Record<string, unknown>): TrialContext | null {
         const taskNumber = typeof details["taskNumber"] === "number" ? details["taskNumber"] : null;
-        const trialNumber = typeof details["trialNumber"] === "number" ? details["trialNumber"] : null;
-        const totalTrials = typeof details["totalTrials"] === "number" ? details["totalTrials"] : null;
+        const trialNumber =
+            typeof details["trialNumber"] === "number" ? details["trialNumber"] : null;
+        const totalTrials =
+            typeof details["totalTrials"] === "number" ? details["totalTrials"] : null;
         if (
             taskNumber === null ||
             trialNumber === null ||
@@ -346,7 +431,7 @@ export class Logger2D {
         context: TrialContext,
         user: "pc" | "vr",
         time: number,
-        pointId?: string
+        pointId?: string,
     ) {
         const summary =
             this.trialSummaries.get(context.key) ??
@@ -356,23 +441,73 @@ export class Logger2D {
         } else {
             summary.incorrectClicks3D += 1;
         }
+        summary.incorrectSequence.push({ time, user, pointId });
         this.trialSummaries.set(context.key, summary);
 
         const trialLabel = Logger2D.formatTrialLabel(
             context.taskNumber,
             context.trialNumber,
-            context.totalTrials
+            context.totalTrials,
         );
         const line =
             `[${new Date(time).toISOString()}] ${trialLabel} ` +
             `user=${user} event=incorrect_click pointId=${pointId ?? "-"}`;
         this.queueText(`${line}\n`);
+        this.lastClickLogTime = Math.max(this.lastClickLogTime, time);
+        this.flushEndLines();
+    }
+
+    private handleCorrectClickLog(logEvent: TimedLogEvent, user: "pc" | "vr") {
+        const details = logEvent.eventDetails ?? {};
+        const context = this.extractTrialContext(details) ?? this.ensureTrialContext();
+        const pointId = typeof details["pointId"] === "string" ? details["pointId"] : undefined;
+        if (!context) {
+            const timestamp = new Date(logEvent.time).toISOString();
+            const label = "task=unknown trial=unknown";
+            this.queueText(
+                `[${timestamp}] ${label} user=${user} event=correct_click pointId=${pointId ?? "-"}\n`,
+            );
+            this.lastClickLogTime = Math.max(this.lastClickLogTime, logEvent.time);
+            this.flushEndLines();
+            return;
+        }
+        this.recordCorrectClick(context, user, logEvent.time, pointId);
+    }
+
+    private recordCorrectClick(
+        context: TrialContext,
+        user: "pc" | "vr",
+        time: number,
+        pointId?: string,
+    ) {
+        const summary =
+            this.trialSummaries.get(context.key) ??
+            this.createTrialSummary(context.taskNumber, context.trialNumber, context.totalTrials);
+        if (user === "pc") {
+            summary.correctClicks2D += 1;
+        } else {
+            summary.correctClicks3D += 1;
+        }
+        summary.correctSequence.push({ time, user, pointId });
+        this.trialSummaries.set(context.key, summary);
+
+        const trialLabel = Logger2D.formatTrialLabel(
+            context.taskNumber,
+            context.trialNumber,
+            context.totalTrials,
+        );
+        const line =
+            `[${new Date(time).toISOString()}] ${trialLabel} ` +
+            `user=${user} event=correct_click pointId=${pointId ?? "-"}`;
+        this.queueText(`${line}\n`);
+        this.lastClickLogTime = Math.max(this.lastClickLogTime, time);
+        this.flushEndLines();
     }
 
     private createTrialSummary(
         taskNumber: number,
         trialNumber: number,
-        totalTrials: number
+        totalTrials: number,
     ): TrialSummary {
         const key = Logger2D.buildTrialKey(taskNumber, trialNumber, totalTrials);
         const summary: TrialSummary = {
@@ -383,6 +518,10 @@ export class Logger2D {
             sampleCount: 0,
             incorrectClicks2D: 0,
             incorrectClicks3D: 0,
+            incorrectSequence: [],
+            correctClicks2D: 0,
+            correctClicks3D: 0,
+            correctSequence: [],
         };
         this.trialSummaries.set(key, summary);
         return summary;
@@ -396,7 +535,8 @@ export class Logger2D {
         this.currentTrial = { key, taskNumber, trialNumber, totalTrials };
         this.suppressRotationLogs = false;
         const summary =
-            this.trialSummaries.get(key) ?? this.createTrialSummary(taskNumber, trialNumber, totalTrials);
+            this.trialSummaries.get(key) ??
+            this.createTrialSummary(taskNumber, trialNumber, totalTrials);
         if (!summary.trialStartTime) {
             summary.trialStartTime = Date.now();
             this.trialSummaries.set(key, summary);
@@ -410,14 +550,87 @@ export class Logger2D {
         }
     }
 
+    public logTaskLifecycle(nextState: TaskState | null) {
+        if (!nextState || this.finalized) {
+            this.lastLifecycleState = nextState;
+            return;
+        }
+
+        const prevInfo = this.lastLifecycleState
+            ? getTaskAndTrial(this.lastLifecycleState.trial)
+            : null;
+        const nextInfo = getTaskAndTrial(nextState.trial);
+        const taskChanged = !prevInfo || prevInfo.taskNumber !== nextInfo.taskNumber;
+        const trialChanged = this.lastLifecycleState
+            ? this.lastLifecycleState.trial !== nextState.trial
+            : true;
+
+        const time = Date.now();
+        const timestamp = new Date(time).toISOString();
+        if (taskChanged) {
+            this.queueText(
+                `[${timestamp}] [2D][${nextState.id}] Task ${nextInfo.taskNumber} start\n`,
+            );
+        }
+
+        if (trialChanged) {
+            this.queueText(
+                `[${timestamp}] [2D][${nextState.id}] Task ${nextInfo.taskNumber} trial ` +
+                    `${nextInfo.trialNumber}/${nextInfo.totalTrials} start\n`,
+            );
+        }
+
+        const completedSuccessfully =
+            nextState.feedback === "success" &&
+            nextState.completed &&
+            !this.lastLifecycleState?.completed;
+
+        if (completedSuccessfully) {
+            if (nextState.trial === 7 && nextState.trial7Assignments) {
+                const totalPairs = nextState.trial7Assignments.length;
+                const solvedPairs = nextState.trial7Assignments.filter(
+                    (assignment: Trial7Assignment) => assignment.done2D && assignment.done3D,
+                ).length;
+                const activeIndex = nextState.colorPairIndex ?? 0;
+                const active = nextState.trial7Assignments[activeIndex];
+                const colorLabel = active?.key ?? "pair";
+                this.queueEndLine(
+                    time,
+                    `[${timestamp}] [2D][${nextState.id}] Task ${nextInfo.taskNumber} trial ` +
+                        `${nextInfo.trialNumber}/${nextInfo.totalTrials} completed ${colorLabel} ` +
+                        `(${solvedPairs}/${totalPairs} pairs solved)\n`,
+                );
+            } else {
+                this.queueEndLine(
+                    time,
+                    `[${timestamp}] [2D][${nextState.id}] Task ${nextInfo.taskNumber} trial ` +
+                        `${nextInfo.trialNumber}/${nextInfo.totalTrials} success ` +
+                        `(completed=${nextState.completed}, feedback=${nextState.feedback})\n`,
+                );
+            }
+
+            const action = determineNextAction(nextState);
+            if (action.action === "next-task" || action.action === "all-complete") {
+                this.queueEndLine(
+                    time,
+                    `[${timestamp}] [2D][${nextState.id}] Task ${nextInfo.taskNumber} success\n`,
+                );
+            }
+        }
+
+        this.lastLifecycleState = nextState;
+    }
+
     public logIncorrectClick2D(pointId: string) {
         const context = this.ensureTrialContext();
         const time = Date.now();
         if (!context) {
             const timestamp = new Date(time).toISOString();
             this.queueText(
-                `[${timestamp}] task=unknown trial=unknown user=pc event=incorrect_click pointId=${pointId}\n`
+                `[${timestamp}] task=unknown trial=unknown user=pc event=incorrect_click pointId=${pointId}\n`,
             );
+            this.lastClickLogTime = Math.max(this.lastClickLogTime, time);
+            this.flushEndLines();
             return;
         }
         this.recordIncorrectClick(context, "pc", time, pointId);
@@ -432,19 +645,22 @@ export class Logger2D {
         const lastSample = samples ? samples[samples.length - 1] : this.lastRotationSample;
 
         const summary =
-            this.trialSummaries.get(key) ?? this.createTrialSummary(taskNumber, trialNumber, totalTrials);
+            this.trialSummaries.get(key) ??
+            this.createTrialSummary(taskNumber, trialNumber, totalTrials);
         summary.trialEndTime = endTime;
-        summary.completionMs = summary.trialStartTime ? endTime - summary.trialStartTime : undefined;
+        summary.completionMs = summary.trialStartTime
+            ? endTime - summary.trialStartTime
+            : undefined;
         this.trialSummaries.set(key, summary);
 
         const line =
             `[${timestamp}] ${trialLabel} event=trial_end final=true ` +
-            `cumulativeYaw=${Logger2D.formatNumber(lastSample?.yaw)} ` +
-            `cumulativePitch=${Logger2D.formatNumber(lastSample?.pitch)} ` +
+            `yaw=${Logger2D.formatNumber(lastSample?.yaw)} ` +
+            `pitch=${Logger2D.formatNumber(lastSample?.pitch)} ` +
             `incorrectClicks2D=${summary.incorrectClicks2D} ` +
             `incorrectClicks3D=${summary.incorrectClicks3D} ` +
             `completionMs=${Logger2D.formatDurationMs(summary.completionMs)}`;
-        this.queueText(`${line}\n`);
+        this.queueEndLine(endTime, `${line}\n`);
 
         if (summary && lastSample) {
             summary.endTime = summary.endTime ?? lastSample.time;
@@ -461,6 +677,8 @@ export class Logger2D {
         }
         this.finalized = true;
 
+        this.flushEndLines(true);
+
         const timestamp = new Date().toISOString();
         const lines: string[] = [];
         lines.push(`=== [${timestamp}] study_end session=${this.sessionId} ===`);
@@ -472,18 +690,35 @@ export class Logger2D {
             const trialLabel = Logger2D.formatTrialLabel(
                 summary.taskNumber,
                 summary.trialNumber,
-                summary.totalTrials
+                summary.totalTrials,
             );
             lines.push(`-- ${trialLabel} --`);
-            const samples = this.trialSamples.get(summary.key) ?? [];
-            if (samples.length === 0) {
-                lines.push("no samples");
+            const sequence = summary.incorrectSequence.filter((entry) =>
+                summary.trialEndTime ? entry.time <= summary.trialEndTime : true,
+            );
+            if (sequence.length === 0) {
+                lines.push("Sequence of incorrect clicks: none");
             } else {
-                for (const sample of samples) {
+                lines.push("Sequence of incorrect clicks:");
+                for (const entry of sequence) {
                     lines.push(
-                        `[${new Date(sample.time).toISOString()}] ` +
-                            `cumulativeYaw=${Logger2D.formatNumber(sample.yaw)} ` +
-                            `cumulativePitch=${Logger2D.formatNumber(sample.pitch)}`
+                        `[${new Date(entry.time).toISOString()}] ` +
+                            `user=${entry.user} pointId=${entry.pointId ?? "-"}`,
+                    );
+                }
+            }
+
+            const correctSequence = summary.correctSequence.filter((entry) =>
+                summary.trialEndTime ? entry.time <= summary.trialEndTime : true,
+            );
+            if (correctSequence.length === 0) {
+                lines.push("Sequence of correct clicks: none");
+            } else {
+                lines.push("Sequence of correct clicks:");
+                for (const entry of correctSequence) {
+                    lines.push(
+                        `[${new Date(entry.time).toISOString()}] ` +
+                            `user=${entry.user} pointId=${entry.pointId ?? "-"}`,
                     );
                 }
             }
@@ -496,6 +731,9 @@ export class Logger2D {
         lines.push("");
         lines.push("=== SUMMARY TABLE (by task/trial) ===");
         lines.push(...this.buildSummaryTableLines(summaries));
+        lines.push("");
+        lines.push(`Total completion time: ${this.formatTotalCompletionMs(summaries)}`);
+        lines.push(this.formatDirectDeicticRateLine(summaries));
         lines.push("");
 
         this.queueText(`${lines.join("\n")}\n`);
@@ -516,9 +754,10 @@ export class Logger2D {
             "trial",
             "incorrect2D",
             "incorrect3D",
+            "firstAttempt",
             "completionMs",
-            "cumulativeYaw",
-            "cumulativePitch",
+            "yaw",
+            "pitch",
         ];
 
         const rows = summaries.map((summary) => [
@@ -526,27 +765,85 @@ export class Logger2D {
             `${summary.trialNumber}/${summary.totalTrials}`,
             Logger2D.formatCount(summary.incorrectClicks2D),
             Logger2D.formatCount(summary.incorrectClicks3D),
+            Logger2D.formatYesNo(summary.incorrectClicks2D + summary.incorrectClicks3D === 0),
             Logger2D.formatDurationMs(summary.completionMs),
             Logger2D.formatNumber(summary.endYaw),
             Logger2D.formatNumber(summary.endPitch),
         ]);
 
-        const widths = header.map((title, index) => {
-            let max = title.length;
-            for (const row of rows) {
-                max = Math.max(max, row[index].length);
-            }
-            return max;
+        const widths = header.map((value, index) => {
+            const rowMax = rows.reduce((max, row) => {
+                const cell = row[index] ?? "";
+                return Math.max(max, cell.length);
+            }, 0);
+            return Math.max(value.length, rowMax);
         });
 
-        const formatRow = (row: string[]) =>
-            row.map((cell, index) => cell.padEnd(widths[index])).join(" | ");
+        const formatRow = (rowValues: string[]) => {
+            const padded = rowValues.map((value, index) => value.padEnd(widths[index], " "));
+            return `| ${padded.join(" | ")} |`;
+        };
 
-        const separator = widths.map((width) => "-".repeat(width)).join("-|-");
-        const lines = [formatRow(header), separator];
+        const divider = `| ${widths.map((width) => "-".repeat(width)).join(" | ")} |`;
+
+        const lines = [formatRow(header), divider];
         for (const row of rows) {
             lines.push(formatRow(row));
         }
         return lines;
+    }
+
+    public logCorrectClick2D(pointId: string) {
+        const context = this.ensureTrialContext();
+        const time = Date.now();
+        if (!context) {
+            const timestamp = new Date(time).toISOString();
+            this.queueText(
+                `[${timestamp}] task=unknown trial=unknown user=pc event=correct_click pointId=${pointId}\n`,
+            );
+            this.lastClickLogTime = Math.max(this.lastClickLogTime, time);
+            this.flushEndLines();
+            return;
+        }
+        this.recordCorrectClick(context, "pc", time, pointId);
+    }
+
+    private formatTotalCompletionMs(summaries: TrialSummary[]): string {
+        const startTimes = summaries
+            .map((summary) => summary.trialStartTime)
+            .filter((time): time is number => typeof time === "number");
+        const endTimes = summaries
+            .map((summary) => summary.trialEndTime)
+            .filter((time): time is number => typeof time === "number");
+        if (startTimes.length > 0 && endTimes.length > 0) {
+            const totalMs = Math.max(...endTimes) - Math.min(...startTimes);
+            return Logger2D.formatDurationMinSec(totalMs);
+        }
+        const sumMs = summaries.reduce((total, summary) => {
+            return total + (summary.completionMs ?? 0);
+        }, 0);
+        return Logger2D.formatDurationMinSec(sumMs);
+    }
+
+    private static formatDurationMinSec(value?: number): string {
+        if (value === undefined || !Number.isFinite(value)) {
+            return "-";
+        }
+        const totalSeconds = Math.max(0, Math.round(value / 1000));
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}m ${seconds}s`;
+    }
+
+    private formatDirectDeicticRateLine(summaries: TrialSummary[]): string {
+        const total = summaries.length;
+        if (total === 0) {
+            return "Direct Deictic Success Rate: -";
+        }
+        const successCount = summaries.filter(
+            (summary) => summary.incorrectClicks2D + summary.incorrectClicks3D === 0,
+        ).length;
+        const percent = (successCount / total) * 100;
+        return `Direct Deictic Success Rate (first attempt): ${successCount}/${total} (${percent.toFixed(2)}%)`;
     }
 }

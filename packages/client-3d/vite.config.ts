@@ -16,6 +16,17 @@ if (tasksEnv && !process.env.VITE_TASKS) {
   process.env.VITE_TASKS = tasksEnv
 }
 
+const calibrationOrientationEnv =
+  process.env.VITE_REQUIRE_CALIBRATION_ORIENTATION ??
+  process.env.REQUIRE_CALIBRATION_ORIENTATION ??
+  process.env.require_calibration_orientation ??
+  process.env.npm_config_require_calibration_orientation ??
+  process.env.npm_config_calibration_orientation
+
+if (calibrationOrientationEnv && !process.env.VITE_REQUIRE_CALIBRATION_ORIENTATION) {
+  process.env.VITE_REQUIRE_CALIBRATION_ORIENTATION = calibrationOrientationEnv
+}
+
 function resolveHost(): string {
   const override = process.env.VITE_HOST?.trim()
   if (override) {

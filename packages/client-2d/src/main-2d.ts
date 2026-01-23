@@ -121,6 +121,7 @@ for (const cfg of DEFAULT_POINT_CONFIGS) {
 
 let studyStarted = syncManager.isStudyStarted();
 let calibrationPending = syncManager.isCalibrationPending();
+let awaitingNextTaskState = false;
 function setWaitingUI() {
     trialBox.textContent = "Waiting for 3D user to initialize the study";
     instructionBox.textContent = "";
@@ -159,25 +160,33 @@ syncManager.onStudyStartedChange((started) => {
     }
 });
 
+syncManager.onTaskStateChange((taskState) => {
+    if (!studyStarted) {
+        return;
+    }
+    logger2d.logTaskLifecycle(taskState);
+});
+
 syncManager.onCalibrationPendingChange((pending) => {
     calibrationPending = pending;
     if (!studyStarted) {
         return;
     }
     if (pending) {
+        awaitingNextTaskState = false;
         setCalibrationUI();
         return;
     }
     syncManager.resetForNextTrial();
-    const currentTask = syncManager.getCurrentTask();
-    if (currentTask) {
-        taskController2D.handleTaskStateChange(currentTask);
-    }
+    awaitingNextTaskState = true;
 });
 
 syncManager.onTaskStateChange((taskState) => {
     if (!studyStarted || calibrationPending) {
         return;
+    }
+    if (awaitingNextTaskState) {
+        awaitingNextTaskState = false;
     }
     taskController2D.handleTaskStateChange(taskState);
 });
@@ -198,8 +207,9 @@ syncManager.onTaskStateChange((taskState) => {
         const previousAssignments = lastTaskState?.trial7Assignments ?? [];
         const previousByKey = new Map(previousAssignments.map((entry) => [entry.key, entry]));
         const totalPairs = taskState.trial7Assignments.length;
-        const solvedCount =
-            taskState.trial7Assignments.filter((entry) => entry.done2D && entry.done3D).length;
+        const solvedCount = taskState.trial7Assignments.filter(
+            (entry) => entry.done2D && entry.done3D,
+        ).length;
 
         taskState.trial7Assignments.forEach((entry, index) => {
             const prev = previousByKey.get(entry.key);
@@ -324,7 +334,10 @@ function drawAll() {
 
     // draw points
     const points = syncManager.getLocalPoints();
-    const taskState = studyStarted && !calibrationPending ? syncManager.getCurrentTask() : null;
+    const taskState =
+        studyStarted && !calibrationPending && !awaitingNextTaskState
+            ? syncManager.getCurrentTask()
+            : null;
     for (const p of points) {
         const visuals = getPointVisual2D(taskState, p.id, colorConfig2D);
         const isCompleted = !!taskState?.completed;
@@ -336,7 +349,7 @@ function drawAll() {
             isCompleted,
             visuals.hideColor,
             visuals.overrideColor,
-            visuals.glowColor
+            visuals.glowColor,
         );
     }
 }

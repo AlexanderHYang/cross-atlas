@@ -24,12 +24,27 @@ export type DefaultPointConfig = {
 
 export const DEFAULT_SPHERE_RADIUS = 3;
 
-export const layoutType: "spherical" | "halfSpherical" | "planar" = "spherical";
-export const DEFAULT_POINT_CONFIGS: DefaultPointConfig[] = generatedConfigs[layoutType].map((point, index) => ({
-    id: `point${index + 1}`,
-    direction: point,
-    draggable: false,
-}));
+type LayoutType = "spherical" | "semiSpherical" | "planar";
+const allowedLayouts: LayoutType[] = ["spherical", "semiSpherical", "planar"];
+const layoutEnv = (import.meta.env.VITE_LAYOUT_TYPE ?? import.meta.env.VITE_LAYOUT) as
+    | string
+    | undefined;
+const normalizedLayout = layoutEnv?.trim();
+const resolvedLayout = allowedLayouts.includes(normalizedLayout as LayoutType)
+    ? (normalizedLayout as LayoutType)
+    : "spherical";
+if (layoutEnv && resolvedLayout !== normalizedLayout) {
+    console.warn(`[Layout] Invalid VITE_LAYOUT_TYPE="${layoutEnv}". Falling back to "spherical".`);
+}
+
+export const layoutType: LayoutType = resolvedLayout;
+export const DEFAULT_POINT_CONFIGS: DefaultPointConfig[] = generatedConfigs[layoutType].map(
+    (point, index) => ({
+        id: `point${index + 1}`,
+        direction: point,
+        draggable: false,
+    }),
+);
 
 // adjust landmark
 DEFAULT_POINT_CONFIGS[0].id = "landmark";

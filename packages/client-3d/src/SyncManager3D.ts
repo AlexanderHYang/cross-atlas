@@ -31,7 +31,7 @@ import {
 import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
 import { TimedLogEvent } from "../../shared/src/logging";
 
-const TASK3_NEUTRAL_COLOR = new BABYLON.Color3(0.82, 0.82, 0.82);
+const TASK3_NEUTRAL_COLOR = new BABYLON.Color3(1, 1, 1);
 const CALIBRATION_DELAY_MS = 1000;
 
 export class SyncManager3D implements PointIdProvider {

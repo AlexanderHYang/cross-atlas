@@ -69,7 +69,24 @@ const STUDY_START_CLICKS = 1;
 const STUDY_SUCCESS_GLOW_MS = 1000;
 const CALIBRATION_CLICKS = 1;
 const CALIBRATION_ANGLE_DEG = 10;
-const REQUIRE_CALIBRATION_ORIENTATION = true;
+function parseBooleanFlag(value: string | undefined, fallback: boolean) {
+    if (value === undefined || value === "") {
+        return fallback;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "on"].includes(normalized)) {
+        return true;
+    }
+    if (["0", "false", "no", "off"].includes(normalized)) {
+        return false;
+    }
+    return fallback;
+}
+
+const REQUIRE_CALIBRATION_ORIENTATION = parseBooleanFlag(
+    import.meta.env.VITE_REQUIRE_CALIBRATION_ORIENTATION as string | undefined,
+    true
+);
 const CALIBRATION_FEEDBACK_MS = 1000;
 let studyStarted = syncManager3D.isStudyStarted();
 let studyActivated = false;

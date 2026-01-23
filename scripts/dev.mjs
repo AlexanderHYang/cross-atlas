@@ -150,7 +150,10 @@ function parseArguments() {
     "vertical",
     "horizontal",
   ]);
+  const allowedLayouts = new Set(["spherical", "halfSpherical", "planar"]);
   let tasksArg;
+  let calibrationOrientationArg;
+  let layoutArg;
 
   for (const arg of args) {
     // parse --projection option
@@ -168,12 +171,33 @@ function parseArguments() {
       }
     }
 
+    if (arg.startsWith("--layout=") || arg.startsWith("--layout-type=")) {
+      const layout = arg.split("=")[1];
+      if (allowedLayouts.has(layout)) {
+        layoutArg = layout;
+      } else {
+        console.error(
+          `Invalid --layout=${layout}. Allowed: ${[...allowedLayouts].join(", ")}`
+        );
+        process.exit(1);
+      }
+    }
+
     if (arg.startsWith("--tasks=") || arg.startsWith("tasks=")) {
       tasksArg = arg.split("=")[1];
     }
 
     if (arg.startsWith("--task=") || arg.startsWith("task=")) {
       tasksArg = arg.split("=")[1];
+    }
+
+    if (
+      arg.startsWith("--require-calibration-orientation=") ||
+      arg.startsWith("require-calibration-orientation=") ||
+      arg.startsWith("--calibration-orientation=") ||
+      arg.startsWith("calibration-orientation=")
+    ) {
+      calibrationOrientationArg = arg.split("=")[1];
     }
   }
 
@@ -188,6 +212,29 @@ function parseArguments() {
     process.env.npm_config_task;
   if (envTasks) {
     envVars["VITE_TASKS"] = envTasks;
+  }
+
+  const envCalibrationOrientation =
+    calibrationOrientationArg ??
+    process.env.VITE_REQUIRE_CALIBRATION_ORIENTATION ??
+    process.env.REQUIRE_CALIBRATION_ORIENTATION ??
+    process.env.require_calibration_orientation ??
+    process.env.npm_config_require_calibration_orientation ??
+    process.env.npm_config_calibration_orientation;
+  if (envCalibrationOrientation !== undefined) {
+    envVars["VITE_REQUIRE_CALIBRATION_ORIENTATION"] = envCalibrationOrientation;
+  }
+
+  const envLayout =
+    layoutArg ??
+    process.env.VITE_LAYOUT_TYPE ??
+    process.env.VITE_LAYOUT ??
+    process.env.LAYOUT_TYPE ??
+    process.env.layout_type ??
+    process.env.npm_config_layout_type ??
+    process.env.npm_config_layout;
+  if (envLayout !== undefined) {
+    envVars["VITE_LAYOUT_TYPE"] = envLayout;
   }
 
   return envVars;

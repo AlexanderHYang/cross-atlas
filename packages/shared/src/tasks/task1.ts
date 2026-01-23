@@ -170,7 +170,7 @@ export function evaluateTask1Selection2D(
         isCorrect,
         successColor: colors.success,
         errorColor: colors.error,
-        errorFlashDurationMs: 2000,
+        errorFlashDurationMs: 1500,
     };
 }
 
@@ -194,7 +194,7 @@ export function evaluateTask1Selection3D(
         successColor: colors.success,
         errorColor: colors.error,
         advanceTrial: isCorrect,
-        flashDurationMs: isCorrect ? undefined : 2000,
+        flashDurationMs: isCorrect ? undefined : 1500,
         stateUpdate: "task1",
     };
 }

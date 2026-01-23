@@ -1,31 +1,30 @@
 import { Quaternion, WebXRDefaultExperience } from "@babylonjs/core";
 import { SyncManager3D } from "./SyncManager3D";
-import { LogEvent, TimedLogEvent } from "../../shared/src/logging"
+import { LogEvent, TimedLogEvent } from "../../shared/src/logging";
 
-const ROTATION_UPDATE_INTERVAL = 2000;
+const ROTATION_UPDATE_INTERVAL = 100;
 const LOG_SEND_INTERVAL = 1000;
 
 export type LogEvent3D = {
-    eventName: string,
-    eventDetails: Record<string, unknown>
-}
+    eventName: string;
+    eventDetails: Record<string, unknown>;
+};
 
 export class Logger3D {
-    private syncManager: SyncManager3D
-    private xr: WebXRDefaultExperience
+    private syncManager: SyncManager3D;
+    private xr: WebXRDefaultExperience;
 
-    private localLogs: TimedLogEvent[] = []
+    private localLogs: TimedLogEvent[] = [];
     private lastTrial: number | null = null;
     private loggingEnabled = false;
 
     // rotation-specific fields
-    private prevCameraQuaternion: Quaternion | null = null;
-    private cumulativePitch: number = 0;
-    private cumulativeYaw: number = 0;
+    private currentYawDeg: number | null = null;
+    private currentPitchDeg: number | null = null;
 
-    constructor (syncManager: SyncManager3D, xr: WebXRDefaultExperience) {
-        this.syncManager = syncManager
-        this.xr = xr
+    constructor(syncManager: SyncManager3D, xr: WebXRDefaultExperience) {
+        this.syncManager = syncManager;
+        this.xr = xr;
 
         this.beginSendingLogs();
         this.syncManager.onTaskStateChange(this.handleTaskStateChange);
@@ -56,41 +55,37 @@ export class Logger3D {
             if (!currentQuaternion) {
                 return;
             }
-            if (!this.prevCameraQuaternion) {
-                this.prevCameraQuaternion = currentQuaternion.clone();
-            } else {
-                if (!this.loggingEnabled) {
-                    this.prevCameraQuaternion = currentQuaternion.clone();
-                    return;
-                }
+            const euler = currentQuaternion.toEulerAngles();
+            const toDegrees = 180 / Math.PI;
+            const yawDeg = euler.y * toDegrees;
+            const pitchDeg = euler.x * toDegrees;
 
-                const delta = this.prevCameraQuaternion.conjugate().multiply(currentQuaternion);
-                const euler = delta.toEulerAngles();
-                const deltaPitch = Math.abs(euler.x);
-                const deltaYaw = Math.abs(euler.y);
-                const toDegrees = 180 / Math.PI;
+            this.currentYawDeg = yawDeg;
+            this.currentPitchDeg = pitchDeg;
 
-                this.cumulativePitch += deltaPitch * toDegrees;
-                this.cumulativeYaw += deltaYaw * toDegrees;
-                this.prevCameraQuaternion = currentQuaternion.clone();
+            if (!this.loggingEnabled) {
+                return;
             }
-        })
+        });
 
         // add interval to send log periodically
         setInterval(() => {
             if (!this.loggingEnabled) {
                 return;
             }
+            if (this.currentYawDeg === null || this.currentPitchDeg === null) {
+                return;
+            }
             const logEvent: LogEvent = {
                 user: "vr",
-                eventName: "cumulativeRotation",
+                eventName: "rotationSample",
                 eventDetails: {
-                    "cumulativePitch": this.cumulativePitch,
-                    "cumulativeYaw": this.cumulativeYaw,
-                }
-            }
+                    yaw: this.currentYawDeg,
+                    pitch: this.currentPitchDeg,
+                },
+            };
             this.addLogEvent(logEvent);
-        }, ROTATION_UPDATE_INTERVAL)
+        }, ROTATION_UPDATE_INTERVAL);
     }
 
     private handleTaskStateChange = (taskState: { trial?: number } | null) => {
@@ -113,9 +108,8 @@ export class Logger3D {
     };
 
     private resetCumulativeRotation() {
-        this.cumulativePitch = 0;
-        this.cumulativeYaw = 0;
-        this.prevCameraQuaternion = null;
+        this.currentYawDeg = null;
+        this.currentPitchDeg = null;
     }
 
     public setLoggingEnabled(enabled: boolean) {
@@ -133,8 +127,8 @@ export class Logger3D {
         const timedLogEvent: TimedLogEvent = {
             time: Date.now(),
             user: "vr",
-            ...logEvent
-        }
+            ...logEvent,
+        };
         this.localLogs.push(timedLogEvent);
     }
 }

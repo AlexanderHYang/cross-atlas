@@ -91,6 +91,7 @@ export class TaskController2D {
         }
 
         if (selection.isCorrect) {
+            this.deps.logger.logCorrectClick2D(clicked.id);
             const color = selection.successColor ?? this.deps.successColor;
             clicked.setDisplayColor(color);
             if (selection.lockOnSuccess) {
