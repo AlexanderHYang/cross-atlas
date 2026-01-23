@@ -6,11 +6,18 @@ import basicSsl from "@vitejs/plugin-basic-ssl";
 
 function logWriterPlugin() {
     const logsDir = path.resolve(__dirname, "../../logs");
+    const studyLogsDir = path.join(logsDir, "study");
+    const timeSeriesDir = path.join(logsDir, "time-series");
 
     return {
         name: "log-writer",
         configureServer(server: any) {
-            server.middlewares.use("/api/logs", (req: any, res: any) => {
+            // Main logs endpoint (handles both regular logs and time-series)
+            server.middlewares.use("/api/logs", (req: any, res: any, next: any) => {
+                // Check if this is a time-series request (req.originalUrl has full path)
+                const fullUrl = req.originalUrl || req.url || "";
+                const isTimeSeries = fullUrl.includes("/timeseries");
+
                 if (req.method !== "POST") {
                     res.statusCode = 405;
                     res.end("Method Not Allowed");
@@ -19,9 +26,10 @@ function logWriterPlugin() {
 
                 let body = "";
                 let tooLarge = false;
+                const maxSize = isTimeSeries ? 10_000_000 : 5_000_000;
                 req.on("data", (chunk: any) => {
                     body += chunk.toString();
-                    if (body.length > 5_000_000) {
+                    if (body.length > maxSize) {
                         res.statusCode = 413;
                         res.end("Payload Too Large");
                         tooLarge = true;
@@ -30,9 +38,7 @@ function logWriterPlugin() {
                 });
 
                 req.on("end", () => {
-                    if (tooLarge) {
-                        return;
-                    }
+                    if (tooLarge) return;
                     let payload: { sessionId?: string; text?: string };
                     try {
                         payload = JSON.parse(body || "{}");
@@ -45,7 +51,7 @@ function logWriterPlugin() {
                     const text = typeof payload.text === "string" ? payload.text : "";
                     if (!text) {
                         res.statusCode = 400;
-                        res.end("Missing log text");
+                        res.end("Missing text");
                         return;
                     }
 
@@ -54,11 +60,17 @@ function logWriterPlugin() {
                             ? payload.sessionId
                             : "study";
                     const safeSessionId = sessionIdRaw.replace(/[^a-zA-Z0-9_-]/g, "");
-                    const filename = safeSessionId ? `study-${safeSessionId}.txt` : "study-log.txt";
+
+                    // Different folder and filename for time-series vs study logs
+                    const targetDir = isTimeSeries ? timeSeriesDir : studyLogsDir;
+                    const filename = isTimeSeries
+                        ? `timeseries-${safeSessionId}.txt`
+                        : `study-${safeSessionId}.txt`;
 
                     try {
-                        fs.mkdirSync(logsDir, { recursive: true });
-                        fs.appendFileSync(path.join(logsDir, filename), text);
+                        fs.mkdirSync(targetDir, { recursive: true });
+                        // Both use append so data is written incrementally
+                        fs.appendFileSync(path.join(targetDir, filename), text);
                         res.statusCode = 200;
                         res.end("ok");
                     } catch (error) {

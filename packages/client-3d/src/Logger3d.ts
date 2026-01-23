@@ -1,9 +1,13 @@
-import { Quaternion, WebXRDefaultExperience } from "@babylonjs/core";
+import { WebXRDefaultExperience } from "@babylonjs/core";
 import { SyncManager3D } from "./SyncManager3D";
 import { LogEvent, TimedLogEvent } from "../../shared/src/logging";
 
-const ROTATION_UPDATE_INTERVAL = 100;
+const ROTATION_SAMPLE_INTERVAL = 100; // Raw samples for time-series (10Hz)
 const LOG_SEND_INTERVAL = 1000;
+
+// Angular velocity gating parameters
+const ANGULAR_VELOCITY_THRESHOLD = 15; // degrees per second
+const DELTA_THRESHOLD = ANGULAR_VELOCITY_THRESHOLD * (ROTATION_SAMPLE_INTERVAL / 1000); // 1.5° at 10Hz
 
 export type LogEvent3D = {
     eventName: string;
@@ -18,9 +22,18 @@ export class Logger3D {
     private lastTrial: number | null = null;
     private loggingEnabled = false;
 
-    // rotation-specific fields
+    // Raw rotation (for time-series)
     private currentYawDeg: number | null = null;
     private currentPitchDeg: number | null = null;
+
+    // Previous raw values for delta computation
+    private prevYawDeg: number | null = null;
+    private prevPitchDeg: number | null = null;
+    private prevSampleTime: number | null = null;
+
+    // Gated cumulative rotation (for main log)
+    private cumulativeYaw: number = 0;
+    private cumulativePitch: number = 0;
 
     constructor(syncManager: SyncManager3D, xr: WebXRDefaultExperience) {
         this.syncManager = syncManager;
@@ -46,46 +59,94 @@ export class Logger3D {
         }, LOG_SEND_INTERVAL); // flush every second
     }
 
+    /**
+     * Wrap angle delta to [-180, 180] range
+     */
+    private wrapDelta(delta: number): number {
+        while (delta > 180) delta -= 360;
+        while (delta < -180) delta += 360;
+        return delta;
+    }
+
+    /**
+     * Apply soft angular velocity gating:
+     * If angular speed >= threshold, accumulate |delta| - deltaThreshold
+     * Otherwise, accumulate 0
+     */
+    private computeGatedDelta(delta: number, deltaTime: number): number {
+        const absDelta = Math.abs(delta);
+        const angularSpeed = absDelta / deltaTime; // degrees per second
+
+        if (angularSpeed >= ANGULAR_VELOCITY_THRESHOLD) {
+            // Soft gate: subtract threshold amount
+            const gatedAmount = absDelta - DELTA_THRESHOLD;
+            return gatedAmount > 0 ? gatedAmount : 0;
+        }
+        return 0;
+    }
+
     private initializeHeadTracking() {
-        // add observable to camera xr camera motion
         const xrCamera = this.xr.baseExperience.camera;
+
+        // Update raw rotation on every frame
         xrCamera.onViewMatrixChangedObservable.add(() => {
-            const currentQuaternion =
-                xrCamera.rotationQuaternion ?? xrCamera.absoluteRotationQuaternion;
+            const currentQuaternion = xrCamera.rotationQuaternion;
             if (!currentQuaternion) {
                 return;
             }
+
             const euler = currentQuaternion.toEulerAngles();
             const toDegrees = 180 / Math.PI;
-            const yawDeg = euler.y * toDegrees;
-            const pitchDeg = euler.x * toDegrees;
-
-            this.currentYawDeg = yawDeg;
-            this.currentPitchDeg = pitchDeg;
-
-            if (!this.loggingEnabled) {
-                return;
-            }
+            this.currentYawDeg = euler.y * toDegrees;
+            this.currentPitchDeg = euler.x * toDegrees;
         });
 
-        // add interval to send log periodically
+        // Sample at fixed interval for time-series and cumulative tracking
         setInterval(() => {
-            if (!this.loggingEnabled) {
-                return;
-            }
             if (this.currentYawDeg === null || this.currentPitchDeg === null) {
                 return;
             }
-            const logEvent: LogEvent = {
-                user: "vr",
-                eventName: "rotationSample",
-                eventDetails: {
-                    yaw: this.currentYawDeg,
-                    pitch: this.currentPitchDeg,
-                },
-            };
-            this.addLogEvent(logEvent);
-        }, ROTATION_UPDATE_INTERVAL);
+
+            const now = Date.now();
+
+            // Send raw rotation sample for time-series (always when logging enabled)
+            if (this.loggingEnabled) {
+                const logEvent: LogEvent = {
+                    user: "vr",
+                    eventName: "rotationSample",
+                    eventDetails: {
+                        yaw: this.currentYawDeg,
+                        pitch: this.currentPitchDeg,
+                    },
+                };
+                this.addLogEvent(logEvent);
+
+                // Compute gated cumulative rotation
+                if (
+                    this.prevYawDeg !== null &&
+                    this.prevPitchDeg !== null &&
+                    this.prevSampleTime !== null
+                ) {
+                    const deltaTime = (now - this.prevSampleTime) / 1000; // seconds
+                    if (deltaTime > 0) {
+                        // Yaw: wrap to handle ±180° boundary
+                        const deltaYaw = this.wrapDelta(this.currentYawDeg - this.prevYawDeg);
+                        const gatedYaw = this.computeGatedDelta(deltaYaw, deltaTime);
+                        this.cumulativeYaw += gatedYaw;
+
+                        // Pitch: no wrapping needed (usually constrained to ±90°)
+                        const deltaPitch = this.currentPitchDeg - this.prevPitchDeg;
+                        const gatedPitch = this.computeGatedDelta(deltaPitch, deltaTime);
+                        this.cumulativePitch += gatedPitch;
+                    }
+                }
+            }
+
+            // Update previous values for next delta computation
+            this.prevYawDeg = this.currentYawDeg;
+            this.prevPitchDeg = this.currentPitchDeg;
+            this.prevSampleTime = now;
+        }, ROTATION_SAMPLE_INTERVAL);
     }
 
     private handleTaskStateChange = (taskState: { trial?: number } | null) => {
@@ -108,8 +169,11 @@ export class Logger3D {
     };
 
     private resetCumulativeRotation() {
-        this.currentYawDeg = null;
-        this.currentPitchDeg = null;
+        this.cumulativeYaw = 0;
+        this.cumulativePitch = 0;
+        this.prevYawDeg = null;
+        this.prevPitchDeg = null;
+        this.prevSampleTime = null;
     }
 
     public setLoggingEnabled(enabled: boolean) {
@@ -121,6 +185,10 @@ export class Logger3D {
             this.lastTrial = null;
             this.resetCumulativeRotation();
         }
+    }
+
+    public getCumulativeRotation(): { yaw: number; pitch: number } {
+        return { yaw: this.cumulativeYaw, pitch: this.cumulativePitch };
     }
 
     public addLogEvent(logEvent: LogEvent3D) {

@@ -8,6 +8,11 @@ import {
 } from "../../shared/src/tasks";
 import { layoutType } from "../../shared/src/defaultPoints";
 
+// Angular velocity gating parameters for cumulative rotation
+const ROTATION_SAMPLE_INTERVAL_MS = 100; // Expected 10Hz sampling
+const ANGULAR_VELOCITY_THRESHOLD = 15; // degrees per second
+const DELTA_THRESHOLD = ANGULAR_VELOCITY_THRESHOLD * (ROTATION_SAMPLE_INTERVAL_MS / 1000); // 1.5° at 10Hz
+
 export type LogEvent2D = {
     eventName: string;
     eventDetails: Record<string, unknown>;
@@ -63,6 +68,12 @@ type TrialSummary = {
     startPitch?: number;
     endYaw?: number;
     endPitch?: number;
+    // Gated cumulative rotation
+    cumulativeYaw: number;
+    cumulativePitch: number;
+    prevYaw?: number;
+    prevPitch?: number;
+    prevSampleTime?: number;
 };
 
 export class Logger2D {
@@ -82,6 +93,12 @@ export class Logger2D {
     private endFlushTimer: ReturnType<typeof setTimeout> | null = null;
     private static readonly END_LOG_QUIET_MS = 250;
 
+    // Time-series logging
+    private pendingTimeSeries: string[] = [];
+    private timeSeriesSendInFlight = false;
+    private timeSeriesHeaderWritten = false;
+    private lastTrialKeyForTimeSeries: string | null = null;
+
     private syncManager: SyncManager2D;
 
     constructor(syncManager: SyncManager2D) {
@@ -90,6 +107,12 @@ export class Logger2D {
         this.queueText(
             `=== [${new Date().toISOString()}] study_start session=${this.sessionId} ===\n`,
         );
+        // Write time-series header
+        this.queueTimeSeries(
+            `=== Time Series Data session=${this.sessionId} ===\n` +
+                `Generated: ${new Date().toISOString()}\n\n`,
+        );
+        this.timeSeriesHeaderWritten = true;
         this.beginReceivingRemoteLogs();
     }
 
@@ -254,6 +277,41 @@ export class Logger2D {
         }
     }
 
+    private queueTimeSeries(text: string) {
+        this.pendingTimeSeries.push(text);
+        void this.sendPendingTimeSeries();
+    }
+
+    private async sendPendingTimeSeries(): Promise<void> {
+        if (this.timeSeriesSendInFlight || this.pendingTimeSeries.length === 0) {
+            return;
+        }
+
+        this.timeSeriesSendInFlight = true;
+        const text = this.pendingTimeSeries.join("");
+        this.pendingTimeSeries = [];
+
+        try {
+            const response = await fetch("/api/logs/timeseries", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sessionId: this.sessionId, text }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        } catch (error) {
+            console.warn("[2D] Failed to write time-series:", error);
+            this.pendingTimeSeries = [text, ...this.pendingTimeSeries];
+        } finally {
+            this.timeSeriesSendInFlight = false;
+            if (this.pendingTimeSeries.length > 0) {
+                void this.sendPendingTimeSeries();
+            }
+        }
+    }
+
     private ensureTrialContext(): TrialContext | null {
         if (this.currentTrial) {
             return this.currentTrial;
@@ -300,6 +358,31 @@ export class Logger2D {
         this.processRotationLog(logEvent, context);
     }
 
+    /**
+     * Wrap angle delta to [-180, 180] range for yaw
+     */
+    private static wrapDelta(delta: number): number {
+        while (delta > 180) delta -= 360;
+        while (delta < -180) delta += 360;
+        return delta;
+    }
+
+    /**
+     * Compute soft-gated delta: if angular speed >= threshold, return |delta| - deltaThreshold
+     */
+    private static computeGatedDelta(delta: number, deltaTimeMs: number): number {
+        const absDelta = Math.abs(delta);
+        const deltaTimeSec = deltaTimeMs / 1000;
+        if (deltaTimeSec <= 0) return 0;
+        const angularSpeed = absDelta / deltaTimeSec; // degrees per second
+
+        if (angularSpeed >= ANGULAR_VELOCITY_THRESHOLD) {
+            const gatedAmount = absDelta - DELTA_THRESHOLD;
+            return gatedAmount > 0 ? gatedAmount : 0;
+        }
+        return 0;
+    }
+
     private processRotationLog(logEvent: TimedLogEvent, context: TrialContext) {
         const details = logEvent.eventDetails ?? {};
         const yaw =
@@ -329,8 +412,24 @@ export class Logger2D {
         };
 
         const samples = this.trialSamples.get(context.key) ?? [];
+        const isFirstSampleForTrial = samples.length === 0;
         samples.push(sample);
         this.trialSamples.set(context.key, samples);
+
+        // Write to time-series file (raw values)
+        if (this.lastTrialKeyForTimeSeries !== context.key) {
+            const trialLabel = Logger2D.formatTrialLabel(
+                context.taskNumber,
+                context.trialNumber,
+                context.totalTrials,
+            );
+            this.queueTimeSeries(`=== ${trialLabel} ===\ntime_ms,yaw,pitch\n`);
+            this.lastTrialKeyForTimeSeries = context.key;
+        }
+        const relativeTime = isFirstSampleForTrial ? 0 : sample.time - samples[0].time;
+        this.queueTimeSeries(
+            `${relativeTime},${sample.yaw.toFixed(6)},${sample.pitch.toFixed(6)}\n`,
+        );
 
         const summary =
             this.trialSummaries.get(context.key) ??
@@ -340,6 +439,30 @@ export class Logger2D {
             summary.startYaw = sample.yaw;
             summary.startPitch = sample.pitch;
         }
+
+        // Compute gated cumulative rotation
+        if (
+            summary.prevYaw !== undefined &&
+            summary.prevPitch !== undefined &&
+            summary.prevSampleTime !== undefined
+        ) {
+            const deltaTimeMs = sample.time - summary.prevSampleTime;
+            if (deltaTimeMs > 0) {
+                // Yaw: wrap to handle ±180° boundary
+                const deltaYaw = Logger2D.wrapDelta(sample.yaw - summary.prevYaw);
+                const gatedYaw = Logger2D.computeGatedDelta(deltaYaw, deltaTimeMs);
+                summary.cumulativeYaw += gatedYaw;
+
+                // Pitch: no wrapping needed
+                const deltaPitch = sample.pitch - summary.prevPitch;
+                const gatedPitch = Logger2D.computeGatedDelta(deltaPitch, deltaTimeMs);
+                summary.cumulativePitch += gatedPitch;
+            }
+        }
+        summary.prevYaw = sample.yaw;
+        summary.prevPitch = sample.pitch;
+        summary.prevSampleTime = sample.time;
+
         summary.sampleCount += 1;
         summary.endTime = sample.time;
         summary.endYaw = sample.yaw;
@@ -522,6 +645,8 @@ export class Logger2D {
             correctClicks2D: 0,
             correctClicks3D: 0,
             correctSequence: [],
+            cumulativeYaw: 0,
+            cumulativePitch: 0,
         };
         this.trialSummaries.set(key, summary);
         return summary;
@@ -655,8 +780,8 @@ export class Logger2D {
 
         const line =
             `[${timestamp}] ${trialLabel} event=trial_end final=true ` +
-            `yaw=${Logger2D.formatNumber(lastSample?.yaw)} ` +
-            `pitch=${Logger2D.formatNumber(lastSample?.pitch)} ` +
+            `cumYaw=${Logger2D.formatNumber(summary.cumulativeYaw)} ` +
+            `cumPitch=${Logger2D.formatNumber(summary.cumulativePitch)} ` +
             `incorrectClicks2D=${summary.incorrectClicks2D} ` +
             `incorrectClicks3D=${summary.incorrectClicks3D} ` +
             `completionMs=${Logger2D.formatDurationMs(summary.completionMs)}`;
@@ -669,6 +794,9 @@ export class Logger2D {
             this.trialSummaries.set(key, summary);
         }
         this.suppressRotationLogs = true;
+
+        // Add blank line after trial in time-series
+        this.queueTimeSeries("\n");
     }
 
     public finalizeStudy() {
@@ -693,14 +821,12 @@ export class Logger2D {
                 summary.totalTrials,
             );
             lines.push(`-- ${trialLabel} --`);
-            const sequence = summary.incorrectSequence.filter((entry) =>
-                summary.trialEndTime ? entry.time <= summary.trialEndTime : true,
-            );
-            if (sequence.length === 0) {
+            // No time filtering - clicks are already associated with correct trial when recorded
+            if (summary.incorrectSequence.length === 0) {
                 lines.push("Sequence of incorrect clicks: none");
             } else {
                 lines.push("Sequence of incorrect clicks:");
-                for (const entry of sequence) {
+                for (const entry of summary.incorrectSequence) {
                     lines.push(
                         `[${new Date(entry.time).toISOString()}] ` +
                             `user=${entry.user} pointId=${entry.pointId ?? "-"}`,
@@ -708,14 +834,11 @@ export class Logger2D {
                 }
             }
 
-            const correctSequence = summary.correctSequence.filter((entry) =>
-                summary.trialEndTime ? entry.time <= summary.trialEndTime : true,
-            );
-            if (correctSequence.length === 0) {
+            if (summary.correctSequence.length === 0) {
                 lines.push("Sequence of correct clicks: none");
             } else {
                 lines.push("Sequence of correct clicks:");
-                for (const entry of correctSequence) {
+                for (const entry of summary.correctSequence) {
                     lines.push(
                         `[${new Date(entry.time).toISOString()}] ` +
                             `user=${entry.user} pointId=${entry.pointId ?? "-"}`,
@@ -756,8 +879,8 @@ export class Logger2D {
             "incorrect3D",
             "firstAttempt",
             "completionMs",
-            "yaw",
-            "pitch",
+            "cumYaw",
+            "cumPitch",
         ];
 
         const rows = summaries.map((summary) => [
@@ -767,8 +890,8 @@ export class Logger2D {
             Logger2D.formatCount(summary.incorrectClicks3D),
             Logger2D.formatYesNo(summary.incorrectClicks2D + summary.incorrectClicks3D === 0),
             Logger2D.formatDurationMs(summary.completionMs),
-            Logger2D.formatNumber(summary.endYaw),
-            Logger2D.formatNumber(summary.endPitch),
+            Logger2D.formatNumber(summary.cumulativeYaw),
+            Logger2D.formatNumber(summary.cumulativePitch),
         ]);
 
         const widths = header.map((value, index) => {
