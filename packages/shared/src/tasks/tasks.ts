@@ -163,6 +163,18 @@ export type TaskState = {
      * For Trial 7: the set of point assignments for each color pair.
      */
     trial7Assignments?: Trial7Assignment[];
+    /**
+     * Pre-selected point IDs for this task (set at task initialization).
+     * Task 1: 4 points (one per trial)
+     * Task 2: 4 points (2 per trial x 2 trials)
+     * Task 3: uses trial7Assignments instead
+     */
+    preselectedPointIds?: string[];
+    /**
+     * Index tracking how many preselected points have been consumed.
+     * Incremented as trials progress within a task.
+     */
+    preselectedIndex?: number;
 };
 
 export type TaskInstructionContent = {

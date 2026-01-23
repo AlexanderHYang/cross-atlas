@@ -28,7 +28,8 @@ import {
     isTask3Trial,
     type PointIdProvider,
 } from "../../shared/src/tasks";
-import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
+import { DEFAULT_POINT_CONFIGS, getDefaultPointConfig } from "../../shared/src/defaultPoints";
+import { selectPointsByAngularDistance } from "../../shared/src/angularPointSelection";
 import { TimedLogEvent } from "../../shared/src/logging";
 
 const TASK3_NEUTRAL_COLOR = new BABYLON.Color3(0.82, 0.82, 0.82);
@@ -135,6 +136,8 @@ export class SyncManager3D implements PointIdProvider {
     }
 
     private normalizeTaskState(task: TaskState | null | undefined): TaskState | null {
+        console.log("normalizeTaskState called with:", task);
+        console.log("preselectedIndex:", task?.preselectedIndex, "preselectedPointIds:", task?.preselectedPointIds);
         if (!task) return null;
         const trial = (task as any).trial ?? (task as any).stage ?? 1;
         const hintSide = task.hintSide ?? "2d";
@@ -148,6 +151,8 @@ export class SyncManager3D implements PointIdProvider {
         const colorPairKey = task.colorPairKey;
         const colorPairIndex = task.colorPairIndex;
         const trial7Assignments = task.trial7Assignments ?? [];
+        const preselectedPointIds = task.preselectedPointIds ?? [];
+        const preselectedIndex = task.preselectedIndex ?? 0;
 
         if (
             trial === (task as any).trial &&
@@ -161,7 +166,9 @@ export class SyncManager3D implements PointIdProvider {
             errorPointId3D === task.errorPointId3D &&
             colorPairKey === task.colorPairKey &&
             colorPairIndex === task.colorPairIndex &&
-            trial7Assignments === task.trial7Assignments
+            trial7Assignments === task.trial7Assignments &&
+            preselectedPointIds === task.preselectedPointIds &&
+            preselectedIndex === task.preselectedIndex
         ) {
             return task;
         }
@@ -181,6 +188,8 @@ export class SyncManager3D implements PointIdProvider {
             colorPairKey,
             colorPairIndex,
             trial7Assignments,
+            preselectedPointIds,
+            preselectedIndex,
         };
     }
 
@@ -368,6 +377,20 @@ export class SyncManager3D implements PointIdProvider {
         if (pending && taskState) {
             payload.calibrationTaskId = taskState.id as TaskId;
             payload.calibrationTrial = taskState.trial;
+
+            // Neutralize the completed task state so old highlights don't flash during calibration.
+            const neutralized: TaskState = {
+                ...taskState,
+                targetPointId2D: null,
+                targetPointId3D: null,
+                feedback: "none",
+                clicked2D: false,
+                clicked3D: false,
+                errorPointId2D: null,
+                errorPointId3D: null,
+            };
+            this.taskMap.set(taskState.id as TaskId, neutralized);
+            this.currentTask = neutralized;
         }
         this.updatingMeta = true;
         this.taskMetaMap.set("calibration", payload);
@@ -394,37 +417,8 @@ export class SyncManager3D implements PointIdProvider {
     }
 
     // PointIdProvider interface implementation
-    public pickRandomTargetId(): string | null {
-        const candidateIds = Array.from(this.localPointsById.keys()).filter((id) => {
-            const cfg = getDefaultPointConfig(id);
-            if (cfg && cfg.selectable === false) {
-                return false;
-            }
-            return true;
-        });
-        if (candidateIds.length === 0) {
-            return null;
-        }
-        const randomId = candidateIds[Math.floor(Math.random() * candidateIds.length)];
-        return randomId;
-    }
-
-    public pickDistinctTargetIds(count: number): string[] | null {
-        const candidateIds = Array.from(this.localPointsById.keys()).filter((id) => {
-            const cfg = getDefaultPointConfig(id);
-            if (cfg && cfg.selectable === false) {
-                return false;
-            }
-            return true;
-        });
-
-        if (candidateIds.length < count) {
-            return null;
-        }
-
-        // Shuffle and take first `count` elements
-        const shuffled = [...candidateIds].sort(() => Math.random() - 0.5);
-        return shuffled.slice(0, count);
+    public pickAngularDistributedIds(count: number): string[] {
+        return selectPointsByAngularDistance(DEFAULT_POINT_CONFIGS, count);
     }
 
     /**
@@ -513,8 +507,8 @@ export class SyncManager3D implements PointIdProvider {
 
     public setTrial(trial: 1 | 2 | 3 | 4, taskId: string = TASK1_ID) {
         this.setActiveTask(taskId as TaskId);
-        const nextTarget = this.pickRandomTargetId();
-        if (!nextTarget) return;
+        const pointIds = this.pickAngularDistributedIds(1);
+        const nextTarget = pointIds[0];
 
         const hintSide = trial === 1 || trial === 3 ? "2d" : "3d";
         const nextState: TaskState = {

@@ -73,8 +73,7 @@ export type TaskTransition = {
 };
 
 export interface PointIdProvider {
-    pickRandomTargetId(): string | null;
-    pickDistinctTargetIds(count: number): string[] | null;
+    pickAngularDistributedIds(count: number): string[];
 }
 
 export interface TaskRunnerCallbacks {
@@ -113,75 +112,104 @@ export function getTaskIdFromFlowState(flowState: TaskFlowState): TaskId {
 }
 
 /**
- * Creates an initial state for Task 1
+ * Creates an initial state for Task 1.
+ * Pre-selects all 4 points for the task upfront.
  */
-export function createInitialTask1State(provider: PointIdProvider): TaskState | null {
-    const targetId = provider.pickRandomTargetId();
-    if (!targetId) return null;
-    return createTask1State(targetId, 1);
+export function createInitialTask1State(provider: PointIdProvider): TaskState {
+    const pointIds = provider.pickAngularDistributedIds(4);
+    const state = createTask1State(pointIds[0], 1);
+    return {
+        ...state,
+        preselectedPointIds: pointIds,
+        preselectedIndex: 1, // First point already used
+    };
 }
 
 /**
- * Creates the next trial state for Task 1
+ * Creates the next trial state for Task 1.
+ * Uses pre-selected points from the initial state.
  */
 export function createNextTask1TrialState(
     currentState: TaskState,
-    provider: PointIdProvider,
 ): TaskState | null {
     const currentTrial = currentState.trial as Task1Trial;
     const nextTrial = getNextTask1Trial(currentTrial);
 
     if (!nextTrial) return null; // Task 1 complete
 
-    const targetId = provider.pickRandomTargetId();
-    if (!targetId) return null;
+    console.log(currentState);
+    console.log(currentState.preselectedIndex, currentState.preselectedPointIds);
+    const { preselectedPointIds, preselectedIndex } = currentState;
+    if (!preselectedPointIds || preselectedIndex === undefined) {
+        throw new Error("Task 1 state missing preselected points");
+    }
 
-    return createTask1State(targetId, nextTrial);
+    const targetId = preselectedPointIds[preselectedIndex];
+    const state = createTask1State(targetId, nextTrial);
+    return {
+        ...state,
+        preselectedPointIds,
+        preselectedIndex: preselectedIndex + 1,
+    };
 }
 
 /**
- * Creates an initial state for Task 2
+ * Creates an initial state for Task 2.
+ * Pre-selects all 4 points for the task upfront.
  */
-export function createInitialTask2State(provider: PointIdProvider): TaskState | null {
-    const targets = provider.pickDistinctTargetIds(2);
-    if (!targets || targets.length < 2) return null;
-    const [target2D, target3D] = targets;
-
-    return createTask2State(target2D, target3D, 5);
+export function createInitialTask2State(provider: PointIdProvider): TaskState {
+    const pointIds = provider.pickAngularDistributedIds(4);
+    const [target2D, target3D] = pointIds;
+    const state = createTask2State(target2D, target3D, 5);
+    return {
+        ...state,
+        preselectedPointIds: pointIds,
+        preselectedIndex: 2, // First 2 points already used
+    };
 }
 
 /**
- * Creates the next trial state for Task 2
+ * Creates the next trial state for Task 2.
+ * Uses pre-selected points from the initial state.
  */
 export function createNextTask2TrialState(
     currentState: TaskState,
-    provider: PointIdProvider,
 ): TaskState | null {
     const currentTrial = currentState.trial as Task2Trial;
     const nextTrial = getNextTask2Trial(currentTrial);
 
     if (!nextTrial) return null; // Task 2 complete
 
-    const targets = provider.pickDistinctTargetIds(2);
-    if (!targets || targets.length < 2) return null;
-    const [target2D, target3D] = targets;
+    const { preselectedPointIds, preselectedIndex } = currentState;
+    if (!preselectedPointIds || preselectedIndex === undefined) {
+        throw new Error("Task 2 state missing preselected points");
+    }
 
-    return createTask2State(target2D, target3D, nextTrial);
+    const target2D = preselectedPointIds[preselectedIndex];
+    const target3D = preselectedPointIds[preselectedIndex + 1];
+    const state = createTask2State(target2D, target3D, nextTrial);
+    return {
+        ...state,
+        preselectedPointIds,
+        preselectedIndex: preselectedIndex + 2,
+    };
 }
 
 /**
- * Creates an initial state for Task 3
+ * Creates an initial state for Task 3.
+ * Selects all 10 points for color pairs upfront.
  */
 export function createInitialTask3State(
     provider: PointIdProvider,
     pairCount = 5,
-): TaskState | null {
-    const pointIds = provider.pickDistinctTargetIds(pairCount * 2);
-
-    if (!pointIds || pointIds.length < pairCount * 2) return null;
-
+): TaskState {
+    const pointIds = provider.pickAngularDistributedIds(pairCount * 2);
     const assignments = createTask3Assignments(pointIds, pairCount);
-    return createTask3State(assignments);
+    const state = createTask3State(assignments);
+    if (!state) {
+        throw new Error("Failed to create Task 3 state: no assignments");
+    }
+    return state;
 }
 
 /**
@@ -229,7 +257,9 @@ export function determineNextAction(currentState: TaskState): {
 }
 
 /**
- * Creates the next state based on the current state and action
+ * Creates the next state based on the current state and action.
+ * For next-trial actions, uses pre-selected points from the current state.
+ * For next-task actions, requires a provider to select new points.
  */
 export function createNextState(
     currentState: TaskState,
@@ -240,10 +270,10 @@ export function createNextState(
         case "next-trial": {
             const flowState = getTaskFlowState(currentState);
             if (flowState === "task1") {
-                return createNextTask1TrialState(currentState, provider);
+                return createNextTask1TrialState(currentState);
             }
             if (flowState === "task2") {
-                return createNextTask2TrialState(currentState, provider);
+                return createNextTask2TrialState(currentState);
             }
             return null;
         }
