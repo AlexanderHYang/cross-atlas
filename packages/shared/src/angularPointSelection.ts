@@ -11,7 +11,10 @@ const LANDMARK_POS = new Vector3(1, 0, 0);
 const TOLERANCE_MULTIPLIER = 1.15;
 
 // Front dead zone in degrees - points within this angular distance from landmark are excluded
-const FRONT_DEAD_ZONE_DEGREES = 20;
+const FRONT_DEAD_ZONE_DEGREES = 1;
+
+// Average angular distance in degrees per point
+const AVERAGE_ANGULAR_DISTANCE_DEGREES = 60;
 
 /**
  * Selects a specified number of points from an array such that the cumulative angular
@@ -19,7 +22,6 @@ const FRONT_DEAD_ZONE_DEGREES = 20;
  *
  * @param points - Array of 3D points to select from
  * @param numPointsToSelect - Number of points to select (without replacement)
- * @param cumulativeAngularDegrees - Target sum of angular distances from landmark
  * @returns Array of selected points, or null if selection criteria cannot be met
  *
  * @example
@@ -33,8 +35,8 @@ const FRONT_DEAD_ZONE_DEGREES = 20;
 export function selectPointsByAngularDistance(
   points: Vector3[],
   numPointsToSelect: number,
-  cumulativeAngularDegrees: number
 ): Vector3[] | null {
+  const cumulativeAngularDegrees = AVERAGE_ANGULAR_DISTANCE_DEGREES * numPointsToSelect;
   const tolerance = cumulativeAngularDegrees * (TOLERANCE_MULTIPLIER - 1);
 
   // Filter out points in the dead zone
