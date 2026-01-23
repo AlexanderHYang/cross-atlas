@@ -73,8 +73,7 @@ export function selectPointsByAngularDistance(
   function backtrack(currentSum: number): boolean {
     // Success case: we have enough points and cumulative sum is within tolerance
     if (selected.length === numPointsToSelect) {
-      // return Math.abs(currentSum - cumulativeAngularDegrees) <= tolerance;
-
+      return Math.abs(currentSum - cumulativeAngularDegrees) <= tolerance;
     }
 
     // Pruning: if we can't possibly reach target even with remaining points
