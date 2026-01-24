@@ -2,7 +2,8 @@ import { Vector3 } from '@babylonjs/core'
 import { getNormal } from './pca'
 import { clamp, equirectangularNormalizedXY, vec3ToLatLon } from '../../shared/src/projection'
 import { SyncManager2D } from './SyncManager2D'
-import { PlaneSyncData } from '@shared/src/sync'
+import { PlaneSyncData } from '../../shared/src/sync'
+import { layoutType } from '../../shared/src/defaultPoints'
 
 const DEFAULT_PLANAR_SCALE = 3.0;
 
@@ -39,16 +40,21 @@ export class PCAProjection implements IProjection {
     updatePCA(points: Array<Vector3 | number[]>) {
         const normal = getNormal(points);
         if (normal) {
-            // get u vector which is has no Y component (to keep it horizontal)
+            // get u vector which has no Y component (to keep it horizontal)
             let u = Vector3.Cross(normal, new Vector3(0,1,0));
             let v;
             if (u.lengthSquared() === 0) {
                 // normal was vertical, use default horizontal plane
+                console.warn("PCAProjection.updatePCA: normal is vertical, using a horizontal plane");
                 u = new Vector3(1,0,0);
                 v = new Vector3(0,0,1);
             } else {
                 u.normalize();
                 v = Vector3.Cross(normal, u).normalize();
+                if (v.y < 0) {
+                    v = v.scale(-1);
+                    // u = u.scale(-1); should this be flipped? sometimes yes sometimes no?
+                }
             }
             this.planarProjection = new PlanarProjection(u, v);
         } else {
@@ -102,8 +108,8 @@ export class PlanarProjection implements IProjection {
 export class ProjectionManager {
     private equirectangularProjection = new EquirectangularProjection();
     private pcaProjection = new PCAProjection();
-    private verticalPlaneProjection = new PlanarProjection(new Vector3(0, 0, 1), new Vector3(0, 1, 0));
-    private horizontalPlaneProjection = new PlanarProjection(new Vector3(1, 0, 0), new Vector3(0, 0, 1));
+    private verticalPlaneProjection = new PlanarProjection(new Vector3(0, 0, -1), new Vector3(0, 1, 0));
+    private horizontalPlaneProjection = new PlanarProjection(new Vector3(0, 0, -1), new Vector3(1, 0, 0));
 
     private currentProjectionType: "equirectangular" | "pca" | "vertical" | "horizontal"
 
@@ -156,6 +162,13 @@ export class ProjectionManager {
     }
 
     project(v: Vector3): [number, number] {
-        return this.getCurrentProjection().project(v);
+        const [x, y] = this.getCurrentProjection().project(v);
+
+        // special case for planar layout and horizontal projection
+        if (layoutType === "planar" && this.currentProjectionType === "horizontal") {
+            return [x, 0];
+        } else {
+            return [x, y];
+        }
     }
 }

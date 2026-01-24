@@ -136,8 +136,6 @@ export class SyncManager3D implements PointIdProvider {
     }
 
     private normalizeTaskState(task: TaskState | null | undefined): TaskState | null {
-        console.log("normalizeTaskState called with:", task);
-        console.log("preselectedIndex:", task?.preselectedIndex, "preselectedPointIds:", task?.preselectedPointIds);
         if (!task) return null;
         const trial = (task as any).trial ?? (task as any).stage ?? 1;
         const hintSide = task.hintSide ?? "2d";
