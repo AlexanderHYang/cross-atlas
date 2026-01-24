@@ -14,7 +14,7 @@ import {
 import { Logger2D } from "./Logger2d";
 import { TaskController2D } from "./tasks/taskController2D";
 
-const DASHBOARD_BG = "#828485ff";
+const DASHBOARD_BG = "#707070";
 
 // Create a single canvas UI for all points (centered, not full screen)
 const canvas = document.createElement("canvas");
@@ -26,8 +26,9 @@ canvas.style.transform = "translate(-50%, -50%)";
 canvas.style.display = "block";
 canvas.style.background = DASHBOARD_BG;
 canvas.style.touchAction = "none";
-canvas.style.border = "4px solid #333"; // visible border
-canvas.style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)";
+canvas.style.border = "2px solid rgba(100, 180, 255, 0.5)";
+canvas.style.borderRadius = "15px";
+canvas.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255, 255, 255, 0.05)";
 document.body.style.margin = "0";
 document.body.style.background = DASHBOARD_BG;
 document.body.appendChild(canvas);
@@ -38,27 +39,44 @@ html, body { height:100%; background: ${DASHBOARD_BG}; }
 #points-canvas { display:block; }
 #trial-box {
 	position: absolute;
-	top: 16px;
+	top: 25px;
 	left: 16px;
-	padding: 8px 12px;
-	background: rgba(0,0,0,0.35);
-	color: #fff;
+	padding: 10px 14px;
+	background: linear-gradient(135deg, rgba(60, 120, 180, 0.4), rgba(40, 80, 140, 0.4));
+	color: #e0f0ff;
 	font-family: sans-serif;
-	border: 1px solid #444;
-	border-radius: 6px;
-	box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+	border: 1.5px solid rgba(100, 180, 255, 0.5);
+	border-radius: 8px;
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+	font-size: 16px;
 }
 #instruction-box {
 	position: absolute;
-	top: 16px;
-	left: 180px;
-	padding: 8px 12px;
-	background: rgba(0,0,0,0.35);
-	color: #fff;
+	top: 25px;
+	left: 170px;
+	padding: 10px 14px;
+	background: linear-gradient(135deg, rgba(60, 120, 180, 0.4), rgba(40, 80, 140, 0.4));
+	color: #e0f0ff;
 	font-family: sans-serif;
-	border: 1px solid #444;
-	border-radius: 6px;
-	box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+	border: 1.5px solid rgba(100, 180, 255, 0.5);
+	border-radius: 8px;
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+	font-size: 16px;
+}
+#info-box {
+	position: absolute;
+	top: 25px;
+	right: 16px;
+	padding: 10px 14px;
+	background: linear-gradient(135deg, rgba(60, 120, 180, 0.4), rgba(40, 80, 140, 0.4));
+	color: #e0f0ff;
+	font-family: sans-serif;
+	border: 1.5px solid rgba(100, 180, 255, 0.5);
+	border-radius: 8px;
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+	text-align: right;
+	font-size: 16px;
+	line-height: 1.5;
 }
 `;
 document.head.appendChild(style);
@@ -87,8 +105,23 @@ instructionBox.id = "instruction-box";
 instructionBox.style.display = "none";
 document.body.appendChild(instructionBox);
 
+const infoBox = document.createElement("div");
+infoBox.id = "info-box";
+infoBox.innerHTML =
+    "<span style='color: #5cf0ff; font-weight: 600;'>spherical</span> <span style='opacity: 0.5; margin: 0 8px;'>|</span> <span style='color: #5cf0ff; font-weight: 600;'>equirectangular</span>";
+document.body.appendChild(infoBox);
+
 // create SyncManager
 const syncManager: SyncManager2D = await SyncManager2D.create();
+
+// Get layout type for info box
+const layoutEnv = (import.meta.env.VITE_LAYOUT_TYPE as string | undefined)?.trim();
+const layoutType = layoutEnv || "spherical";
+const updateInfoBox = () => {
+    const projectionType = syncManager.getProjectionManager().getCurrentProjectionType();
+    infoBox.innerHTML = `<span style='color: #5cf0ff; font-weight: 600;'>${layoutType}</span> <span style='opacity: 0.5; margin: 0 8px;'>|</span> <span style='color: #5cf0ff; font-weight: 600;'>${projectionType}</span>`;
+};
+updateInfoBox();
 
 // create logger
 const logger2d = new Logger2D(syncManager);
@@ -286,6 +319,7 @@ window.addEventListener("keydown", (ev) => {
 
         const projectionType = syncManager.getProjectionManager().getCurrentProjectionType();
         console.log(`[2D] Projection switched to: ${projectionType}`);
+        updateInfoBox();
     }
 });
 
@@ -294,8 +328,8 @@ let width = 0,
 function resize() {
     const dpr = window.devicePixelRatio || 1;
     // Make canvas a large but not full-screen area, centered with margins
-    const maxW = Math.max(400, Math.min(window.innerWidth - 120, 1200));
-    const maxH = Math.max(300, Math.min(window.innerHeight - 120, 800));
+    const maxW = Math.max(500, Math.min(window.innerWidth - 80, 1600));
+    const maxH = Math.max(400, Math.min(window.innerHeight - 80, 1000));
     width = Math.floor(maxW);
     height = Math.floor(maxH);
     canvas.width = Math.floor(width * dpr);
