@@ -57,7 +57,7 @@ export class PCAProjection implements IProjection {
                 }
 
                 // this isnt really working, not sure how to make horizontal not flipped sometimes
-                if (u.z < 0) {
+                if (u.z > 0) {
                     u = u.scale(-1);
                 }
             }
@@ -65,6 +65,7 @@ export class PCAProjection implements IProjection {
         } else {
             console.warn("PCAProjection.updatePCA: could not compute normal from points");
         }
+        console.log("PCAProjection.updatePCA: updated planar projection:", this.planarProjection);
     }
 }
 
