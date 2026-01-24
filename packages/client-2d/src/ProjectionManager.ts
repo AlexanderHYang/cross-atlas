@@ -4,6 +4,7 @@ import { clamp, equirectangularNormalizedXY, vec3ToLatLon } from '../../shared/s
 import { SyncManager2D } from './SyncManager2D'
 import { PlaneSyncData } from '../../shared/src/sync'
 import { layoutType } from '../../shared/src/defaultPoints'
+import { LANDMARK_POS } from '../../shared/src/angularPointSelection'
 
 const DEFAULT_PLANAR_SCALE = 3.0;
 
@@ -53,7 +54,11 @@ export class PCAProjection implements IProjection {
                 v = Vector3.Cross(normal, u).normalize();
                 if (v.y < 0) {
                     v = v.scale(-1);
-                    // u = u.scale(-1); should this be flipped? sometimes yes sometimes no?
+                }
+
+                // this isnt really working, not sure how to make horizontal not flipped sometimes
+                if (u.z < 0) {
+                    u = u.scale(-1);
                 }
             }
             this.planarProjection = new PlanarProjection(u, v);

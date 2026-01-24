@@ -6,7 +6,7 @@ import { Vector3 } from "@babylonjs/core";
 import { DefaultPointConfig } from "./defaultPoints";
 
 // Landmark position (origin/forward reference point)
-const LANDMARK_POS = new Vector3(1, 0, 0);
+export const LANDMARK_POS = new Vector3(1, 0, 0);
 
 // Tolerance multiplier
 const TOLERANCE_MULTIPLIER = 1.3;
