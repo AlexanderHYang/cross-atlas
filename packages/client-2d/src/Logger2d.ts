@@ -746,6 +746,32 @@ export class Logger2D {
         this.lastLifecycleState = nextState;
     }
 
+    public logPointSelection(params: {
+        taskNumber: number;
+        pointIds: string[];
+        cumulativeDegrees: number;
+        points: { pointId: string; degrees: number | null; difficulty: string }[];
+    }) {
+        const timestamp = new Date().toISOString();
+        const pointsLabel = params.points
+            .map((entry) => {
+                const degrees =
+                    entry.degrees === null || !Number.isFinite(entry.degrees)
+                        ? "-"
+                        : entry.degrees.toFixed(2);
+                return `${entry.pointId}:${degrees}deg:${entry.difficulty}`;
+            })
+            .join(", ");
+        const cumulative =
+            params.cumulativeDegrees === null || !Number.isFinite(params.cumulativeDegrees)
+                ? "-"
+                : params.cumulativeDegrees.toFixed(2);
+        this.queueText(
+            `[${timestamp}] task=${params.taskNumber} event=point_selection ` +
+                `cumulative_degrees=${cumulative} points=${pointsLabel}\n`,
+        );
+    }
+
     public logIncorrectClick2D(pointId: string) {
         const context = this.ensureTrialContext();
         const time = Date.now();

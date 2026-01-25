@@ -9,7 +9,7 @@ import { DefaultPointConfig } from "./defaultPoints";
 export const LANDMARK_POS = new Vector3(1, 0, 0);
 
 // Tolerance multiplier
-const TOLERANCE_MULTIPLIER = 1.3;
+const TOLERANCE_MULTIPLIER = 1.1;
 
 // Front dead zone in degrees - points within this angular distance from landmark are excluded
 const FRONT_DEAD_ZONE_DEGREES = 1;

@@ -209,7 +209,10 @@ export function createInitialTask3State(
     if (!state) {
         throw new Error("Failed to create Task 3 state: no assignments");
     }
-    return state;
+    return {
+        ...state,
+        preselectedPointIds: pointIds,
+    };
 }
 
 /**

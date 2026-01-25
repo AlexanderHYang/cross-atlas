@@ -1,7 +1,12 @@
 import { Logger, Vector3 } from "@babylonjs/core";
 import { Point2D } from "./Point2D";
 import { SyncManager2D } from "./SyncManager2D";
-import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from "../../shared/src/defaultPoints";
+import {
+    DEFAULT_POINT_CONFIGS,
+    DEFAULT_SPHERE_RADIUS,
+    getDefaultPointConfig,
+} from "../../shared/src/defaultPoints";
+import { LANDMARK_POS } from "../../shared/src/angularPointSelection";
 import {
     TaskColorConfig2D,
     TaskState,
@@ -44,6 +49,7 @@ html, body { height:100%; background: ${DASHBOARD_BG}; }
 	background: linear-gradient(135deg, rgba(60, 120, 180, 0.4), rgba(40, 80, 140, 0.4));
 	color: #e0f0ff;
 	font-family: sans-serif;
+	font-weight: 600;
 	border: 1.5px solid rgba(100, 180, 255, 0.5);
 	border-radius: 8px;
 	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.1);
@@ -52,7 +58,7 @@ html, body { height:100%; background: ${DASHBOARD_BG}; }
 #instruction-box {
 	position: absolute;
 	top: 25px;
-	left: 170px;
+	left: 190px;
 	padding: 10px 14px;
 	background: linear-gradient(135deg, rgba(60, 120, 180, 0.4), rgba(40, 80, 140, 0.4));
 	color: #e0f0ff;
@@ -137,6 +143,60 @@ const taskController2D = new TaskController2D({
     drawAll,
 });
 
+const HARD_THRESHOLD_DEGREES = 60;
+const AVERAGE_THRESHOLD_DEGREES = 45;
+const ANGLE_PRECISION = 2;
+const loggedSelectionTasks = new Set<number>();
+
+function getAngularDistanceDegrees(pointId: string): number | null {
+    const config = getDefaultPointConfig(pointId);
+    if (!config) {
+        return null;
+    }
+    const position = new Vector3(config.direction.x, config.direction.y, config.direction.z);
+    const angularRad = Vector3.GetAngleBetweenVectors(position, LANDMARK_POS, Vector3.Up());
+    const degrees = (angularRad * 180) / Math.PI;
+    return Number.parseFloat(degrees.toFixed(ANGLE_PRECISION));
+}
+
+function classifyDifficulty(degrees: number | null): "easy" | "average" | "hard" | "unknown" {
+    if (degrees === null || !Number.isFinite(degrees)) {
+        return "unknown";
+    }
+    if (degrees > HARD_THRESHOLD_DEGREES) {
+        return "hard";
+    }
+    if (degrees >= AVERAGE_THRESHOLD_DEGREES) {
+        return "average";
+    }
+    return "easy";
+}
+
+function logPointSelectionIfNeeded(taskState: TaskState, taskNumber: number) {
+    if (loggedSelectionTasks.has(taskNumber)) {
+        return;
+    }
+    if (!taskState.preselectedPointIds?.length) {
+        return;
+    }
+    const pointDetails = taskState.preselectedPointIds.map((pointId) => {
+        const degrees = getAngularDistanceDegrees(pointId);
+        return {
+            pointId,
+            degrees,
+            difficulty: classifyDifficulty(degrees),
+        };
+    });
+    const cumulativeDegrees = pointDetails.reduce((sum, entry) => sum + (entry.degrees ?? 0), 0);
+    logger2d.logPointSelection({
+        taskNumber,
+        pointIds: taskState.preselectedPointIds,
+        cumulativeDegrees: Number.parseFloat(cumulativeDegrees.toFixed(ANGLE_PRECISION)),
+        points: pointDetails,
+    });
+    loggedSelectionTasks.add(taskNumber);
+}
+
 // Create defaults that match the 3D scene
 for (const cfg of DEFAULT_POINT_CONFIGS) {
     const point = new Point2D(cfg.id, syncManager);
@@ -191,6 +251,7 @@ syncManager.onStudyStartedChange((started) => {
         const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(currentTask.trial);
         logger2d.setTrialContext(taskNumber, trialNumber, totalTrials);
         taskController2D.handleTaskStateChange(currentTask);
+        logPointSelectionIfNeeded(currentTask, taskNumber);
     }
 });
 
@@ -291,6 +352,12 @@ syncManager.onTaskStateChange((taskState) => {
 
     const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(taskState.trial);
     logger2d.setTrialContext(taskNumber, trialNumber, totalTrials);
+
+    const prevTaskNumber = lastTaskState ? getTaskAndTrial(lastTaskState.trial).taskNumber : null;
+    const taskChanged = prevTaskNumber === null || prevTaskNumber !== taskNumber;
+    if (taskChanged) {
+        logPointSelectionIfNeeded(taskState, taskNumber);
+    }
 
     const completedSuccessfully =
         taskState.feedback === "success" && taskState.completed && !lastTaskState?.completed;
