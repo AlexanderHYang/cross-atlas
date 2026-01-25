@@ -150,10 +150,11 @@ export class Point2D {
         _taskCompleted: boolean,
         hideColor: boolean = false,
         overrideColor: Vector3 | null = null,
-        glowColor: Vector3 | null = null
+        glowColor: Vector3 | null = null,
+        yOffset: number = 0,
     ) {
         const x = ((this.nx + 1) / 2) * width;
-        const y = (1-(this.ny + 1) / 2) * height;
+        const y = (1 - (this.ny + 1) / 2) * height + yOffset;
         // color stored in this.color as Vector3 (r,g,b) in 0..1
         const sourceColor = overrideColor ?? (hideColor ? this.baseColor : this.color);
         const r = Math.round(Math.min(1, Math.max(0, sourceColor.x)) * 255);
@@ -187,12 +188,12 @@ export class Point2D {
         }
     }
 
-    hitTest(px: number, py: number, width: number, height: number) {
+    hitTest(px: number, py: number, width: number, height: number, yOffset: number = 0) {
         if (!this.selectable || this.flashing) {
             return false;
         }
         const x = ((this.nx + 1) / 2) * width;
-        const y = (1 - (this.ny + 1) / 2) * height;
+        const y = (1 - (this.ny + 1) / 2) * height + yOffset;
         const radius = 12;
 
         if (this.id === "landmark") {

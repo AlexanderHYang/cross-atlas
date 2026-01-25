@@ -124,6 +124,13 @@ const syncManager: SyncManager2D = await SyncManager2D.create();
 // Get layout type for info box
 const layoutEnv = (import.meta.env.VITE_LAYOUT_TYPE as string | undefined)?.trim();
 const layoutType = layoutEnv || "spherical";
+
+// Helper to compute y-offset for semiSpherical + horizontal layout
+function getYOffset(): number {
+    const projectionType = syncManager.getProjectionManager().getCurrentProjectionType();
+    return layoutType === "semiSpherical" && projectionType === "horizontal" ? 50 : 0;
+}
+
 const updateInfoBox = () => {
     const projectionType = syncManager.getProjectionManager().getCurrentProjectionType();
     infoBox.innerHTML = `<span style='color: #5cf0ff; font-weight: 600;'>${layoutType}</span> <span style='opacity: 0.5; margin: 0 8px;'>|</span> <span style='color: #5cf0ff; font-weight: 600;'>${projectionType}</span>`;
@@ -207,10 +214,23 @@ for (const cfg of DEFAULT_POINT_CONFIGS) {
     // point.pos3d = direction.scale(DEFAULT_SPHERE_RADIUS);
     point.pos3d = direction;
 
-    const [nx, ny] = syncManager.getProjectionManager().project(point.pos3d.clone());
-    point.nx = nx;
-    point.ny = ny;
+    // Register point without projection coords yet (will set after scale normalization)
+    point.nx = 0;
+    point.ny = 0;
     syncManager.registerPoint(point);
+}
+
+// Compute scale factors for all projections based on 3D point positions
+// This ensures consistent scale across all projection types (RMS normalization)
+syncManager
+    .getProjectionManager()
+    .computeScaleFactors(syncManager.getLocalPoints().map((p) => p.pos3d));
+
+// Now compute projected 2D coordinates with scale normalization applied
+for (const p of syncManager.getLocalPoints()) {
+    const [nx, ny] = syncManager.getProjectionManager().project(p.pos3d.clone());
+    p.nx = nx;
+    p.ny = ny;
 }
 
 let studyStarted = syncManager.isStudyStarted();
@@ -395,10 +415,10 @@ let width = 0,
 function resize() {
     const dpr = window.devicePixelRatio || 1;
     // Make canvas a large but not full-screen area, centered with margins
-    const maxW = Math.max(500, Math.min(window.innerWidth - 80, 1600));
+    const maxW = Math.max(500, Math.min(window.innerWidth - 80, 1700));
     const reservedTop = TOP_UI_HEIGHT;
     const availableHeight = Math.max(200, window.innerHeight - reservedTop - TOP_UI_GAP - 40);
-    const maxH = Math.max(300, Math.min(availableHeight, 1000));
+    const maxH = Math.max(300, Math.min(availableHeight, 1400));
     width = Math.floor(maxW);
     height = Math.floor(maxH);
     canvas.width = Math.floor(width * dpr);
@@ -442,6 +462,7 @@ function drawAll() {
         studyStarted && !calibrationPending && !awaitingNextTaskState
             ? syncManager.getCurrentTask()
             : null;
+    const yOffset = getYOffset();
     for (const p of points) {
         const visuals = getPointVisual2D(taskState, p.id, colorConfig2D);
         const isCompleted = !!taskState?.completed;
@@ -454,6 +475,7 @@ function drawAll() {
             visuals.hideColor,
             visuals.overrideColor,
             visuals.glowColor,
+            yOffset,
         );
     }
 }
@@ -475,10 +497,11 @@ canvas.addEventListener("pointerdown", (ev) => {
     const px = ev.clientX - rect.left;
     const py = ev.clientY - rect.top;
     const points = syncManager.getLocalPoints();
+    const yOffset = getYOffset();
     // hit test reverse order so last drawn (if ordering matters) is on top
     for (let i = points.length - 1; i >= 0; i--) {
         const p = points[i];
-        if (p.hitTest(px, py, width, height)) {
+        if (p.hitTest(px, py, width, height, yOffset)) {
             if (p.isDraggable()) {
                 dragging = p;
                 dragMoved = false;
@@ -519,7 +542,7 @@ function tryHandle2DSelection(px: number, py: number) {
     if (!studyStarted || calibrationPending) {
         return;
     }
-    taskController2D.tryHandleSelection(px, py, width, height);
+    taskController2D.tryHandleSelection(px, py, width, height, getYOffset());
 }
 
 // animate

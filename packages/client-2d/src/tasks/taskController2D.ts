@@ -64,7 +64,7 @@ export class TaskController2D {
                 taskState,
                 this.deps.syncManager.getLocalPoints(),
                 this.deps.errorColor,
-                this.lastProcessedErrorPointId3D
+                this.lastProcessedErrorPointId3D,
             );
         } else {
             this.lastProcessedErrorPointId3D = null;
@@ -73,13 +73,19 @@ export class TaskController2D {
         applyTaskVisuals2D(taskState, this.deps.syncManager.getLocalPoints());
     };
 
-    public tryHandleSelection(px: number, py: number, width: number, height: number): void {
+    public tryHandleSelection(
+        px: number,
+        py: number,
+        width: number,
+        height: number,
+        yOffset: number = 0,
+    ): void {
         const taskState = this.deps.syncManager.getCurrentTask();
         const points = this.deps.syncManager.getLocalPoints();
         let clicked: Point2D | null = null;
         for (let i = points.length - 1; i >= 0; i--) {
             const p = points[i];
-            if (p.hitTest(px, py, width, height)) {
+            if (p.hitTest(px, py, width, height, yOffset)) {
                 clicked = p;
                 break;
             }
