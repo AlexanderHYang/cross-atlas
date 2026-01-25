@@ -30,7 +30,8 @@ import {
     getFirstEnabledTask,
     type PointIdProvider,
 } from "../../shared/src/tasks";
-import { getDefaultPointConfig } from "../../shared/src/defaultPoints";
+import { DEFAULT_POINT_CONFIGS, getDefaultPointConfig } from "../../shared/src/defaultPoints";
+import { selectPointsByAngularDistance } from "../../shared/src/angularPointSelection";
 import { Vector3 } from "@babylonjs/core";
 import { PCAProjection, ProjectionManager } from "./ProjectionManager";
 import { TimedLogEvent } from "../../shared/src/logging";
@@ -117,6 +118,8 @@ export class SyncManager2D implements PointIdProvider {
         const colorPairKey = task.colorPairKey;
         const colorPairIndex = task.colorPairIndex;
         const trial7Assignments = task.trial7Assignments ?? [];
+        const preselectedPointIds = task.preselectedPointIds ?? [];
+        const preselectedIndex = task.preselectedIndex ?? 0;
 
         if (
             trial === (task as any).trial &&
@@ -150,6 +153,8 @@ export class SyncManager2D implements PointIdProvider {
             colorPairKey,
             colorPairIndex,
             trial7Assignments,
+            preselectedPointIds,
+            preselectedIndex,
         };
     }
 
@@ -342,43 +347,8 @@ export class SyncManager2D implements PointIdProvider {
     }
 
     // PointIdProvider interface implementation
-    public pickRandomTargetId(): string | null {
-        const candidateIds = Array.from(this.localPointsById.values())
-            .filter((pt) => {
-                const cfg = getDefaultPointConfig(pt.id);
-                if (cfg && cfg.selectable === false) {
-                    return false;
-                }
-                return true;
-            })
-            .map((pt) => pt.id);
-
-        if (candidateIds.length === 0) {
-            return null;
-        }
-
-        const randomId = candidateIds[Math.floor(Math.random() * candidateIds.length)];
-        return randomId;
-    }
-
-    public pickDistinctTargetIds(count: number): string[] | null {
-        const candidateIds = Array.from(this.localPointsById.values())
-            .filter((pt) => {
-                const cfg = getDefaultPointConfig(pt.id);
-                if (cfg && cfg.selectable === false) {
-                    return false;
-                }
-                return true;
-            })
-            .map((pt) => pt.id);
-
-        if (candidateIds.length < count) {
-            return null;
-        }
-
-        // Shuffle and take first `count` elements
-        const shuffled = [...candidateIds].sort(() => Math.random() - 0.5);
-        return shuffled.slice(0, count);
+    public pickAngularDistributedIds(count: number): string[] {
+        return selectPointsByAngularDistance(DEFAULT_POINT_CONFIGS, count);
     }
 
     public ensureTaskTarget(taskId: TaskId = this.activeTaskId) {
@@ -425,6 +395,8 @@ export class SyncManager2D implements PointIdProvider {
         this.resetAllPointColors();
 
         const taskState = createInitialTask1State(this);
+        console.log("Initial Task 1 state:", taskState);
+        console.log(taskState.preselectedIndex, taskState.preselectedPointIds);
         if (!taskState) {
             console.warn("Unable to start Task 1: no selectable points");
             return;
@@ -636,6 +608,7 @@ export class SyncManager2D implements PointIdProvider {
             }
             p.resetToBaseColor();
             p.setSelectable(true);
+            this.transactPointUpdate(p);
         }
     }
 
@@ -676,10 +649,8 @@ export class SyncManager2D implements PointIdProvider {
         this.setActiveTask(taskId as TaskId);
         this.resetAllPointColors();
 
-        const randomId = this.pickRandomTargetId();
-        if (!randomId) {
-            return;
-        }
+        const pointIds = this.pickAngularDistributedIds(1);
+        const randomId = pointIds[0];
 
         const hintSide = trial === 1 || trial === 3 ? "2d" : "3d";
         const taskState = createTaskState(taskId, randomId, trial, hintSide);
@@ -835,6 +806,22 @@ export class SyncManager2D implements PointIdProvider {
         if (pending && taskState) {
             payload.calibrationTaskId = taskState.id as TaskId;
             payload.calibrationTrial = taskState.trial;
+
+            // Neutralize the just-completed task state so highlights from the previous
+            // trial do not re-appear during calibration. Keep identifiers/trial numbers
+            // so flow decisions still work after calibration.
+            const neutralized: TaskState = {
+                ...taskState,
+                targetPointId2D: null,
+                targetPointId3D: null,
+                feedback: "none",
+                clicked2D: false,
+                clicked3D: false,
+                errorPointId2D: null,
+                errorPointId3D: null,
+            };
+            this.taskMap.set(taskState.id as TaskId, neutralized);
+            this.currentTask = neutralized;
         }
         this.updatingMeta = true;
         this.taskMetaMap.set("calibration", payload);

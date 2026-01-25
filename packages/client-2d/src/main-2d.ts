@@ -315,7 +315,6 @@ window.addEventListener("keydown", (ev) => {
             const [nx, ny] = syncManager.getProjectionManager().project(p.pos3d);
             p.nx = nx;
             p.ny = ny;
-            console.log(p.pos3d);
         }
 
         const projectionType = syncManager.getProjectionManager().getCurrentProjectionType();
