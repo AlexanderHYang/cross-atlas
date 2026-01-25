@@ -27,11 +27,12 @@ The `npm run dev` script supports a few flags that map to Vite env vars:
 - `--layout=<spherical|semiSpherical|planar>` (alias `--layout-type=<...>`): select the generated point layout.
 - `--tasks=<digits>` or `--task=<digits>`: enable specific tasks by number (e.g. `--tasks=1` for Task 1 only, `--tasks=13` for Tasks 1 and 3).
 - `--require-calibration-orientation=<true|false>` (alias `--calibration-orientation=<true|false>`): require the 3D user to face the landmark during calibration.
+- `--random-selection=<true|false>`: use randomized angular-distance sampling instead of the precomputed point selections.
 
 Example:
 
 ```bash
-npm run dev -- --projection=pca --layout=planar --tasks=1 --require-calibration-orientation=false
+npm run dev -- --projection=pca --layout=planar --tasks=1 --require-calibration-orientation=false --random-selection=true
 ```
 
 3. Demo

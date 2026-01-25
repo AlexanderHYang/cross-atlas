@@ -144,6 +144,7 @@ function parseArguments() {
     let tasksArg;
     let calibrationOrientationArg;
     let layoutArg;
+    let randomSelectionArg;
 
     for (const arg of args) {
         // parse --projection option
@@ -189,6 +190,10 @@ function parseArguments() {
         ) {
             calibrationOrientationArg = arg.split("=")[1];
         }
+
+        if (arg.startsWith("--random-selection=")) {
+            randomSelectionArg = arg.split("=")[1];
+        }
     }
 
     const envTasks =
@@ -225,6 +230,16 @@ function parseArguments() {
         process.env.npm_config_layout;
     if (envLayout !== undefined) {
         envVars["VITE_LAYOUT_TYPE"] = envLayout;
+    }
+
+    const envRandomSelection =
+        randomSelectionArg ??
+        process.env.VITE_RANDOM_SELECTION ??
+        process.env.RANDOM_SELECTION ??
+        process.env.random_selection ??
+        process.env.npm_config_random_selection;
+    if (envRandomSelection !== undefined) {
+        envVars["VITE_RANDOM_SELECTION"] = envRandomSelection;
     }
 
     return envVars;

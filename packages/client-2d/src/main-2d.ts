@@ -155,7 +155,7 @@ function getAngularDistanceDegrees(pointId: string): number | null {
     }
     const position = new Vector3(config.direction.x, config.direction.y, config.direction.z);
     const angularRad = Vector3.GetAngleBetweenVectors(position, LANDMARK_POS, Vector3.Up());
-    const degrees = (angularRad * 180) / Math.PI;
+    const degrees = Math.abs((angularRad * 180) / Math.PI);
     return Number.parseFloat(degrees.toFixed(ANGLE_PRECISION));
 }
 

@@ -7,6 +7,7 @@ import {
     Trial7Assignment,
 } from "../../shared/src/tasks";
 import { layoutType } from "../../shared/src/defaultPoints";
+import { isRandomSelectionEnabled } from "../../shared/src/pointSelections";
 
 // Angular velocity gating parameters for cumulative rotation
 const ROTATION_SAMPLE_INTERVAL_MS = 100; // Expected 10Hz sampling
@@ -104,8 +105,12 @@ export class Logger2D {
     constructor(syncManager: SyncManager2D) {
         this.syncManager = syncManager;
         this.sessionId = Logger2D.createSessionId();
+        const selectionMode = isRandomSelectionEnabled() ? "random" : "precomputed";
+        const projection = this.syncManager.getProjectionManager().getCurrentProjectionType();
+        const timestamp = new Date().toISOString();
         this.queueText(
-            `=== [${new Date().toISOString()}] study_start session=${this.sessionId} ===\n`,
+            `=== [${timestamp}] study_start session=${this.sessionId} ` +
+                `selection_mode=${selectionMode} layout=${layoutType} projection=${projection} ===\n`,
         );
         // Write time-series header
         this.queueTimeSeries(

@@ -30,6 +30,10 @@ import {
 } from "../../shared/src/tasks";
 import { DEFAULT_POINT_CONFIGS, getDefaultPointConfig } from "../../shared/src/defaultPoints";
 import { selectPointsByAngularDistance } from "../../shared/src/angularPointSelection";
+import {
+    getPrecomputedTrialSelection,
+    isRandomSelectionEnabled,
+} from "../../shared/src/pointSelections";
 import { TimedLogEvent } from "../../shared/src/logging";
 
 const TASK3_NEUTRAL_COLOR = new BABYLON.Color3(1, 1, 1);
@@ -505,7 +509,10 @@ export class SyncManager3D implements PointIdProvider {
 
     public setTrial(trial: 1 | 2 | 3 | 4, taskId: string = TASK1_ID) {
         this.setActiveTask(taskId as TaskId);
-        const pointIds = this.pickAngularDistributedIds(1);
+        const precomputed = !isRandomSelectionEnabled()
+            ? getPrecomputedTrialSelection(trial)
+            : null;
+        const pointIds = precomputed ?? this.pickAngularDistributedIds(1);
         const nextTarget = pointIds[0];
 
         const hintSide = trial === 1 || trial === 3 ? "2d" : "3d";

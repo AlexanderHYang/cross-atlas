@@ -32,6 +32,10 @@ import {
 } from "../../shared/src/tasks";
 import { DEFAULT_POINT_CONFIGS, getDefaultPointConfig } from "../../shared/src/defaultPoints";
 import { selectPointsByAngularDistance } from "../../shared/src/angularPointSelection";
+import {
+    getPrecomputedTrialSelection,
+    isRandomSelectionEnabled,
+} from "../../shared/src/pointSelections";
 import { Vector3 } from "@babylonjs/core";
 import { PCAProjection, ProjectionManager } from "./ProjectionManager";
 import { TimedLogEvent } from "../../shared/src/logging";
@@ -649,7 +653,10 @@ export class SyncManager2D implements PointIdProvider {
         this.setActiveTask(taskId as TaskId);
         this.resetAllPointColors();
 
-        const pointIds = this.pickAngularDistributedIds(1);
+        const precomputed = !isRandomSelectionEnabled()
+            ? getPrecomputedTrialSelection(trial)
+            : null;
+        const pointIds = precomputed ?? this.pickAngularDistributedIds(1);
         const randomId = pointIds[0];
 
         const hintSide = trial === 1 || trial === 3 ? "2d" : "3d";

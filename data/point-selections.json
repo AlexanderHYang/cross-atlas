@@ -1,0 +1,806 @@
+[
+  {
+    "layout": "spherical",
+    "projection": "equirectangular",
+    "trial": 1,
+    "points": [
+      "point13"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "equirectangular",
+    "trial": 2,
+    "points": [
+      "point18"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "equirectangular",
+    "trial": 3,
+    "points": [
+      "point6"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "equirectangular",
+    "trial": 4,
+    "points": [
+      "point7"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "equirectangular",
+    "trial": 5,
+    "points": [
+      "point14",
+      "point2"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "equirectangular",
+    "trial": 6,
+    "points": [
+      "point20",
+      "point7"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "equirectangular",
+    "trial": 7,
+    "points": [
+      "point14",
+      "point15",
+      "point18",
+      "point19",
+      "point2",
+      "point21",
+      "point24",
+      "point29",
+      "point30",
+      "point9"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "pca",
+    "trial": 1,
+    "points": [
+      "point17"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "pca",
+    "trial": 2,
+    "points": [
+      "point27"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "pca",
+    "trial": 3,
+    "points": [
+      "point29"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "pca",
+    "trial": 4,
+    "points": [
+      "point30"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "pca",
+    "trial": 5,
+    "points": [
+      "point15",
+      "point18"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "pca",
+    "trial": 6,
+    "points": [
+      "point28",
+      "point30"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "pca",
+    "trial": 7,
+    "points": [
+      "point12",
+      "point14",
+      "point15",
+      "point16",
+      "point18",
+      "point2",
+      "point26",
+      "point29",
+      "point30",
+      "point7"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "vertical",
+    "trial": 1,
+    "points": [
+      "point2"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "vertical",
+    "trial": 2,
+    "points": [
+      "point3"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "vertical",
+    "trial": 3,
+    "points": [
+      "point30"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "vertical",
+    "trial": 4,
+    "points": [
+      "point5"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "vertical",
+    "trial": 5,
+    "points": [
+      "point11",
+      "point18"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "vertical",
+    "trial": 6,
+    "points": [
+      "point2",
+      "point7"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "vertical",
+    "trial": 7,
+    "points": [
+      "point10",
+      "point12",
+      "point15",
+      "point18",
+      "point19",
+      "point2",
+      "point29",
+      "point30",
+      "point5",
+      "point7"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "horizontal",
+    "trial": 1,
+    "points": [
+      "point17"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "horizontal",
+    "trial": 2,
+    "points": [
+      "point18"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "horizontal",
+    "trial": 3,
+    "points": [
+      "point19"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "horizontal",
+    "trial": 4,
+    "points": [
+      "point8"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "horizontal",
+    "trial": 5,
+    "points": [
+      "point18",
+      "point2"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "horizontal",
+    "trial": 6,
+    "points": [
+      "point25",
+      "point30"
+    ]
+  },
+  {
+    "layout": "spherical",
+    "projection": "horizontal",
+    "trial": 7,
+    "points": [
+      "point14",
+      "point17",
+      "point18",
+      "point19",
+      "point2",
+      "point21",
+      "point22",
+      "point23",
+      "point4",
+      "point5"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "equirectangular",
+    "trial": 1,
+    "points": [
+      "point12"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "equirectangular",
+    "trial": 2,
+    "points": [
+      "point19"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "equirectangular",
+    "trial": 3,
+    "points": [
+      "point2"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "equirectangular",
+    "trial": 4,
+    "points": [
+      "point8"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "equirectangular",
+    "trial": 5,
+    "points": [
+      "point10",
+      "point16"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "equirectangular",
+    "trial": 6,
+    "points": [
+      "point18",
+      "point5"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "equirectangular",
+    "trial": 7,
+    "points": [
+      "point10",
+      "point15",
+      "point17",
+      "point20",
+      "point22",
+      "point23",
+      "point27",
+      "point29",
+      "point3",
+      "point5"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "pca",
+    "trial": 1,
+    "points": [
+      "point16"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "pca",
+    "trial": 2,
+    "points": [
+      "point3"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "pca",
+    "trial": 3,
+    "points": [
+      "point30"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "pca",
+    "trial": 4,
+    "points": [
+      "point8"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "pca",
+    "trial": 5,
+    "points": [
+      "point17",
+      "point2"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "pca",
+    "trial": 6,
+    "points": [
+      "point23",
+      "point27"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "pca",
+    "trial": 7,
+    "points": [
+      "point11",
+      "point16",
+      "point18",
+      "point19",
+      "point21",
+      "point23",
+      "point25",
+      "point28",
+      "point6",
+      "point8"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "vertical",
+    "trial": 1,
+    "points": [
+      "point14"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "vertical",
+    "trial": 2,
+    "points": [
+      "point23"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "vertical",
+    "trial": 3,
+    "points": [
+      "point3"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "vertical",
+    "trial": 4,
+    "points": [
+      "point7"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "vertical",
+    "trial": 5,
+    "points": [
+      "point14",
+      "point20"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "vertical",
+    "trial": 6,
+    "points": [
+      "point22",
+      "point9"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "vertical",
+    "trial": 7,
+    "points": [
+      "point13",
+      "point14",
+      "point17",
+      "point19",
+      "point20",
+      "point22",
+      "point24",
+      "point27",
+      "point28",
+      "point7"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "horizontal",
+    "trial": 1,
+    "points": [
+      "point17"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "horizontal",
+    "trial": 2,
+    "points": [
+      "point22"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "horizontal",
+    "trial": 3,
+    "points": [
+      "point24"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "horizontal",
+    "trial": 4,
+    "points": [
+      "point25"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "horizontal",
+    "trial": 5,
+    "points": [
+      "point15",
+      "point26"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "horizontal",
+    "trial": 6,
+    "points": [
+      "point3",
+      "point8"
+    ]
+  },
+  {
+    "layout": "semiSpherical",
+    "projection": "horizontal",
+    "trial": 7,
+    "points": [
+      "point10",
+      "point15",
+      "point16",
+      "point18",
+      "point19",
+      "point20",
+      "point26",
+      "point4",
+      "point8",
+      "point9"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "equirectangular",
+    "trial": 1,
+    "points": [
+      "point10"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "equirectangular",
+    "trial": 2,
+    "points": [
+      "point14"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "equirectangular",
+    "trial": 3,
+    "points": [
+      "point2"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "equirectangular",
+    "trial": 4,
+    "points": [
+      "point6"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "equirectangular",
+    "trial": 5,
+    "points": [
+      "point10",
+      "point14"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "equirectangular",
+    "trial": 6,
+    "points": [
+      "point27",
+      "point28"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "equirectangular",
+    "trial": 7,
+    "points": [
+      "point10",
+      "point11",
+      "point13",
+      "point14",
+      "point15",
+      "point20",
+      "point21",
+      "point26",
+      "point5",
+      "point9"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "pca",
+    "trial": 1,
+    "points": [
+      "point15"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "pca",
+    "trial": 2,
+    "points": [
+      "point17"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "pca",
+    "trial": 3,
+    "points": [
+      "point19"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "pca",
+    "trial": 4,
+    "points": [
+      "point8"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "pca",
+    "trial": 5,
+    "points": [
+      "point15",
+      "point3"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "pca",
+    "trial": 6,
+    "points": [
+      "point4",
+      "point5"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "pca",
+    "trial": 7,
+    "points": [
+      "point16",
+      "point17",
+      "point18",
+      "point19",
+      "point2",
+      "point21",
+      "point22",
+      "point3",
+      "point4",
+      "point7"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "vertical",
+    "trial": 1,
+    "points": [
+      "point10"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "vertical",
+    "trial": 2,
+    "points": [
+      "point12"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "vertical",
+    "trial": 3,
+    "points": [
+      "point16"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "vertical",
+    "trial": 4,
+    "points": [
+      "point2"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "vertical",
+    "trial": 5,
+    "points": [
+      "point18",
+      "point19"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "vertical",
+    "trial": 6,
+    "points": [
+      "point21",
+      "point7"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "vertical",
+    "trial": 7,
+    "points": [
+      "point10",
+      "point13",
+      "point14",
+      "point16",
+      "point20",
+      "point23",
+      "point25",
+      "point27",
+      "point30",
+      "point9"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "horizontal",
+    "trial": 1,
+    "points": [
+      "point14"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "horizontal",
+    "trial": 2,
+    "points": [
+      "point20"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "horizontal",
+    "trial": 3,
+    "points": [
+      "point22"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "horizontal",
+    "trial": 4,
+    "points": [
+      "point29"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "horizontal",
+    "trial": 5,
+    "points": [
+      "point17",
+      "point22"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "horizontal",
+    "trial": 6,
+    "points": [
+      "point30",
+      "point4"
+    ]
+  },
+  {
+    "layout": "planar",
+    "projection": "horizontal",
+    "trial": 7,
+    "points": [
+      "point11",
+      "point15",
+      "point19",
+      "point21",
+      "point22",
+      "point24",
+      "point27",
+      "point3",
+      "point30",
+      "point5"
+    ]
+  }
+]
