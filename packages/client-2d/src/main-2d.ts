@@ -21,7 +21,6 @@ const canvas = document.createElement("canvas");
 canvas.id = "points-canvas";
 canvas.style.position = "absolute";
 canvas.style.left = "50%";
-canvas.style.top = "50%";
 canvas.style.transform = "translate(-50%, -50%)";
 canvas.style.display = "block";
 canvas.style.background = DASHBOARD_BG;
@@ -82,6 +81,8 @@ html, body { height:100%; background: ${DASHBOARD_BG}; }
 document.head.appendChild(style);
 
 const ctx = canvas.getContext("2d")!;
+const TOP_UI_HEIGHT = 80;
+const TOP_UI_GAP = 12;
 const SUCCESS_COLOR_VEC = new Vector3(0x2e / 255, 0xcc / 255, 0x71 / 255);
 const ERROR_COLOR_VEC = new Vector3(0xc0 / 255, 0x39 / 255, 0x2b / 255);
 const colorConfig2D: TaskColorConfig2D = {
@@ -329,13 +330,16 @@ function resize() {
     const dpr = window.devicePixelRatio || 1;
     // Make canvas a large but not full-screen area, centered with margins
     const maxW = Math.max(500, Math.min(window.innerWidth - 80, 1600));
-    const maxH = Math.max(400, Math.min(window.innerHeight - 80, 1000));
+    const reservedTop = TOP_UI_HEIGHT;
+    const availableHeight = Math.max(200, window.innerHeight - reservedTop - TOP_UI_GAP - 40);
+    const maxH = Math.max(300, Math.min(availableHeight, 1000));
     width = Math.floor(maxW);
     height = Math.floor(maxH);
     canvas.width = Math.floor(width * dpr);
     canvas.height = Math.floor(height * dpr);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    canvas.style.top = `${reservedTop + TOP_UI_GAP + height / 2}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 window.addEventListener("resize", resize);

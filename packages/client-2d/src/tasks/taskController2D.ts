@@ -23,6 +23,7 @@ export type TaskController2DDeps = {
     successColor: Vector3;
     errorColor: Vector3;
     ui: TaskUIRefs;
+    onLayoutChange?: () => void;
     drawAll: () => void;
 };
 
@@ -49,6 +50,7 @@ export class TaskController2D {
             instructionBox.textContent = "";
             instructionBox.style.display = "none";
         }
+        this.deps.onLayoutChange?.();
         console.debug("2D Task state changed:", {
             trial,
             targetPointId2D: taskState?.targetPointId2D,
