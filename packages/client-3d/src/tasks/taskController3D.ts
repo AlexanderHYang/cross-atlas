@@ -25,7 +25,6 @@ export type TaskController3DDeps = {
 };
 
 export class TaskController3D {
-    private trialTransitionHandle: number | null = null;
     private lastTrial: number | null = null;
     private lastColorPairIndex: number | null = null;
     private lastProcessedErrorPointId2D: string | null = null;
@@ -92,9 +91,6 @@ export class TaskController3D {
             case "task1":
                 if (selection.isCorrect) {
                     this.deps.syncManager.markGuessTrialSuccess(task.id);
-                    if (selection.advanceTrial) {
-                        this.scheduleNextTrialFrom3D(task.trial, task.id);
-                    }
                 }
                 break;
             case "task2":
@@ -197,26 +193,6 @@ export class TaskController3D {
             p.resetToBaseColor();
             p.setSelectable(true);
         }
-    }
-
-    private scheduleNextTrialFrom3D(currentTrial: number, taskId: string) {
-        if (this.deps.syncManager.isCalibrationPending()) {
-            return;
-        }
-        if (this.trialTransitionHandle !== null) {
-            window.clearTimeout(this.trialTransitionHandle);
-        }
-        this.trialTransitionHandle = window.setTimeout(() => {
-            this.trialTransitionHandle = null;
-            if (this.deps.syncManager.isCalibrationPending()) {
-                return;
-            }
-            if (currentTrial === 1) {
-                this.deps.syncManager.setTrial(2, taskId);
-            } else if (currentTrial === 3) {
-                this.deps.syncManager.setTrial(4, taskId);
-            }
-        }, 2000);
     }
 
     private clearVrHintGlow() {
