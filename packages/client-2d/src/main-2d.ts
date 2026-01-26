@@ -1,6 +1,7 @@
 import { Logger, Vector3 } from "@babylonjs/core";
 import { Point2D } from "./Point2D";
 import { SyncManager2D } from "./SyncManager2D";
+import { PCAProjection } from "./ProjectionManager";
 import {
     DEFAULT_POINT_CONFIGS,
     DEFAULT_SPHERE_RADIUS,
@@ -218,6 +219,14 @@ for (const cfg of DEFAULT_POINT_CONFIGS) {
     point.nx = 0;
     point.ny = 0;
     syncManager.registerPoint(point);
+}
+
+// If using PCA projection, update the principal components with all points
+if (syncManager.getProjectionManager().getCurrentProjectionType() === "pca") {
+    const pcaProjection = syncManager
+        .getProjectionManager()
+        .getCurrentProjection() as PCAProjection;
+    pcaProjection.updatePCA(syncManager.getLocalPoints().map((p) => p.pos3d));
 }
 
 // Compute scale factors for all projections based on 3D point positions
