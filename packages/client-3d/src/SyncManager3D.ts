@@ -497,6 +497,31 @@ export class SyncManager3D implements PointIdProvider {
     }
 
     /**
+     * Handle Task 1 trial clicks from the 3D side (trials 1 or 3).
+     * Updates error sync on incorrect clicks so both sides show the same error sphere.
+     */
+    public handleTask1Click3D(
+        isCorrect: boolean,
+        selectedPointId: string,
+        taskId: string = TASK1_ID
+    ) {
+        const existing = this.normalizeTaskState(this.taskMap.get(taskId));
+        if (!existing || (existing.trial !== 1 && existing.trial !== 3)) return;
+        if (existing.completed) return;
+
+        const result = handleTask1Selection3D(existing, selectedPointId);
+        const updated = result.updated;
+
+        this.taskMap.set(taskId, updated);
+        this.currentTask = updated;
+        this.notifyTaskListeners();
+
+        if (result.shouldTransition) {
+            this.scheduleNextTransition(updated);
+        }
+    }
+
+    /**
      * Handle Task 2 collaborative trial clicks from the 3D side.
      */
     public handleTask2Click3D(
@@ -666,8 +691,6 @@ export class SyncManager3D implements PointIdProvider {
      * Start Task 2 from the beginning
      */
     private startTask2() {
-        this.setActiveTask(TASK2_ID);
-
         const taskState = createInitialTask2State(this, {
             projection: this.getSelectionProjection(),
         });
@@ -678,6 +701,7 @@ export class SyncManager3D implements PointIdProvider {
 
         this.taskMap.set(TASK2_ID, taskState);
         this.currentTask = taskState;
+        this.setActiveTask(TASK2_ID);
         this.notifyTaskListeners();
     }
 
@@ -685,8 +709,6 @@ export class SyncManager3D implements PointIdProvider {
      * Start Task 3 from the beginning
      */
     private startTask3() {
-        this.setActiveTask(TASK3_ID);
-
         const taskState = createInitialTask3State(this, 5, {
             projection: this.getSelectionProjection(),
         });
@@ -698,6 +720,7 @@ export class SyncManager3D implements PointIdProvider {
         this.setNeutralColorsForTask3(taskState.trial7Assignments);
         this.taskMap.set(TASK3_ID, taskState);
         this.currentTask = taskState;
+        this.setActiveTask(TASK3_ID);
         this.notifyTaskListeners();
     }
 

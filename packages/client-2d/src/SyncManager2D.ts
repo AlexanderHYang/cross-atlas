@@ -455,7 +455,6 @@ export class SyncManager2D implements PointIdProvider {
      * Start Task 1 from the beginning
      */
     private startTask1() {
-        this.setActiveTask(TASK1_ID);
         this.resetAllPointColors();
 
         const taskState = createInitialTask1State(this, {
@@ -470,6 +469,7 @@ export class SyncManager2D implements PointIdProvider {
 
         this.taskMap.set(TASK1_ID, taskState);
         this.currentTask = taskState;
+        this.setActiveTask(TASK1_ID);
         this.notifyTaskListeners();
     }
 
@@ -477,7 +477,6 @@ export class SyncManager2D implements PointIdProvider {
      * Start Task 2 from the beginning
      */
     private startTask2() {
-        this.setActiveTask(TASK2_ID);
         this.resetAllPointColors();
 
         const taskState = createInitialTask2State(this, {
@@ -490,6 +489,7 @@ export class SyncManager2D implements PointIdProvider {
 
         this.taskMap.set(TASK2_ID, taskState);
         this.currentTask = taskState;
+        this.setActiveTask(TASK2_ID);
         this.notifyTaskListeners();
     }
 
@@ -497,7 +497,6 @@ export class SyncManager2D implements PointIdProvider {
      * Start Task 3 from the beginning
      */
     private startTask3() {
-        this.setActiveTask(TASK3_ID);
         this.resetAllPointColors();
 
         const taskState = createInitialTask3State(this, 5, {
@@ -511,6 +510,7 @@ export class SyncManager2D implements PointIdProvider {
         this.setNeutralColorsForTask3(taskState.trial7Assignments);
         this.taskMap.set(TASK3_ID, taskState);
         this.currentTask = taskState;
+        this.setActiveTask(TASK3_ID);
         this.notifyTaskListeners();
     }
 
@@ -684,6 +684,10 @@ export class SyncManager2D implements PointIdProvider {
                 p.pos3d = new Vector3(cfg.direction.x, cfg.direction.y, cfg.direction.z);
             }
         }
+    }
+
+    public resetTask3NeutralColors(assignments?: TaskState["trial7Assignments"] | null) {
+        this.setNeutralColorsForTask3(assignments);
     }
 
     private setNeutralColorsForTask3(assignments?: TaskState["trial7Assignments"] | null) {

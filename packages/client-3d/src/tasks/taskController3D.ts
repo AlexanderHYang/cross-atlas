@@ -4,6 +4,7 @@ import {
     applyTaskVisuals3D,
     evaluateSelection3D,
     getTaskAndTrial,
+    isTask1Trial,
     isTask2Trial,
     isTask3Trial,
 } from "../../../shared/src/tasks";
@@ -83,9 +84,11 @@ export class TaskController3D {
 
         switch (selection.stateUpdate) {
             case "task1":
-                if (selection.isCorrect) {
-                    this.deps.syncManager.markGuessTrialSuccess(task.id);
-                }
+                this.deps.syncManager.handleTask1Click3D(
+                    !!selection.isCorrect,
+                    point.id,
+                    task.id
+                );
                 break;
             case "task2":
                 this.deps.syncManager.handleTask2Click3D(
@@ -150,7 +153,7 @@ export class TaskController3D {
         });
         this.applyVrHintGlow(task);
 
-        const isErrorSyncTrial = isTask2Trial(trial) || isTask3Trial(trial);
+        const isErrorSyncTrial = isTask1Trial(trial) || isTask2Trial(trial) || isTask3Trial(trial);
         if (isErrorSyncTrial) {
             const remoteErrorPointId = task?.errorPointId2D ?? null;
             if (remoteErrorPointId !== this.lastProcessedErrorPointId2D) {

@@ -5,6 +5,7 @@ import {
     evaluateSelection2D,
     getInstructionForTask,
     getTaskAndTrial,
+    isTask1Trial,
     isTask2Trial,
     isTask3Trial,
 } from "../../../shared/src/tasks";
@@ -81,9 +82,13 @@ export class TaskController2D {
             this.lastProcessedErrorPointId3D = null;
         }
 
+        if (isTask3Trial(trial) && this.lastTrial !== 7) {
+            this.deps.syncManager.resetTask3NeutralColors(taskState?.trial7Assignments);
+        }
+
         applyTaskVisuals2D(taskState, this.deps.syncManager.getLocalPoints());
 
-        const isErrorSyncTrial = isTask2Trial(trial) || isTask3Trial(trial);
+        const isErrorSyncTrial = isTask1Trial(trial) || isTask2Trial(trial) || isTask3Trial(trial);
         if (isErrorSyncTrial) {
             const remoteErrorPointId = taskState?.errorPointId3D ?? null;
             if (remoteErrorPointId !== this.lastProcessedErrorPointId3D) {

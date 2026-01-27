@@ -78,11 +78,21 @@ export function handleTask1Selection3D(
             ...currentState,
             feedback: "success",
             completed: true,
+            errorPointId3D: null,
+            errorPointId2D: null,
         };
         return { updated, isCorrect: true, shouldTransition: true };
     }
 
-    return { updated: currentState, isCorrect: false, shouldTransition: false };
+    const updated: TaskState = {
+        ...currentState,
+        feedback: "error",
+        completed: false,
+        errorPointId3D: selectedPointId,
+        errorPointId2D: null,
+    };
+
+    return { updated, isCorrect: false, shouldTransition: false };
 }
 
 /**
@@ -106,6 +116,8 @@ export function handleTask1Selection2D(
         ...currentState,
         feedback: isCorrect ? "success" : "error",
         completed: isCorrect,
+        errorPointId2D: isCorrect ? null : selectedPointId,
+        errorPointId3D: null,
     };
 
     return { updated, isCorrect, shouldTransition: isCorrect };
