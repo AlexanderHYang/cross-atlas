@@ -13,6 +13,7 @@ import {
     getCurrentProjectionIndex,
     getCounterbalanceConfig,
     getTotalProjections,
+    COUNTERBALANCE_SEQUENCES,
 } from "../../shared/src/counterbalance";
 
 // Angular velocity gating parameters for cumulative rotation
@@ -132,6 +133,31 @@ export class Logger2D {
             `=== [${timestamp}] study_start session=${this.sessionId} ` +
                 `selection_mode=${selectionMode} layout=${layoutType} projection=${projection}${counterbalanceInfo} ===\n`,
         );
+
+        // Log counterbalance sequence details if enabled
+        if (isCounterbalanceEnabled()) {
+            const cbConfig = getCounterbalanceConfig();
+            const sequence = COUNTERBALANCE_SEQUENCES[cbConfig.sequence];
+            const sequenceStr = sequence.join(" → ");
+            this.queueText(
+                `Counterbalance sequence S${cbConfig.sequence}: ${sequenceStr}\n\n`,
+            );
+        }
+
+        // Log the first projection header
+        if (isCounterbalanceEnabled()) {
+            const projIndex = getCurrentProjectionIndex();
+            const lines: string[] = [];
+            lines.push("=".repeat(80));
+            lines.push(
+                `=== [${timestamp}] projection_start projection=${projection} layout=${layoutType} ===`,
+            );
+            lines.push(`=== Projection ${projIndex + 1}/${getTotalProjections()}: ${projection.toUpperCase()} ===`);
+            lines.push("=".repeat(80));
+            lines.push("");
+            this.queueText(`${lines.join("\n")}\n`);
+        }
+
         // Write time-series header
         this.queueTimeSeries(
             `=== Time Series Data session=${this.sessionId} ===\n` +
@@ -1017,6 +1043,28 @@ export class Logger2D {
         this.finalized = false;
         this.suppressLifecycleLogs = false;
         this.currentProjectionIndex = getCurrentProjectionIndex();
+    }
+
+    /**
+     * Log the start of a new projection session in counterbalance mode.
+     * This creates a clear visual header in the log file.
+     */
+    public logProjectionStart(
+        projection: string,
+        projectionIndex: number,
+        totalProjections: number,
+    ) {
+        const timestamp = Logger2D.formatLocalTimestamp(new Date());
+        const lines: string[] = [];
+        lines.push("");
+        lines.push("=".repeat(80));
+        lines.push(
+            `=== [${timestamp}] projection_start projection=${projection} layout=${layoutType} ===`,
+        );
+        lines.push(`=== Projection ${projectionIndex}/${totalProjections}: ${projection.toUpperCase()} ===`);
+        lines.push("=".repeat(80));
+        lines.push("");
+        this.queueText(`${lines.join("\n")}\n`);
     }
 
     public finalizeStudy() {

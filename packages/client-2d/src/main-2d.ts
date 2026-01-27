@@ -315,6 +315,7 @@ syncManager.onStudyStartedChange((started) => {
         const totalProj = getTotalProjections();
 
         logger2d.resetForNewProjection();
+        logger2d.logProjectionStart(nextProjection, projIndex + 1, totalProj);
         loggedSelectionTasks.clear();
         syncManager.switchProjectionAndRestartTasks(nextProjection);
         updateInfoBox();
