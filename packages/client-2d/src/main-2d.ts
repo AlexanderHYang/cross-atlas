@@ -19,6 +19,18 @@ import {
 } from "../../shared/src/tasks";
 import { Logger2D } from "./Logger2d";
 import { TaskController2D } from "./tasks/taskController2D";
+import {
+    parseCounterbalanceFlag,
+    setCounterbalanceConfig,
+    isCounterbalanceEnabled,
+    getCurrentCounterbalanceProjection,
+    advanceToNextProjection,
+    hasMoreProjections,
+    getCurrentProjectionIndex,
+    getTotalProjections,
+    isProjectionTransitioning,
+    setProjectionTransitioning,
+} from "../../shared/src/counterbalance";
 
 const DASHBOARD_BG = "#707070";
 
@@ -49,25 +61,30 @@ html, body { height:100%; background: ${DASHBOARD_BG}; }
 	padding: 10px 14px;
 	background: linear-gradient(135deg, rgba(60, 120, 180, 0.4), rgba(40, 80, 140, 0.4));
 	color: #e0f0ff;
-	font-family: sans-serif;
-	font-weight: 600;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	font-weight: 500;
 	border: 1.5px solid rgba(100, 180, 255, 0.5);
 	border-radius: 8px;
 	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.1);
 	font-size: 16px;
+	line-height: 1.5;
+	letter-spacing: 0.3px;
 }
 #instruction-box {
 	position: absolute;
 	top: 25px;
-	left: 190px;
+	left: 220px;
 	padding: 10px 14px;
 	background: linear-gradient(135deg, rgba(60, 120, 180, 0.4), rgba(40, 80, 140, 0.4));
 	color: #e0f0ff;
-	font-family: sans-serif;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	font-weight: 500;
 	border: 1.5px solid rgba(100, 180, 255, 0.5);
 	border-radius: 8px;
 	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.1);
 	font-size: 16px;
+	line-height: 1.5;
+	letter-spacing: 0.3px;
 }
 #info-box {
 	position: absolute;
@@ -76,13 +93,15 @@ html, body { height:100%; background: ${DASHBOARD_BG}; }
 	padding: 10px 14px;
 	background: linear-gradient(135deg, rgba(60, 120, 180, 0.4), rgba(40, 80, 140, 0.4));
 	color: #e0f0ff;
-	font-family: sans-serif;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	font-weight: 500;
 	border: 1.5px solid rgba(100, 180, 255, 0.5);
 	border-radius: 8px;
 	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.1);
 	text-align: right;
 	font-size: 16px;
 	line-height: 1.5;
+	letter-spacing: 0.3px;
 }
 `;
 document.head.appendChild(style);
@@ -103,6 +122,13 @@ if (tasksConfig) {
     setTaskFlowConfig(tasksConfig);
 }
 
+// Initialize counterbalance if flag is provided
+const counterbalanceFlag = (import.meta.env.VITE_COUNTERBALANCE as string | undefined)?.trim();
+const counterbalanceSequence = parseCounterbalanceFlag(counterbalanceFlag);
+if (counterbalanceSequence) {
+    setCounterbalanceConfig(counterbalanceSequence);
+}
+
 const trialBox = document.createElement("div");
 trialBox.id = "trial-box";
 trialBox.textContent = "Trial 1";
@@ -116,11 +142,20 @@ document.body.appendChild(instructionBox);
 const infoBox = document.createElement("div");
 infoBox.id = "info-box";
 infoBox.innerHTML =
-    "<span style='color: #5cf0ff; font-weight: 600;'>spherical</span> <span style='opacity: 0.5; margin: 0 8px;'>|</span> <span style='color: #5cf0ff; font-weight: 600;'>equirectangular</span>";
+    "Layout: <span style='color: #a8d5ff;'>spherical</span> <span style='opacity: 0.5; margin: 0 8px;'>|</span> Projection: <span style='color: #a8d5ff;'>equirectangular</span>";
 document.body.appendChild(infoBox);
 
 // create SyncManager
 const syncManager: SyncManager2D = await SyncManager2D.create();
+
+let initialProjectionOverride: ReturnType<typeof getCurrentCounterbalanceProjection> = null;
+// If counterbalance is enabled, set the initial projection from the sequence
+if (isCounterbalanceEnabled()) {
+    initialProjectionOverride = getCurrentCounterbalanceProjection();
+    if (initialProjectionOverride) {
+        console.log(`[Counterbalance] Setting initial projection: ${initialProjectionOverride}`);
+    }
+}
 
 // Get layout type for info box
 const layoutEnv = (import.meta.env.VITE_LAYOUT_TYPE as string | undefined)?.trim();
@@ -134,7 +169,7 @@ function getYOffset(): number {
 
 const updateInfoBox = () => {
     const projectionType = syncManager.getProjectionManager().getCurrentProjectionType();
-    infoBox.innerHTML = `<span style='color: #5cf0ff; font-weight: 600;'>${layoutType}</span> <span style='opacity: 0.5; margin: 0 8px;'>|</span> <span style='color: #5cf0ff; font-weight: 600;'>${projectionType}</span>`;
+    infoBox.innerHTML = `Layout: <span style='color: #a8d5ff;'>${layoutType}</span> <span style='opacity: 0.5; margin: 0 8px;'>|</span> Projection: <span style='color: #a8d5ff;'>${projectionType}</span>`;
 };
 updateInfoBox();
 
@@ -267,9 +302,30 @@ if (!studyStarted) {
 syncManager.onStudyStartedChange((started) => {
     studyStarted = started;
     if (!started) {
+        syncManager.resetPointsToDefaultConfig();
         setWaitingUI();
         return;
     }
+
+    if (isCounterbalanceEnabled() && isProjectionTransitioning()) {
+        const nextProjection =
+            getCurrentCounterbalanceProjection() ??
+            syncManager.getProjectionManager().getCurrentProjectionType();
+        const projIndex = getCurrentProjectionIndex();
+        const totalProj = getTotalProjections();
+
+        logger2d.resetForNewProjection();
+        loggedSelectionTasks.clear();
+        syncManager.switchProjectionAndRestartTasks(nextProjection);
+        updateInfoBox();
+        instructionBox.style.display = "none";
+
+        console.log(
+            `[Counterbalance] Started projection ${projIndex + 1}/${totalProj}: ${nextProjection}`,
+        );
+        setProjectionTransitioning(false);
+    }
+
     logger2d.addLogEvent({
         eventName: "start_sequence_completed",
         eventDetails: { status: "started" },
@@ -288,6 +344,10 @@ syncManager.onTaskStateChange((taskState) => {
     if (!studyStarted) {
         return;
     }
+    if (taskState) {
+        const { taskNumber } = getTaskAndTrial(taskState.trial);
+        logPointSelectionIfNeeded(taskState, taskNumber);
+    }
     logger2d.logTaskLifecycle(taskState);
 });
 
@@ -301,6 +361,7 @@ syncManager.onCalibrationPendingChange((pending) => {
         setCalibrationUI();
         return;
     }
+
     syncManager.resetForNextTrial();
     awaitingNextTaskState = true;
 });
@@ -311,6 +372,10 @@ syncManager.onTaskStateChange((taskState) => {
     }
     if (awaitingNextTaskState) {
         awaitingNextTaskState = false;
+    }
+    // Don't update UI during projection transitions to preserve transition message
+    if (isProjectionTransitioning()) {
+        return;
     }
     taskController2D.handleTaskStateChange(taskState);
 });
@@ -373,31 +438,105 @@ syncManager.onTaskStateChange((taskState) => {
         });
     }
 
-    if (taskState.completed && determineNextAction(taskState).action === "all-complete") {
-        trialBox.textContent = "Session complete";
-        instructionBox.textContent = "Congrats, you have finished all the tasks in this session!";
-        instructionBox.style.display = "block";
-    }
-
     const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(taskState.trial);
     logger2d.setTrialContext(taskNumber, trialNumber, totalTrials);
-
-    const prevTaskNumber = lastTaskState ? getTaskAndTrial(lastTaskState.trial).taskNumber : null;
-    const taskChanged = prevTaskNumber === null || prevTaskNumber !== taskNumber;
-    if (taskChanged) {
-        logPointSelectionIfNeeded(taskState, taskNumber);
-    }
 
     const completedSuccessfully =
         taskState.feedback === "success" && taskState.completed && !lastTaskState?.completed;
 
     if (completedSuccessfully) {
         const action = determineNextAction(taskState);
+
+        // Log trial end for all completed trials (including trial 4)
         if (taskState.trial !== 7 || action.action === "all-complete") {
             logger2d.logTrialEnd(taskNumber, trialNumber, totalTrials);
         }
+
+        // Handle counterbalance projection transitions
         if (action.action === "all-complete") {
-            logger2d.finalizeStudy();
+            // Check if counterbalance mode is enabled and there are more projections
+            if (isCounterbalanceEnabled() && hasMoreProjections() && !isProjectionTransitioning()) {
+                // Set transitioning flag to prevent race conditions
+                setProjectionTransitioning(true);
+
+                const currentProjection = syncManager
+                    .getProjectionManager()
+                    .getCurrentProjectionType();
+                const currentProjIndex = getCurrentProjectionIndex();
+                const totalProj = getTotalProjections();
+                const nextProjection = advanceToNextProjection();
+
+                // Finalize current projection with old-style summary
+                logger2d.finalizeProjection(currentProjection, currentProjIndex + 1, totalProj);
+
+                if (nextProjection) {
+                    // Hide trial box during transition
+                    trialBox.style.display = "none";
+
+                    // Move instruction box to left position during transition
+                    instructionBox.style.left = "16px";
+
+                    // Set up countdown timer
+                    let countdown = 10;
+                    const updateTransitionMessage = () => {
+                        instructionBox.innerHTML = `Projection ${currentProjIndex + 1} of ${totalProj} complete <span style='opacity: 0.5; margin: 0 8px;'>|</span> Starting next projection (<span style='color: #a8d5ff;'>${nextProjection}</span>) in ${countdown}s`;
+                    };
+                    updateTransitionMessage();
+                    instructionBox.style.display = "block";
+
+                    const countdownInterval = window.setInterval(() => {
+                        countdown--;
+                        if (countdown > 0) {
+                            updateTransitionMessage();
+                        } else {
+                            window.clearInterval(countdownInterval);
+                        }
+                    }, 1000);
+
+                    // Leave a transition gap before applying the next projection and restarting
+                    window.setTimeout(() => {
+                        window.clearInterval(countdownInterval);
+                        syncManager.applyProjection(nextProjection);
+                        updateInfoBox();
+
+                        // Restore instruction box position
+                        instructionBox.style.left = "220px";
+
+                        // Show trial box again
+                        trialBox.style.display = "block";
+
+                        // Restart the study start sequence; on start completion we restart tasks
+                        syncManager.setStudyStarted(false);
+                    }, 10000);
+                }
+
+                lastTaskState = taskState;
+                return;
+            }
+
+            // All projections complete (or not in counterbalance mode)
+            if (isCounterbalanceEnabled()) {
+                // Finalize last projection
+                const currentProjection = syncManager
+                    .getProjectionManager()
+                    .getCurrentProjectionType();
+                const currentProjIndex = getCurrentProjectionIndex();
+                const totalProj = getTotalProjections();
+                logger2d.finalizeProjection(currentProjection, currentProjIndex + 1, totalProj);
+                logger2d.finalizeCounterbalanceStudy();
+
+                // Hide trial box and move instruction box to left
+                trialBox.style.display = "none";
+                instructionBox.style.left = "16px";
+                instructionBox.innerHTML = `<span style='color: #2ecc71; font-weight: 600;'>Study complete <span style='opacity: 0.5; margin: 0 8px;'>|</span> All ${totalProj} projections finished</span>`;
+            } else {
+                // Hide trial box and move instruction box to left
+                trialBox.style.display = "none";
+                instructionBox.style.left = "16px";
+                instructionBox.innerHTML = `<span style='color: #2ecc71; font-weight: 600;'>Session complete</span>`;
+                logger2d.finalizeStudy();
+            }
+            instructionBox.style.display = "block";
         }
     }
 

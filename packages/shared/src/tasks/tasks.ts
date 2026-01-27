@@ -1,4 +1,5 @@
 import { Color3, Vector3 } from "@babylonjs/core";
+import type { ProjectionType } from "../pointSelections";
 import {
     getTask1PointVisual2D,
     evaluateTask1Selection2D,
@@ -142,13 +143,13 @@ export type TaskState = {
      */
     targetPointId3D?: string | null;
     /**
-     * For syncing error flashes: the point ID that was incorrectly clicked by 2D.
-     * Set when 2D clicks the wrong point, cleared after the flash is shown.
+     * For syncing error highlights: the point ID that was incorrectly clicked by 2D.
+     * Set when 2D clicks the wrong point, cleared when corrected or replaced by a new error.
      */
     errorPointId2D?: string | null;
     /**
-     * For syncing error flashes: the point ID that was incorrectly clicked by 3D.
-     * Set when 3D clicks the wrong point, cleared after the flash is shown.
+     * For syncing error highlights: the point ID that was incorrectly clicked by 3D.
+     * Set when 3D clicks the wrong point, cleared when corrected or replaced by a new error.
      */
     errorPointId3D?: string | null;
     /**
@@ -229,6 +230,8 @@ export type TaskPoint2D = {
     getBaseColor(): Vector3;
     setColor(color: Vector3): void;
     flashColorSync(color: Vector3, durationMs: number): void;
+    setErrorHighlight(color: Vector3, glow?: boolean): void;
+    clearErrorHighlight(): void;
 };
 
 export type TaskPoint3D = {
@@ -241,6 +244,8 @@ export type TaskPoint3D = {
     resetToBaseColor(): void;
     getDefaultColor(): Color3;
     flashColorSynced(color: Color3, durationMs: number): void;
+    setErrorHighlight(color: Color3): void;
+    clearErrorHighlight(): void;
 };
 
 export const TASK_COLLECTION = "task";
@@ -257,6 +262,7 @@ export type TaskMeta = {
     calibrationPending?: boolean;
     calibrationTaskId?: TaskId;
     calibrationTrial?: TaskTrial;
+    projectionType?: ProjectionType;
 };
 
 export function createTaskState(
@@ -402,7 +408,7 @@ export function applyTaskVisuals3D(
     taskState: TaskState | null,
     pointsById: Map<string, TaskPoint3D>,
     colors: TaskColorConfig3D,
-    options?: { flashingPointId?: string | null; resetAllPointColors?: () => void }
+    options?: { resetAllPointColors?: () => void }
 ) {
     if (!taskState) return;
 
@@ -416,7 +422,7 @@ export function applyTaskVisuals3D(
     } else if (isTask2Trial(taskState.trial)) {
         applyTask2Visuals3D(taskState, pointsById, colors);
     } else if (isTask3Trial(taskState.trial)) {
-        applyTask3Visuals3D(taskState, pointsById, colors, options?.flashingPointId ?? null);
+        applyTask3Visuals3D(taskState, pointsById, colors);
     }
 }
 

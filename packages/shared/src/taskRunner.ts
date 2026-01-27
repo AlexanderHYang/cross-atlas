@@ -34,6 +34,7 @@ import {
     isTask3Complete,
 } from "./tasks/task3";
 import { getPrecomputedTaskSelection, isRandomSelectionEnabled } from "./pointSelections";
+import type { ProjectionType } from "./pointSelections";
 
 export const TRANSITION_DELAY_MS = 2000;
 
@@ -116,8 +117,13 @@ export function getTaskIdFromFlowState(flowState: TaskFlowState): TaskId {
  * Creates an initial state for Task 1.
  * Pre-selects all 4 points for the task upfront.
  */
-export function createInitialTask1State(provider: PointIdProvider): TaskState {
-    const precomputed = !isRandomSelectionEnabled() ? getPrecomputedTaskSelection(1) : null;
+export function createInitialTask1State(
+    provider: PointIdProvider,
+    options?: { layout?: string; projection?: ProjectionType },
+): TaskState {
+    const precomputed = !isRandomSelectionEnabled()
+        ? getPrecomputedTaskSelection(1, options)
+        : null;
     const pointIds = precomputed ?? provider.pickAngularDistributedIds(4);
     const state = createTask1State(pointIds[0], 1);
     return {
@@ -159,8 +165,13 @@ export function createNextTask1TrialState(
  * Creates an initial state for Task 2.
  * Pre-selects all 4 points for the task upfront.
  */
-export function createInitialTask2State(provider: PointIdProvider): TaskState {
-    const precomputed = !isRandomSelectionEnabled() ? getPrecomputedTaskSelection(2) : null;
+export function createInitialTask2State(
+    provider: PointIdProvider,
+    options?: { layout?: string; projection?: ProjectionType },
+): TaskState {
+    const precomputed = !isRandomSelectionEnabled()
+        ? getPrecomputedTaskSelection(2, options)
+        : null;
     const pointIds = precomputed ?? provider.pickAngularDistributedIds(4);
     const [target2D, target3D] = pointIds;
     const state = createTask2State(target2D, target3D, 5);
@@ -205,8 +216,11 @@ export function createNextTask2TrialState(
 export function createInitialTask3State(
     provider: PointIdProvider,
     pairCount = 5,
+    options?: { layout?: string; projection?: ProjectionType },
 ): TaskState {
-    const precomputed = !isRandomSelectionEnabled() ? getPrecomputedTaskSelection(3) : null;
+    const precomputed = !isRandomSelectionEnabled()
+        ? getPrecomputedTaskSelection(3, options)
+        : null;
     const pointIds = precomputed ?? provider.pickAngularDistributedIds(pairCount * 2);
     const assignments = createTask3Assignments(pointIds, pairCount);
     const state = createTask3State(assignments);
@@ -272,6 +286,7 @@ export function createNextState(
     currentState: TaskState,
     action: ReturnType<typeof determineNextAction>,
     provider: PointIdProvider,
+    options?: { layout?: string; projection?: ProjectionType },
 ): TaskState | null {
     switch (action.action) {
         case "next-trial": {
@@ -287,10 +302,10 @@ export function createNextState(
 
         case "next-task": {
             if (action.nextTaskId === TASK2_ID) {
-                return createInitialTask2State(provider);
+                return createInitialTask2State(provider, options);
             }
             if (action.nextTaskId === TASK3_ID) {
-                return createInitialTask3State(provider);
+                return createInitialTask3State(provider, 5, options);
             }
             return null;
         }

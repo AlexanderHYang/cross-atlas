@@ -5,7 +5,8 @@ import {
     evaluateSelection2D,
     getInstructionForTask,
     getTaskAndTrial,
-    processTrial7ErrorFlash2D,
+    isTask2Trial,
+    isTask3Trial,
 } from "../../../shared/src/tasks";
 import type { Logger2D } from "../Logger2d";
 import type { Point2D } from "../Point2D";
@@ -27,8 +28,18 @@ export type TaskController2DDeps = {
     drawAll: () => void;
 };
 
+type ErrorSource = "local" | "remote";
+
 export class TaskController2D {
+    private lastTrial: number | null = null;
+    private lastColorPairIndex: number | null = null;
     private lastProcessedErrorPointId3D: string | null = null;
+    private localErrorPointId: string | null = null;
+    private remoteErrorPointId: string | null = null;
+    private errorHighlights = new Map<
+        string,
+        { prevColor: Vector3; sources: Set<ErrorSource> }
+    >();
 
     constructor(private readonly deps: TaskController2DDeps) {}
 
@@ -36,8 +47,7 @@ export class TaskController2D {
         const { trialBox, instructionBox } = this.deps.ui;
         const trial = taskState?.trial ?? 1;
         const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(trial);
-        const label = `Task ${taskNumber}: Trial ${trialNumber}/${totalTrials}`;
-        trialBox.textContent = label;
+        trialBox.innerHTML = `Task ${taskNumber} <span style='opacity: 0.5; margin: 0 8px;'>|</span> Trial <span style='color: #a8d5ff; font-weight: 600;'>${trialNumber}</span>/<span style='opacity: 0.7;'>${totalTrials}</span>`;
         const instruction = getInstructionForTask(taskState);
         if (instruction.visible) {
             instructionBox.style.display = "block";
@@ -59,18 +69,35 @@ export class TaskController2D {
             clicked3D: taskState?.clicked3D,
         });
 
-        if (trial === 7) {
-            this.lastProcessedErrorPointId3D = processTrial7ErrorFlash2D(
-                taskState,
-                this.deps.syncManager.getLocalPoints(),
-                this.deps.errorColor,
-                this.lastProcessedErrorPointId3D,
-            );
-        } else {
+        const trialChanged = this.lastTrial !== null && this.lastTrial !== trial;
+        const colorPairIndex = taskState?.colorPairIndex ?? null;
+        const isNewPair =
+            isTask3Trial(trial) &&
+            colorPairIndex !== null &&
+            colorPairIndex !== this.lastColorPairIndex;
+
+        if (trialChanged || isNewPair) {
+            this.clearAllErrors({ restore: true });
             this.lastProcessedErrorPointId3D = null;
         }
 
         applyTaskVisuals2D(taskState, this.deps.syncManager.getLocalPoints());
+
+        const isErrorSyncTrial = isTask2Trial(trial) || isTask3Trial(trial);
+        if (isErrorSyncTrial) {
+            const remoteErrorPointId = taskState?.errorPointId3D ?? null;
+            if (remoteErrorPointId !== this.lastProcessedErrorPointId3D) {
+                this.lastProcessedErrorPointId3D = remoteErrorPointId;
+                this.setRemoteError(remoteErrorPointId);
+            }
+        } else if (this.lastProcessedErrorPointId3D !== null) {
+            this.lastProcessedErrorPointId3D = null;
+            this.setRemoteError(null);
+        }
+
+        this.lastTrial = trial;
+        this.lastColorPairIndex = colorPairIndex;
+        this.syncErrors();
     };
 
     public tryHandleSelection(
@@ -100,6 +127,7 @@ export class TaskController2D {
 
         if (selection.isCorrect) {
             this.deps.logger.logCorrectClick2D(clicked.id);
+            this.setLocalError(null);
             const color = selection.successColor ?? this.deps.successColor;
             clicked.setDisplayColor(color);
             if (selection.lockOnSuccess) {
@@ -108,12 +136,98 @@ export class TaskController2D {
             this.deps.drawAll();
         } else {
             this.deps.logger.logIncorrectClick2D(clicked.id);
-            const errorColor = selection.errorColor ?? this.deps.errorColor;
-            const duration = selection.errorFlashDurationMs ?? 2000;
-
-            clicked.flashColorSync(errorColor, duration);
+            this.setLocalError(clicked.id);
         }
 
         this.deps.syncManager.handleSelection2D(clicked.id);
+    }
+
+    private getPointById(pointId: string): Point2D | null {
+        const points = this.deps.syncManager.getLocalPoints();
+        for (const point of points) {
+            if (point.id === pointId) {
+                return point;
+            }
+        }
+        return null;
+    }
+
+    private setLocalError(pointId: string | null) {
+        this.localErrorPointId = pointId;
+        this.syncErrors();
+    }
+
+    private setRemoteError(pointId: string | null) {
+        this.remoteErrorPointId = pointId;
+        this.syncErrors();
+    }
+
+    private syncErrors() {
+        const desired = new Set<string>();
+        if (this.localErrorPointId) {
+            desired.add(this.localErrorPointId);
+        }
+        if (this.remoteErrorPointId) {
+            desired.add(this.remoteErrorPointId);
+        }
+
+        for (const [pointId, entry] of this.errorHighlights.entries()) {
+            if (desired.has(pointId)) {
+                continue;
+            }
+            const point = this.getPointById(pointId);
+            if (point) {
+                point.clearErrorHighlight();
+                point.setDisplayColor(entry.prevColor);
+            }
+            this.errorHighlights.delete(pointId);
+        }
+
+        for (const pointId of desired) {
+            const point = this.getPointById(pointId);
+            if (!point) {
+                continue;
+            }
+            let entry = this.errorHighlights.get(pointId);
+            if (!entry) {
+                entry = { prevColor: point.getStableColor(), sources: new Set<ErrorSource>() };
+                this.errorHighlights.set(pointId, entry);
+            } else {
+                entry.prevColor = point.getStableColor();
+            }
+            entry.sources.clear();
+            if (this.localErrorPointId === pointId) {
+                entry.sources.add("local");
+            }
+            if (this.remoteErrorPointId === pointId) {
+                entry.sources.add("remote");
+            }
+            this.updateErrorVisual(point, entry);
+        }
+    }
+
+    private updateErrorVisual(
+        point: Point2D,
+        entry: { prevColor: Vector3; sources: Set<ErrorSource> }
+    ) {
+        const showGlow = entry.sources.has("remote");
+        point.setErrorHighlight(this.deps.errorColor, showGlow);
+    }
+
+    private clearAllErrors(options?: { restore?: boolean }) {
+        const restore = options?.restore ?? true;
+        for (const [pointId, entry] of this.errorHighlights.entries()) {
+            const point = this.getPointById(pointId);
+            if (!point) {
+                continue;
+            }
+            point.clearErrorHighlight();
+            if (restore) {
+                point.setDisplayColor(entry.prevColor);
+            }
+        }
+        this.errorHighlights.clear();
+        this.localErrorPointId = null;
+        this.remoteErrorPointId = null;
     }
 }

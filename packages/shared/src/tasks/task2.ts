@@ -64,6 +64,10 @@ export function handleTask2Selection2D(
         return { updated: currentState, isCorrect: false, shouldTransition: false };
     }
 
+    if (currentState.clicked2D) {
+        return { updated: currentState, isCorrect: true, shouldTransition: false };
+    }
+
     // Ignore clicks on the 3D partner's target
     if (selectedPointId === currentState.targetPointId3D) {
         return { updated: currentState, isCorrect: false, shouldTransition: false };
@@ -77,6 +81,7 @@ export function handleTask2Selection2D(
         clicked2D: isCorrect,
         feedback: !isCorrect ? "error" : bothCorrect ? "success" : "none",
         completed: bothCorrect,
+        errorPointId2D: !isCorrect ? selectedPointId : null,
     };
 
     return { updated, isCorrect, shouldTransition: bothCorrect };
@@ -94,6 +99,10 @@ export function handleTask2Selection3D(
         return { updated: currentState, isCorrect: false, shouldTransition: false };
     }
 
+    if (currentState.clicked3D) {
+        return { updated: currentState, isCorrect: true, shouldTransition: false };
+    }
+
     // Ignore clicks on the 2D partner's target
     if (selectedPointId === currentState.targetPointId2D) {
         return { updated: currentState, isCorrect: false, shouldTransition: false };
@@ -107,6 +116,7 @@ export function handleTask2Selection3D(
         clicked3D: isCorrect,
         feedback: !isCorrect ? "error" : bothCorrect ? "success" : "none",
         completed: bothCorrect,
+        errorPointId3D: !isCorrect ? selectedPointId : null,
     };
 
     return { updated, isCorrect, shouldTransition: bothCorrect };
@@ -159,6 +169,10 @@ export function evaluateTask2Selection2D(
         return { handled: false };
     }
 
+    if (taskState.clicked2D) {
+        return { handled: false };
+    }
+
     if (!taskState.targetPointId2D || selectedPointId === taskState.targetPointId3D) {
         return { handled: false };
     }
@@ -179,6 +193,10 @@ export function evaluateTask2Selection3D(
     colors: TaskColorConfig3D,
 ): TaskSelection3DEffect {
     if (!taskState || !isTask2Trial(taskState.trial) || taskState.completed) {
+        return { handled: false };
+    }
+
+    if (taskState.clicked3D) {
         return { handled: false };
     }
 

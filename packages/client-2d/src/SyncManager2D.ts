@@ -36,6 +36,12 @@ import {
     getPrecomputedTrialSelection,
     isRandomSelectionEnabled,
 } from "../../shared/src/pointSelections";
+import type { ProjectionType } from "../../shared/src/pointSelections";
+import {
+    getCurrentCounterbalanceProjection,
+    isCounterbalanceEnabled,
+    syncCounterbalanceIndex,
+} from "../../shared/src/counterbalance";
 import { Vector3 } from "@babylonjs/core";
 import { PCAProjection, ProjectionManager } from "./ProjectionManager";
 import { TimedLogEvent } from "../../shared/src/logging";
@@ -96,7 +102,8 @@ export class SyncManager2D implements PointIdProvider {
 
         // 3) initialize projection manager
         const projectionOption = import.meta.env.VITE_PROJECTION;
-        let projectionType: "equirectangular" | "pca" | "vertical" | "horizontal" = "equirectangular";
+        let projectionType: "equirectangular" | "pca" | "vertical" | "horizontal" =
+            "equirectangular";
         if (projectionOption === "pca") {
             projectionType = "pca";
         } else if (projectionOption === "vertical") {
@@ -105,7 +112,41 @@ export class SyncManager2D implements PointIdProvider {
             projectionType = "horizontal";
         }
         this.projectionManager = new ProjectionManager(projectionType);
+    }
 
+    private getSelectionProjection(): ProjectionType {
+        return this.projectionManager.getCurrentProjectionType();
+    }
+
+    private setProjectionMeta(projectionType: ProjectionType) {
+        this.updatingMeta = true;
+        this.taskMetaMap.set("projection", { projectionType });
+        this.updatingMeta = false;
+    }
+
+    public applyProjection(projectionType: ProjectionType) {
+        console.log(`[SyncManager2D] Applying projection: ${projectionType}`);
+
+        this.projectionManager.setCurrentProjectionType(projectionType);
+        this.setProjectionMeta(projectionType);
+
+        if (projectionType === "pca") {
+            const pcaProjection = this.projectionManager.getCurrentProjection() as PCAProjection;
+            pcaProjection.updatePCA(this.getLocalPoints().map((d) => d.pos3d));
+        }
+
+        this.projectionManager.computeScaleFactors(this.getLocalPoints().map((d) => d.pos3d));
+
+        const planeData = this.projectionManager.getCurrentProjection().getPlaneSyncData();
+        if (planeData) {
+            this.updatePlaneSyncData(planeData);
+        }
+
+        for (const p of this.getLocalPoints()) {
+            const [nx, ny] = this.projectionManager.project(p.pos3d);
+            p.nx = nx;
+            p.ny = ny;
+        }
     }
 
     private normalizeTaskState(task: TaskState | null | undefined): TaskState | null {
@@ -259,16 +300,34 @@ export class SyncManager2D implements PointIdProvider {
         // if PCA then update it with any remote points
         if (this.projectionManager.getCurrentProjectionType() === "pca") {
             const pcaProjection = this.projectionManager.getCurrentProjection() as PCAProjection;
-            pcaProjection.updatePCA(
-                this.getLocalPoints()
-                .map(d => d.pos3d)
-            );
+            pcaProjection.updatePCA(this.getLocalPoints().map((d) => d.pos3d));
         }
 
         // update PCA plane data if applicable
         const pcaPlaneData = this.projectionManager.getCurrentProjection().getPlaneSyncData();
         if (pcaPlaneData) {
             this.updatePlaneSyncData(pcaPlaneData);
+        }
+    }
+
+    private initializeSelectionProjection() {
+        const projectionMeta = this.taskMetaMap.get("projection");
+        const counterbalanceProjection = isCounterbalanceEnabled()
+            ? getCurrentCounterbalanceProjection()
+            : null;
+        const desiredProjection =
+            projectionMeta?.projectionType ??
+            counterbalanceProjection ??
+            this.projectionManager.getCurrentProjectionType();
+
+        if (desiredProjection && desiredProjection !== this.projectionManager.getCurrentProjectionType()) {
+            this.projectionManager.setCurrentProjectionType(desiredProjection);
+        }
+        if (desiredProjection && isCounterbalanceEnabled()) {
+            syncCounterbalanceIndex(desiredProjection);
+        }
+        if (desiredProjection && (!projectionMeta || projectionMeta.projectionType !== desiredProjection)) {
+            this.setProjectionMeta(desiredProjection);
         }
     }
 
@@ -288,6 +347,7 @@ export class SyncManager2D implements PointIdProvider {
             manager.taskMetaMap.set("calibration", { calibrationPending: false });
             manager.calibrationPending = false;
         }
+        manager.initializeSelectionProjection();
         if (manager.studyStarted) {
             if (!manager.currentTask || !manager.currentTask.targetPointId2D) {
                 manager.ensureTaskTarget(manager.activeTaskId);
@@ -398,7 +458,9 @@ export class SyncManager2D implements PointIdProvider {
         this.setActiveTask(TASK1_ID);
         this.resetAllPointColors();
 
-        const taskState = createInitialTask1State(this);
+        const taskState = createInitialTask1State(this, {
+            projection: this.getSelectionProjection(),
+        });
         console.log("Initial Task 1 state:", taskState);
         console.log(taskState.preselectedIndex, taskState.preselectedPointIds);
         if (!taskState) {
@@ -418,7 +480,9 @@ export class SyncManager2D implements PointIdProvider {
         this.setActiveTask(TASK2_ID);
         this.resetAllPointColors();
 
-        const taskState = createInitialTask2State(this);
+        const taskState = createInitialTask2State(this, {
+            projection: this.getSelectionProjection(),
+        });
         if (!taskState) {
             console.warn("Unable to start Task 2: no selectable points");
             return;
@@ -436,7 +500,9 @@ export class SyncManager2D implements PointIdProvider {
         this.setActiveTask(TASK3_ID);
         this.resetAllPointColors();
 
-        const taskState = createInitialTask3State(this);
+        const taskState = createInitialTask3State(this, 5, {
+            projection: this.getSelectionProjection(),
+        });
         if (!taskState) {
             console.warn("Unable to start Task 3: not enough selectable points");
             return;
@@ -492,20 +558,6 @@ export class SyncManager2D implements PointIdProvider {
             this.scheduleNextTransition(result.updated);
         }
 
-        // Clear trial 7 error after the flash so repeated incorrect clicks still sync
-        if (isTask3Trial(trial) && !result.isCorrect) {
-            const errorId = selectedPointId;
-            window.setTimeout(() => {
-                const latest = this.normalizeTaskState(this.taskMap.get(this.activeTaskId));
-                if (!latest || latest.trial !== 7) return;
-                if (latest.errorPointId2D !== errorId) return;
-                const cleared: TaskState = { ...latest, errorPointId2D: null };
-                this.taskMap.set(this.activeTaskId, cleared);
-                this.currentTask = cleared;
-                this.notifyTaskListeners();
-            }, result.updated.errorPointId2D ? 1000 : 1000);
-        }
-
         return { isCorrect: result.isCorrect };
     }
 
@@ -539,7 +591,11 @@ export class SyncManager2D implements PointIdProvider {
     /**
      * Handle Task 2 collaborative trial clicks from the 2D side.
      */
-    public handleTask2Click2D(isCorrect: boolean, taskId: string = TASK2_ID) {
+    public handleTask2Click2D(
+        isCorrect: boolean,
+        selectedPointId: string,
+        taskId: string = TASK2_ID
+    ) {
         const existing = this.normalizeTaskState(this.taskMap.get(taskId));
         if (
             !existing ||
@@ -547,13 +603,14 @@ export class SyncManager2D implements PointIdProvider {
             !existing.targetPointId2D
         )
             return;
-        if (existing.completed) return;
+        if (existing.completed || existing.clicked2D) return;
 
         const updated: TaskState = {
             ...existing,
             clicked2D: isCorrect,
             feedback: !isCorrect ? "error" : existing.clicked3D ? "success" : "none",
             completed: isCorrect && !!existing.clicked3D,
+            errorPointId2D: !isCorrect ? selectedPointId : null,
         };
 
         this.taskMap.set(taskId, updated);
@@ -568,7 +625,7 @@ export class SyncManager2D implements PointIdProvider {
     public handleTrial7Click2D(
         isCorrect: boolean,
         selectedPointId: string,
-        taskId: string = TASK3_ID
+        taskId: string = TASK3_ID,
     ) {
         const existing = this.normalizeTaskState(this.taskMap.get(taskId));
         if (!existing || existing.trial !== 7 || !existing.trial7Assignments) return;
@@ -581,18 +638,6 @@ export class SyncManager2D implements PointIdProvider {
         this.currentTask = updated;
         this.notifyTaskListeners();
 
-        if (!result.isCorrect) {
-            window.setTimeout(() => {
-                const latest = this.normalizeTaskState(this.taskMap.get(taskId));
-                if (!latest || latest.trial !== 7) return;
-                if (latest.errorPointId2D !== selectedPointId) return;
-                const cleared: TaskState = { ...latest, errorPointId2D: null };
-                this.taskMap.set(taskId, cleared);
-                this.currentTask = cleared;
-                this.notifyTaskListeners();
-            }, 1000);
-        }
-
         if (updated.completed) {
             this.scheduleNextTransition(updated);
         }
@@ -600,6 +645,7 @@ export class SyncManager2D implements PointIdProvider {
 
     private resetAllPointColors() {
         for (const p of this.localPointsById.values()) {
+            p.clearErrorHighlight();
             const cfg = getDefaultPointConfig(p.id);
             if (cfg?.selectable === false) {
                 if (cfg.color) {
@@ -618,6 +664,26 @@ export class SyncManager2D implements PointIdProvider {
 
     public resetForNextTrial() {
         this.resetAllPointColors();
+    }
+
+    public resetPointsToDefaultConfig() {
+        for (const p of this.localPointsById.values()) {
+            p.clearErrorHighlight();
+            const cfg = getDefaultPointConfig(p.id);
+            const baseColor = cfg?.color
+                ? new Vector3(cfg.color.x, cfg.color.y, cfg.color.z)
+                : new Vector3(1, 1, 1);
+            const draggable = cfg?.draggable !== false;
+            const selectable = cfg?.selectable !== false;
+            p.setDraggable(draggable);
+            p.setSelectable(selectable);
+            p.setBaseColor(baseColor);
+            p.setDisplayColor(baseColor);
+            p.clearLockedColor();
+            if (cfg) {
+                p.pos3d = new Vector3(cfg.direction.x, cfg.direction.y, cfg.direction.z);
+            }
+        }
     }
 
     private setNeutralColorsForTask3(assignments?: TaskState["trial7Assignments"] | null) {
@@ -654,7 +720,7 @@ export class SyncManager2D implements PointIdProvider {
         this.resetAllPointColors();
 
         const precomputed = !isRandomSelectionEnabled()
-            ? getPrecomputedTrialSelection(trial)
+            ? getPrecomputedTrialSelection(trial, { projection: this.getSelectionProjection() })
             : null;
         const pointIds = precomputed ?? this.pickAngularDistributedIds(1);
         const randomId = pointIds[0];
@@ -704,13 +770,15 @@ export class SyncManager2D implements PointIdProvider {
             const action = determineNextAction(latest);
             console.log(
                 `[2D] Transition action: ${action.action}`,
-                action.nextTaskId ? `-> ${action.nextTaskId}` : ""
+                action.nextTaskId ? `-> ${action.nextTaskId}` : "",
             );
 
             switch (action.action) {
                 case "next-trial": {
                     this.resetAllPointColors();
-                    const nextState = createNextState(latest, action, this);
+                    const nextState = createNextState(latest, action, this, {
+                        projection: this.getSelectionProjection(),
+                    });
                     if (nextState) {
                         const taskId = getTaskIdFromFlowState(getTaskFlowState(nextState));
                         this.setActiveTask(taskId);
@@ -731,7 +799,9 @@ export class SyncManager2D implements PointIdProvider {
                     break;
                 }
                 case "advance-pair": {
-                    const nextState = createNextState(latest, action, this);
+                    const nextState = createNextState(latest, action, this, {
+                        projection: this.getSelectionProjection(),
+                    });
                     if (nextState) {
                         this.taskMap.set(TASK3_ID, nextState);
                         this.currentTask = nextState;
@@ -793,6 +863,16 @@ export class SyncManager2D implements PointIdProvider {
         return this.studyStarted;
     }
 
+    public setStudyStarted(started: boolean) {
+        if (this.studyStarted === started) {
+            return;
+        }
+        this.updatingMeta = true;
+        this.taskMetaMap.set("study", { studyStarted: started });
+        this.updatingMeta = false;
+        this.updateStudyStarted(started);
+    }
+
     public onCalibrationPendingChange(listener: (pending: boolean) => void) {
         this.calibrationListeners.add(listener);
         listener(this.calibrationPending);
@@ -838,5 +918,30 @@ export class SyncManager2D implements PointIdProvider {
 
     public getCurrentTask(): TaskState | null {
         return this.currentTask;
+    }
+
+    /**
+     * Switch to a new projection and restart the task flow from the beginning.
+     * Used for counterbalance mode where participants complete all tasks multiple times
+     * with different projections.
+     */
+    public switchProjectionAndRestartTasks(
+        projectionType: "equirectangular" | "pca" | "vertical" | "horizontal",
+    ) {
+        console.log(
+            `[SyncManager2D] Switching to projection: ${projectionType} and restarting tasks`,
+        );
+
+        this.applyProjection(projectionType);
+
+        // Start fresh from Task 1
+        const firstTask = getFirstEnabledTask();
+        if (firstTask === TASK1_ID) {
+            this.startTask1();
+        } else if (firstTask === TASK2_ID) {
+            this.startTask2();
+        } else if (firstTask === TASK3_ID) {
+            this.startTask3();
+        }
     }
 }

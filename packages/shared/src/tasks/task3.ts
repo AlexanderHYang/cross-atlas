@@ -156,9 +156,9 @@ export function handleTask3Selection2D(
         feedback: !isCorrect ? "error" : pairSolved ? "success" : "none",
         completed: pairSolved,
         trial7Assignments: updatedAssignments,
-        // Set errorPointId2D when wrong click so 3D side can show the flash
+        // Set errorPointId2D when wrong click so 3D side can show the error highlight
         errorPointId2D: !isCorrect ? selectedPointId : null,
-        errorPointId3D: null, // Clear any previous 3D error
+        errorPointId3D: currentState.errorPointId3D ?? null,
     };
 
     return { updated, isCorrect, shouldAdvancePair: pairSolved };
@@ -205,9 +205,9 @@ export function handleTask3Selection3D(
         feedback: !isCorrect ? "error" : pairSolved ? "success" : "none",
         completed: pairSolved,
         trial7Assignments: updatedAssignments,
-        // Set errorPointId3D when wrong click so 2D side can show the flash
+        // Set errorPointId3D when wrong click so 2D side can show the error highlight
         errorPointId3D: !isCorrect ? selectedPointId : null,
-        errorPointId2D: null, // Clear any previous 2D error
+        errorPointId2D: currentState.errorPointId2D ?? null,
     };
 
     return { updated, isCorrect, shouldAdvancePair: pairSolved };
@@ -549,7 +549,6 @@ export function applyTask3Visuals3D(
     taskState: TaskState | null,
     pointsById: Map<string, TaskPoint3D>,
     colors: TaskColorConfig3D,
-    flashingPointId: string | null,
 ) {
     if (!taskState || taskState.trial !== 7) {
         return;
@@ -559,9 +558,7 @@ export function applyTask3Visuals3D(
     const activePair = activeAssignment ? getColorPairByKey(activeAssignment.key) : null;
     const activeSolved = !!activeAssignment && activeAssignment.done2D && activeAssignment.done3D;
 
-    if (!flashingPointId) {
-        clearLocalHints(pointsById);
-    }
+    clearLocalHints(pointsById);
 
     setTrial7Selectability3D(taskState, pointsById.values());
 
@@ -585,12 +582,20 @@ export function processTrial7ErrorFlash2D(
 
     const pointMap = createPointMap(points);
     if (taskState.errorPointId3D && taskState.errorPointId3D !== lastProcessedErrorPointId) {
+        if (lastProcessedErrorPointId) {
+            const previous = pointMap.get(lastProcessedErrorPointId);
+            previous?.clearErrorHighlight();
+            previous?.setDisplayColor(previous.getBaseColor());
+        }
         const errorPoint = pointMap.get(taskState.errorPointId3D);
-        errorPoint?.flashColorSync(errorColor, 1500);
+        errorPoint?.setErrorHighlight(errorColor, true);
         return taskState.errorPointId3D;
     }
 
-    if (!taskState.errorPointId3D) {
+    if (!taskState.errorPointId3D && lastProcessedErrorPointId) {
+        const previous = pointMap.get(lastProcessedErrorPointId);
+        previous?.clearErrorHighlight();
+        previous?.setDisplayColor(previous.getBaseColor());
         return null;
     }
 
@@ -608,12 +613,20 @@ export function processTrial7ErrorFlash3D(
     }
 
     if (taskState.errorPointId2D && taskState.errorPointId2D !== lastProcessedErrorPointId) {
+        if (lastProcessedErrorPointId) {
+            const previous = points.get(lastProcessedErrorPointId);
+            previous?.clearErrorHighlight();
+            previous?.setDisplayColor(previous.getDefaultColor());
+        }
         const errorPoint = points.get(taskState.errorPointId2D);
-        errorPoint?.flashColorSynced(errorColor, 1500);
+        errorPoint?.setErrorHighlight(errorColor);
         return taskState.errorPointId2D;
     }
 
-    if (!taskState.errorPointId2D) {
+    if (!taskState.errorPointId2D && lastProcessedErrorPointId) {
+        const previous = points.get(lastProcessedErrorPointId);
+        previous?.clearErrorHighlight();
+        previous?.setDisplayColor(previous.getDefaultColor());
         return null;
     }
 

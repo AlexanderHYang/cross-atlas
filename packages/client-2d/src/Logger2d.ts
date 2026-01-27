@@ -8,6 +8,12 @@ import {
 } from "../../shared/src/tasks";
 import { layoutType } from "../../shared/src/defaultPoints";
 import { isRandomSelectionEnabled } from "../../shared/src/pointSelections";
+import {
+    isCounterbalanceEnabled,
+    getCurrentProjectionIndex,
+    getCounterbalanceConfig,
+    getTotalProjections,
+} from "../../shared/src/counterbalance";
 
 // Angular velocity gating parameters for cumulative rotation
 const ROTATION_SAMPLE_INTERVAL_MS = 100; // Expected 10Hz sampling
@@ -87,6 +93,7 @@ export class Logger2D {
     private trialSummaries: Map<string, TrialSummary> = new Map();
     private pendingRotationLogs: TimedLogEvent[] = [];
     private suppressRotationLogs = false;
+    private suppressLifecycleLogs = false;
     private finalized = false;
     private lastLifecycleState: TaskState | null = null;
     private lastClickLogTime = 0;
@@ -100,6 +107,10 @@ export class Logger2D {
     private timeSeriesHeaderWritten = false;
     private lastTrialKeyForTimeSeries: string | null = null;
 
+    // Counterbalance tracking
+    private currentProjectionIndex = 0;
+    private projectionSummaries: Map<number, TrialSummary[]> = new Map();
+
     private syncManager: SyncManager2D;
 
     constructor(syncManager: SyncManager2D) {
@@ -107,15 +118,24 @@ export class Logger2D {
         this.sessionId = Logger2D.createSessionId();
         const selectionMode = isRandomSelectionEnabled() ? "random" : "precomputed";
         const projection = this.syncManager.getProjectionManager().getCurrentProjectionType();
-        const timestamp = new Date().toISOString();
+        const timestamp = Logger2D.formatLocalTimestamp(new Date());
+
+        // Build counterbalance info string if enabled
+        let counterbalanceInfo = "";
+        if (isCounterbalanceEnabled()) {
+            const cbConfig = getCounterbalanceConfig();
+            this.currentProjectionIndex = getCurrentProjectionIndex();
+            counterbalanceInfo = ` counterbalance=S${cbConfig.sequence} projection_index=${this.currentProjectionIndex + 1}/${getTotalProjections()}`;
+        }
+
         this.queueText(
             `=== [${timestamp}] study_start session=${this.sessionId} ` +
-                `selection_mode=${selectionMode} layout=${layoutType} projection=${projection} ===\n`,
+                `selection_mode=${selectionMode} layout=${layoutType} projection=${projection}${counterbalanceInfo} ===\n`,
         );
         // Write time-series header
         this.queueTimeSeries(
             `=== Time Series Data session=${this.sessionId} ===\n` +
-                `Generated: ${new Date().toISOString()}\n\n`,
+                `Generated: ${Logger2D.formatLocalTimestamp(new Date())}\n\n`,
         );
         this.timeSeriesHeaderWritten = true;
         this.beginReceivingRemoteLogs();
@@ -137,7 +157,7 @@ export class Logger2D {
     }
 
     public addLogEvent(logEvent: LogEvent2D) {
-        const timestamp = new Date().toISOString();
+        const timestamp = Logger2D.formatLocalTimestamp(new Date());
         const trialLabel = this.currentTrial
             ? Logger2D.formatTrialLabel(
                   this.currentTrial.taskNumber,
@@ -157,7 +177,7 @@ export class Logger2D {
     }
 
     private static createSessionId(): string {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const timestamp = Logger2D.formatLocalTimestampForFile(new Date());
         const suffix = Math.random().toString(36).slice(2, 8);
         return `${timestamp}-${suffix}`;
     }
@@ -199,6 +219,29 @@ export class Logger2D {
         return Math.round(value).toString();
     }
 
+    private static formatLocalTimestamp(value: number | Date): string {
+        const date = value instanceof Date ? value : new Date(value);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        const hours = String(date.getHours()).padStart(2, "0");
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+        const seconds = String(date.getSeconds()).padStart(2, "0");
+        const millis = String(date.getMilliseconds()).padStart(3, "0");
+        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${millis}`;
+    }
+
+    private static formatLocalTimestampForFile(value: number | Date): string {
+        const date = value instanceof Date ? value : new Date(value);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        const hours = String(date.getHours()).padStart(2, "0");
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+        const seconds = String(date.getSeconds()).padStart(2, "0");
+        return `${year}-${month}-${day}T${hours}-${minutes}-${seconds}`;
+    }
+
     private static formatBinary(value: boolean): string {
         return value ? "1" : "0";
     }
@@ -211,7 +254,7 @@ export class Logger2D {
         if (!value) {
             return "-";
         }
-        return new Date(value).toISOString();
+        return Logger2D.formatLocalTimestamp(value);
     }
 
     private queueText(text: string) {
@@ -488,7 +531,7 @@ export class Logger2D {
             return;
         }
         const time = Date.now();
-        const timestamp = new Date(time).toISOString();
+        const timestamp = Logger2D.formatLocalTimestamp(time);
         const pairLabel = `${params.pairKey} (${params.pairIndex + 1})`;
         const progress =
             params.solvedCount !== undefined && params.totalPairs !== undefined
@@ -509,7 +552,7 @@ export class Logger2D {
             return;
         }
         const time = Date.now();
-        const timestamp = new Date(time).toISOString();
+        const timestamp = Logger2D.formatLocalTimestamp(time);
         const pairLabel = `${params.pairKey} (${params.pairIndex + 1})`;
         const progress =
             params.solvedCount !== undefined && params.totalPairs !== undefined
@@ -523,7 +566,7 @@ export class Logger2D {
         const context = this.extractTrialContext(details) ?? this.ensureTrialContext();
         const pointId = typeof details["pointId"] === "string" ? details["pointId"] : undefined;
         if (!context) {
-            const timestamp = new Date(logEvent.time).toISOString();
+            const timestamp = Logger2D.formatLocalTimestamp(logEvent.time);
             const label = "task=unknown trial=unknown";
             this.queueText(
                 `[${timestamp}] ${label} user=${user} event=incorrect_click pointId=${pointId ?? "-"}\n`,
@@ -578,7 +621,7 @@ export class Logger2D {
             context.totalTrials,
         );
         const line =
-            `[${new Date(time).toISOString()}] ${trialLabel} ` +
+            `[${Logger2D.formatLocalTimestamp(time)}] ${trialLabel} ` +
             `user=${user} event=incorrect_click pointId=${pointId ?? "-"}`;
         this.queueText(`${line}\n`);
         this.lastClickLogTime = Math.max(this.lastClickLogTime, time);
@@ -590,7 +633,7 @@ export class Logger2D {
         const context = this.extractTrialContext(details) ?? this.ensureTrialContext();
         const pointId = typeof details["pointId"] === "string" ? details["pointId"] : undefined;
         if (!context) {
-            const timestamp = new Date(logEvent.time).toISOString();
+            const timestamp = Logger2D.formatLocalTimestamp(logEvent.time);
             const label = "task=unknown trial=unknown";
             this.queueText(
                 `[${timestamp}] ${label} user=${user} event=correct_click pointId=${pointId ?? "-"}\n`,
@@ -625,7 +668,7 @@ export class Logger2D {
             context.totalTrials,
         );
         const line =
-            `[${new Date(time).toISOString()}] ${trialLabel} ` +
+            `[${Logger2D.formatLocalTimestamp(time)}] ${trialLabel} ` +
             `user=${user} event=correct_click pointId=${pointId ?? "-"}`;
         this.queueText(`${line}\n`);
         this.lastClickLogTime = Math.max(this.lastClickLogTime, time);
@@ -681,7 +724,7 @@ export class Logger2D {
     }
 
     public logTaskLifecycle(nextState: TaskState | null) {
-        if (!nextState || this.finalized) {
+        if (!nextState || this.finalized || this.suppressLifecycleLogs) {
             this.lastLifecycleState = nextState;
             return;
         }
@@ -696,7 +739,7 @@ export class Logger2D {
             : true;
 
         const time = Date.now();
-        const timestamp = new Date(time).toISOString();
+        const timestamp = Logger2D.formatLocalTimestamp(time);
         if (taskChanged) {
             this.queueText(
                 `[${timestamp}] [2D][${nextState.id}] Task ${nextInfo.taskNumber} start\n`,
@@ -757,23 +800,23 @@ export class Logger2D {
         cumulativeDegrees: number;
         points: { pointId: string; degrees: number | null; difficulty: string }[];
     }) {
-        const timestamp = new Date().toISOString();
+        const timestamp = Logger2D.formatLocalTimestamp(new Date());
         const pointsLabel = params.points
             .map((entry) => {
                 const degrees =
                     entry.degrees === null || !Number.isFinite(entry.degrees)
                         ? "-"
                         : entry.degrees.toFixed(2);
-                return `${entry.pointId}:${degrees}deg:${entry.difficulty}`;
+                return `${entry.pointId}(${degrees}deg, ${entry.difficulty})`;
             })
-            .join(", ");
+            .join("; ");
         const cumulative =
             params.cumulativeDegrees === null || !Number.isFinite(params.cumulativeDegrees)
                 ? "-"
                 : params.cumulativeDegrees.toFixed(2);
         this.queueText(
             `[${timestamp}] task=${params.taskNumber} event=point_selection ` +
-                `cumulative_degrees=${cumulative} points=${pointsLabel}\n`,
+                `cumulative_degrees=${cumulative} points=[${pointsLabel}]\n`,
         );
     }
 
@@ -781,7 +824,7 @@ export class Logger2D {
         const context = this.ensureTrialContext();
         const time = Date.now();
         if (!context) {
-            const timestamp = new Date(time).toISOString();
+            const timestamp = Logger2D.formatLocalTimestamp(time);
             this.queueText(
                 `[${timestamp}] task=unknown trial=unknown user=pc event=incorrect_click pointId=${pointId}\n`,
             );
@@ -796,7 +839,7 @@ export class Logger2D {
         const key = Logger2D.buildTrialKey(taskNumber, trialNumber, totalTrials);
         const trialLabel = Logger2D.formatTrialLabel(taskNumber, trialNumber, totalTrials);
         const endTime = Date.now();
-        const timestamp = new Date(endTime).toISOString();
+        const timestamp = Logger2D.formatLocalTimestamp(endTime);
         const samples = this.trialSamples.get(key);
         const lastSample = samples ? samples[samples.length - 1] : this.lastRotationSample;
 
@@ -830,6 +873,152 @@ export class Logger2D {
         this.queueTimeSeries("\n");
     }
 
+    /**
+     * Log a projection transition in counterbalance mode.
+     * Called when switching from one projection to the next.
+     */
+    public logProjectionTransition(
+        previousProjection: string,
+        nextProjection: string,
+        projectionIndex: number,
+        totalProjections: number,
+    ) {
+        // Save current summaries for the completed projection
+        this.projectionSummaries.set(this.currentProjectionIndex, this.getSortedSummaries());
+        this.suppressLifecycleLogs = true;
+
+        const timestamp = Logger2D.formatLocalTimestamp(new Date());
+        const lines: string[] = [];
+        lines.push("");
+        lines.push(
+            `=== [${timestamp}] projection_complete projection=${previousProjection} projection_index=${projectionIndex}/${totalProjections} ===`,
+        );
+        lines.push("");
+        lines.push(
+            `--- PROJECTION ${projectionIndex}/${totalProjections} SUMMARY (${previousProjection}) ---`,
+        );
+
+        const summaries = this.getSortedSummaries();
+        lines.push(...this.buildSummaryTableLines(summaries));
+        lines.push("");
+        lines.push(
+            `Projection ${projectionIndex} completion time: ${this.formatTotalCompletionMs(summaries)}`,
+        );
+        lines.push("");
+        lines.push(
+            `=== [${timestamp}] projection_start projection=${nextProjection} projection_index=${projectionIndex + 1}/${totalProjections} ===`,
+        );
+        lines.push("");
+
+        this.queueText(`${lines.join("\n")}\n`);
+
+        // Clear trial data for next projection
+        this.trialSamples.clear();
+        this.trialSummaries.clear();
+        this.lastRotationSample = null;
+        this.currentTrial = null;
+        this.lastLifecycleState = null;
+        this.suppressRotationLogs = false;
+        this.currentProjectionIndex = projectionIndex; // This is the NEW index (0-based)
+    }
+
+    /**
+     * Finalize the current projection with an old-style summary.
+     * Called at the end of each projection in counterbalance mode.
+     */
+    public finalizeProjection(
+        projection: string,
+        projectionIndex: number,
+        totalProjections: number,
+    ) {
+        this.suppressLifecycleLogs = true;
+        this.flushEndLines(true);
+
+        // Save current summaries for this projection
+        this.projectionSummaries.set(this.currentProjectionIndex, [...this.getSortedSummaries()]);
+
+        const timestamp = Logger2D.formatLocalTimestamp(new Date());
+        const lines: string[] = [];
+
+        lines.push(
+            `=== [${timestamp}] projection_end projection=${projection} projection_index=${projectionIndex}/${totalProjections} session=${this.sessionId} ===`,
+        );
+        lines.push("");
+        lines.push("=== TRIAL VALUES (grouped) ===");
+
+        const summaries = this.getSortedSummaries();
+        for (const summary of summaries) {
+            const trialLabel = Logger2D.formatTrialLabel(
+                summary.taskNumber,
+                summary.trialNumber,
+                summary.totalTrials,
+            );
+            lines.push(`-- ${trialLabel} --`);
+            if (summary.incorrectSequence.length === 0) {
+                lines.push("Sequence of incorrect clicks: none");
+            } else {
+                lines.push("Sequence of incorrect clicks:");
+                for (const entry of summary.incorrectSequence) {
+                    lines.push(
+                        `[${Logger2D.formatLocalTimestamp(entry.time)}] ` +
+                            `user=${entry.user} pointId=${entry.pointId ?? "-"}`,
+                    );
+                }
+            }
+
+            if (summary.correctSequence.length === 0) {
+                lines.push("Sequence of correct clicks: none");
+            } else {
+                lines.push("Sequence of correct clicks:");
+                for (const entry of summary.correctSequence) {
+                    lines.push(
+                        `[${Logger2D.formatLocalTimestamp(entry.time)}] ` +
+                            `user=${entry.user} pointId=${entry.pointId ?? "-"}`,
+                    );
+                }
+            }
+            lines.push("");
+        }
+
+        lines.push(`Projection: ${projection}`);
+        lines.push(`Layout: ${layoutType}`);
+        lines.push(`Projection index: ${projectionIndex}/${totalProjections}`);
+        lines.push("");
+        lines.push("=== SUMMARY TABLE (by task/trial) ===");
+        lines.push(...this.buildSummaryTableLines(summaries));
+        lines.push("");
+        lines.push(`Total completion time: ${this.formatTotalCompletionMs(summaries)}`);
+        lines.push(this.formatDirectDeicticRateLine(summaries));
+        lines.push("");
+
+        this.queueText(`${lines.join("\n")}\n`);
+
+        // Clear trial data for next projection
+        this.trialSamples.clear();
+        this.trialSummaries.clear();
+        this.lastRotationSample = null;
+        this.currentTrial = null;
+        this.lastLifecycleState = null;
+        this.suppressRotationLogs = false;
+        this.finalized = false; // Allow finalization for next projection
+    }
+
+    /**
+     * Reset state for a new projection in counterbalance mode.
+     * Called before starting trials with a new projection.
+     */
+    public resetForNewProjection() {
+        this.trialSamples.clear();
+        this.trialSummaries.clear();
+        this.lastRotationSample = null;
+        this.currentTrial = null;
+        this.lastLifecycleState = null;
+        this.suppressRotationLogs = false;
+        this.finalized = false;
+        this.suppressLifecycleLogs = false;
+        this.currentProjectionIndex = getCurrentProjectionIndex();
+    }
+
     public finalizeStudy() {
         if (this.finalized) {
             return;
@@ -838,8 +1027,9 @@ export class Logger2D {
 
         this.flushEndLines(true);
 
-        const timestamp = new Date().toISOString();
+        const timestamp = Logger2D.formatLocalTimestamp(new Date());
         const lines: string[] = [];
+
         lines.push(`=== [${timestamp}] study_end session=${this.sessionId} ===`);
         lines.push("");
         lines.push("=== TRIAL VALUES (grouped) ===");
@@ -859,7 +1049,7 @@ export class Logger2D {
                 lines.push("Sequence of incorrect clicks:");
                 for (const entry of summary.incorrectSequence) {
                     lines.push(
-                        `[${new Date(entry.time).toISOString()}] ` +
+                        `[${Logger2D.formatLocalTimestamp(entry.time)}] ` +
                             `user=${entry.user} pointId=${entry.pointId ?? "-"}`,
                     );
                 }
@@ -871,7 +1061,7 @@ export class Logger2D {
                 lines.push("Sequence of correct clicks:");
                 for (const entry of summary.correctSequence) {
                     lines.push(
-                        `[${new Date(entry.time).toISOString()}] ` +
+                        `[${Logger2D.formatLocalTimestamp(entry.time)}] ` +
                             `user=${entry.user} pointId=${entry.pointId ?? "-"}`,
                     );
                 }
@@ -882,6 +1072,7 @@ export class Logger2D {
         const projection = this.syncManager.getProjectionManager().getCurrentProjectionType();
         lines.push(`Projection: ${projection}`);
         lines.push(`Layout: ${layoutType}`);
+
         lines.push("");
         lines.push("=== SUMMARY TABLE (by task/trial) ===");
         lines.push(...this.buildSummaryTableLines(summaries));
@@ -890,6 +1081,21 @@ export class Logger2D {
         lines.push(this.formatDirectDeicticRateLine(summaries));
         lines.push("");
 
+        this.queueText(`${lines.join("\n")}\n`);
+    }
+
+    public finalizeCounterbalanceStudy() {
+        if (this.finalized) {
+            return;
+        }
+        this.finalized = true;
+
+        this.flushEndLines(true);
+
+        const timestamp = Logger2D.formatLocalTimestamp(new Date());
+        const lines: string[] = [];
+        lines.push(`=== [${timestamp}] study_end session=${this.sessionId} mode=counterbalance ===`);
+        lines.push("");
         this.queueText(`${lines.join("\n")}\n`);
     }
 
@@ -951,7 +1157,7 @@ export class Logger2D {
         const context = this.ensureTrialContext();
         const time = Date.now();
         if (!context) {
-            const timestamp = new Date(time).toISOString();
+            const timestamp = Logger2D.formatLocalTimestamp(time);
             this.queueText(
                 `[${timestamp}] task=unknown trial=unknown user=pc event=correct_click pointId=${pointId}\n`,
             );

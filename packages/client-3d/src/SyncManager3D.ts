@@ -34,6 +34,7 @@ import {
     getPrecomputedTrialSelection,
     isRandomSelectionEnabled,
 } from "../../shared/src/pointSelections";
+import type { ProjectionType } from "../../shared/src/pointSelections";
 import { TimedLogEvent } from "../../shared/src/logging";
 
 const TASK3_NEUTRAL_COLOR = new BABYLON.Color3(1, 1, 1);
@@ -58,6 +59,9 @@ export class SyncManager3D implements PointIdProvider {
     private studyStarted = false;
     private calibrationPending = false;
     private calibrationListeners: Set<(pending: boolean) => void> = new Set();
+    private studyListeners: Set<(started: boolean) => void> = new Set();
+    private currentProjectionType: ProjectionType = "equirectangular";
+    private pendingCalibrationCompletion = false;
 
     private constructor() {
         // 1) connect to websocket provider
@@ -84,6 +88,15 @@ export class SyncManager3D implements PointIdProvider {
         this.taskMap = this.ydoc.getMap(TASK_COLLECTION) as Y.Map<TaskState>;
         this.taskMetaMap = this.ydoc.getMap(TASK_META_COLLECTION) as Y.Map<TaskMeta>;
         this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PlaneSyncData>;
+
+        const projectionOption = import.meta.env.VITE_PROJECTION;
+        if (projectionOption === "pca") {
+            this.currentProjectionType = "pca";
+        } else if (projectionOption === "vertical") {
+            this.currentProjectionType = "vertical";
+        } else if (projectionOption === "horizontal") {
+            this.currentProjectionType = "horizontal";
+        }
 
         // this might be unneeded?
         // 3) initialize existing remote charts
@@ -126,7 +139,13 @@ export class SyncManager3D implements PointIdProvider {
     }
 
     private updateStudyStarted(started: boolean) {
+        if (this.studyStarted === started) {
+            return;
+        }
         this.studyStarted = started;
+        for (const listener of this.studyListeners) {
+            listener(started);
+        }
     }
 
     private updateCalibrationPending(pending: boolean) {
@@ -195,6 +214,10 @@ export class SyncManager3D implements PointIdProvider {
         };
     }
 
+    private getSelectionProjection(): ProjectionType {
+        return this.currentProjectionType;
+    }
+
     private initializeRemoteObserver(plane: BABYLON.Mesh) {
         this.syncedPointDataMap.observe((event, transaction) => {
             for (const key of event.keysChanged) {
@@ -237,6 +260,11 @@ export class SyncManager3D implements PointIdProvider {
 
             const calibrationMeta = this.taskMetaMap.get("calibration");
             this.updateCalibrationPending(!!calibrationMeta?.calibrationPending);
+
+            const projectionMeta = this.taskMetaMap.get("projection");
+            if (projectionMeta?.projectionType) {
+                this.currentProjectionType = projectionMeta.projectionType;
+            }
         });
 
         this.taskMap.observe(() => {
@@ -248,6 +276,15 @@ export class SyncManager3D implements PointIdProvider {
             this.currentTask = normalized;
             this.logLifecycle(this.currentTask);
             this.notifyTaskListeners();
+
+            if (
+                !this.calibrationPending &&
+                this.pendingCalibrationCompletion &&
+                this.currentTask?.completed
+            ) {
+                this.pendingCalibrationCompletion = false;
+                this.scheduleNextTransition(this.currentTask, { skipCalibration: true });
+            }
         });
 
         this.syncedPCADataMap.observe((event) => {
@@ -279,6 +316,10 @@ export class SyncManager3D implements PointIdProvider {
         if (!manager.taskMetaMap.get("calibration")) {
             manager.taskMetaMap.set("calibration", { calibrationPending: false });
             manager.calibrationPending = false;
+        }
+        const projectionMeta = manager.taskMetaMap.get("projection");
+        if (projectionMeta?.projectionType) {
+            manager.currentProjectionType = projectionMeta.projectionType;
         }
         if (!manager.currentTask) {
             manager.taskMap.set(manager.activeTaskId, {
@@ -353,6 +394,14 @@ export class SyncManager3D implements PointIdProvider {
         };
     }
 
+    public onStudyStartedChange(listener: (started: boolean) => void) {
+        this.studyListeners.add(listener);
+        listener(this.studyStarted);
+        return () => {
+            this.studyListeners.delete(listener);
+        };
+    }
+
     public setStudyStarted(started: boolean) {
         if (this.studyStarted === started) {
             return;
@@ -409,8 +458,10 @@ export class SyncManager3D implements PointIdProvider {
             ? this.normalizeTaskState(this.currentTask)
             : this.normalizeTaskState(this.taskMap.get(this.activeTaskId));
         if (!latest || !latest.completed) {
+            this.pendingCalibrationCompletion = true;
             return;
         }
+        this.pendingCalibrationCompletion = false;
         this.scheduleNextTransition(latest, { skipCalibration: true });
     }
 
@@ -448,7 +499,11 @@ export class SyncManager3D implements PointIdProvider {
     /**
      * Handle Task 2 collaborative trial clicks from the 3D side.
      */
-    public handleTask2Click3D(isCorrect: boolean, taskId: string = TASK2_ID) {
+    public handleTask2Click3D(
+        isCorrect: boolean,
+        selectedPointId: string,
+        taskId: string = TASK2_ID
+    ) {
         const existing = this.normalizeTaskState(this.taskMap.get(taskId));
         if (
             !existing ||
@@ -456,13 +511,14 @@ export class SyncManager3D implements PointIdProvider {
             !existing.targetPointId3D
         )
             return;
-        if (existing.completed) return;
+        if (existing.completed || existing.clicked3D) return;
 
         const updated: TaskState = {
             ...existing,
             clicked3D: isCorrect,
             feedback: !isCorrect ? "error" : existing.clicked2D ? "success" : "none",
             completed: isCorrect && !!existing.clicked2D,
+            errorPointId3D: !isCorrect ? selectedPointId : null,
         };
 
         this.taskMap.set(taskId, updated);
@@ -490,18 +546,6 @@ export class SyncManager3D implements PointIdProvider {
         this.currentTask = updated;
         this.notifyTaskListeners();
 
-        if (!result.isCorrect) {
-            window.setTimeout(() => {
-                const latest = this.normalizeTaskState(this.taskMap.get(taskId));
-                if (!latest || latest.trial !== 7) return;
-                if (latest.errorPointId3D !== selectedPointId) return;
-                const cleared: TaskState = { ...latest, errorPointId3D: null };
-                this.taskMap.set(taskId, cleared);
-                this.currentTask = cleared;
-                this.notifyTaskListeners();
-            }, 1000);
-        }
-
         if (updated.completed) {
             this.scheduleNextTransition(updated);
         }
@@ -510,7 +554,7 @@ export class SyncManager3D implements PointIdProvider {
     public setTrial(trial: 1 | 2 | 3 | 4, taskId: string = TASK1_ID) {
         this.setActiveTask(taskId as TaskId);
         const precomputed = !isRandomSelectionEnabled()
-            ? getPrecomputedTrialSelection(trial)
+            ? getPrecomputedTrialSelection(trial, { projection: this.getSelectionProjection() })
             : null;
         const pointIds = precomputed ?? this.pickAngularDistributedIds(1);
         const nextTarget = pointIds[0];
@@ -577,7 +621,9 @@ export class SyncManager3D implements PointIdProvider {
 
             switch (action.action) {
                 case "next-trial": {
-                    const nextState = createNextState(latest, action, this);
+                    const nextState = createNextState(latest, action, this, {
+                        projection: this.getSelectionProjection(),
+                    });
                     if (nextState) {
                         const taskId = getTaskIdFromFlowState(getTaskFlowState(nextState));
                         this.setActiveTask(taskId);
@@ -598,7 +644,9 @@ export class SyncManager3D implements PointIdProvider {
                     break;
                 }
                 case "advance-pair": {
-                    const nextState = createNextState(latest, action, this);
+                    const nextState = createNextState(latest, action, this, {
+                        projection: this.getSelectionProjection(),
+                    });
                     if (nextState) {
                         this.taskMap.set(TASK3_ID, nextState);
                         this.currentTask = nextState;
@@ -620,7 +668,9 @@ export class SyncManager3D implements PointIdProvider {
     private startTask2() {
         this.setActiveTask(TASK2_ID);
 
-        const taskState = createInitialTask2State(this);
+        const taskState = createInitialTask2State(this, {
+            projection: this.getSelectionProjection(),
+        });
         if (!taskState) {
             console.warn("Unable to start Task 2: no selectable points");
             return;
@@ -637,7 +687,9 @@ export class SyncManager3D implements PointIdProvider {
     private startTask3() {
         this.setActiveTask(TASK3_ID);
 
-        const taskState = createInitialTask3State(this);
+        const taskState = createInitialTask3State(this, 5, {
+            projection: this.getSelectionProjection(),
+        });
         if (!taskState) {
             console.warn("Unable to start Task 3: not enough selectable points");
             return;

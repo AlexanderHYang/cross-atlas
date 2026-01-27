@@ -141,10 +141,12 @@ function parseArguments() {
 
     const allowedProjections = new Set(["equirectangular", "pca", "vertical", "horizontal"]);
     const allowedLayouts = new Set(["spherical", "semiSpherical", "planar"]);
+    const allowedCounterbalance = new Set(["1", "2", "3", "4"]);
     let tasksArg;
     let calibrationOrientationArg;
     let layoutArg;
     let randomSelectionArg;
+    let counterbalanceArg;
 
     for (const arg of args) {
         // parse --projection option
@@ -194,6 +196,16 @@ function parseArguments() {
         if (arg.startsWith("--random-selection=")) {
             randomSelectionArg = arg.split("=")[1];
         }
+
+        if (arg.startsWith("--counterbalance=") || arg.startsWith("--cb=")) {
+            const cb = arg.split("=")[1];
+            if (allowedCounterbalance.has(cb)) {
+                counterbalanceArg = cb;
+            } else {
+                console.error(`Invalid --counterbalance=${cb}. Allowed: 1, 2, 3, 4`);
+                process.exit(1);
+            }
+        }
     }
 
     const envTasks =
@@ -240,6 +252,16 @@ function parseArguments() {
         process.env.npm_config_random_selection;
     if (envRandomSelection !== undefined) {
         envVars["VITE_RANDOM_SELECTION"] = envRandomSelection;
+    }
+
+    const envCounterbalance =
+        counterbalanceArg ??
+        process.env.VITE_COUNTERBALANCE ??
+        process.env.COUNTERBALANCE ??
+        process.env.counterbalance ??
+        process.env.npm_config_counterbalance;
+    if (envCounterbalance !== undefined) {
+        envVars["VITE_COUNTERBALANCE"] = envCounterbalance;
     }
 
     return envVars;

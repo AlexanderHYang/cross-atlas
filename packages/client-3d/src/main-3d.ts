@@ -28,6 +28,11 @@ vrHintGlow.innerGlow = true;
 vrHintGlow.outerGlow = true;
 vrHintGlow.blurHorizontalSize = 1.5;
 vrHintGlow.blurVerticalSize = 1.5;
+const errorGlow = new HighlightLayer("errorGlow", scene);
+errorGlow.innerGlow = true;
+errorGlow.outerGlow = true;
+errorGlow.blurHorizontalSize = 1.5;
+errorGlow.blurVerticalSize = 1.5;
 
 const liftOffset = 0.5;
 const env = sceneManager.createEnvironment({ bigRadius: DEFAULT_SPHERE_RADIUS });
@@ -132,6 +137,7 @@ const taskController3D = new TaskController3D({
     successColor,
     errorColor,
     vrHintGlowLayer: vrHintGlow,
+    errorGlowLayer: errorGlow,
 });
 
 function activateStudy() {
@@ -298,6 +304,23 @@ syncManager3D.onCalibrationPendingChange((pending) => {
         if (landmarkPoint) {
             landmarkPoint.setSelectable(landmarkSelectableAfterStart);
         }
+    }
+});
+
+syncManager3D.onStudyStartedChange((started) => {
+    studyStarted = started;
+    if (started) {
+        return;
+    }
+    landmarkClickStreak = 0;
+    calibrationActive = false;
+    calibrationClickStreak = 0;
+    taskController3D.setCalibrationActive(false);
+    taskController3D.resetForIdle();
+    if (landmarkPoint) {
+        landmarkPoint.setSelectable(true);
+        highlighter.removeMesh(landmarkPoint.mesh);
+        highlighter.addMesh(landmarkPoint.mesh, Color3.White());
     }
 });
 

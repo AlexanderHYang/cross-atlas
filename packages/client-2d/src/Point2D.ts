@@ -9,6 +9,7 @@ export class Point2D {
     onLocalChange: () => void;
     color: Vector3 = new Vector3(1, 1, 1);
     private baseColor: Vector3 = new Vector3(1, 1, 1);
+    private lastStableColor: Vector3 = new Vector3(1, 1, 1);
     pos3d: Vector3 = new Vector3(0, 0, 0);
 
     // 2d specific state
@@ -16,9 +17,12 @@ export class Point2D {
     ny: number = 0;
     private draggable: boolean = true;
     private selectable: boolean = true;
+    private desiredSelectable: boolean = true;
     private colorLock: Vector3 | null = null;
     private flashHandle: number | null = null;
     private flashing: boolean = false;
+    private errorHighlightActive: boolean = false;
+    private errorGlowActive: boolean = false;
 
     constructor(id: string, syncManager: SyncManager2D) {
         this.id = id;
@@ -36,6 +40,10 @@ export class Point2D {
     }
 
     public setSelectable(value: boolean) {
+        this.desiredSelectable = value;
+        if (this.errorHighlightActive) {
+            return;
+        }
         this.selectable = value;
     }
 
@@ -51,8 +59,13 @@ export class Point2D {
         return this.baseColor.clone();
     }
 
+    public getDisplayColor(): Vector3 {
+        return this.color.clone();
+    }
+
     public setBaseColor(color: Vector3) {
         this.baseColor.copyFrom(color);
+        this.lastStableColor.copyFrom(color);
     }
 
     public resetToBaseColor() {
@@ -61,8 +74,15 @@ export class Point2D {
     }
 
     public setDisplayColor(color: Vector3) {
-        this.color.copyFrom(color);
+        this.applyLocalColor(color);
+        if (!this.errorHighlightActive) {
+            this.lastStableColor.copyFrom(color);
+        }
         this.materializeColorChange();
+    }
+
+    private applyLocalColor(color: Vector3) {
+        this.color.copyFrom(color);
     }
 
     private materializeColorChange() {
@@ -88,6 +108,19 @@ export class Point2D {
             this.flashing = false;
             this.flashHandle = null;
         }, durationMs);
+    }
+
+    public setErrorHighlight(color: Vector3, glow: boolean = false) {
+        this.errorHighlightActive = true;
+        this.errorGlowActive = glow;
+        this.selectable = false;
+        this.applyLocalColor(color);
+    }
+
+    public clearErrorHighlight() {
+        this.errorHighlightActive = false;
+        this.errorGlowActive = false;
+        this.selectable = this.desiredSelectable;
     }
 
     public setLockedColor(color: Vector3) {
@@ -130,10 +163,16 @@ export class Point2D {
     }
 
     public applyRemoteData(remoteData: PointSyncData) {
-        // Skip applying remote color if we're currently flashing
-        if (this.flashHandle === null) {
-            this.color.set(remoteData.color.x, remoteData.color.y, remoteData.color.z);
+        // Skip applying remote color if we're currently flashing or showing an error highlight
+        const incoming = new Vector3(remoteData.color.x, remoteData.color.y, remoteData.color.z);
+        this.lastStableColor.copyFrom(incoming);
+        if (this.flashHandle === null && !this.errorHighlightActive) {
+            this.color.copyFrom(incoming);
         }
+    }
+
+    public getStableColor(): Vector3 {
+        return this.lastStableColor.clone();
     }
 
     public getLocalData(): PointSyncData {
@@ -156,17 +195,24 @@ export class Point2D {
         const x = ((this.nx + 1) / 2) * width;
         const y = (1 - (this.ny + 1) / 2) * height + yOffset;
         // color stored in this.color as Vector3 (r,g,b) in 0..1
-        const sourceColor = overrideColor ?? (hideColor ? this.baseColor : this.color);
+        const sourceColor = this.errorHighlightActive
+            ? this.color
+            : overrideColor ?? (hideColor ? this.baseColor : this.color);
         const r = Math.round(Math.min(1, Math.max(0, sourceColor.x)) * 255);
         const g = Math.round(Math.min(1, Math.max(0, sourceColor.y)) * 255);
         const b = Math.round(Math.min(1, Math.max(0, sourceColor.z)) * 255);
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         const radius = 12;
 
-        if (glowColor) {
-            const glowR = Math.round(Math.min(1, Math.max(0, glowColor.x)) * 255);
-            const glowG = Math.round(Math.min(1, Math.max(0, glowColor.y)) * 255);
-            const glowB = Math.round(Math.min(1, Math.max(0, glowColor.z)) * 255);
+        const resolvedGlow = this.errorHighlightActive
+            ? this.errorGlowActive
+                ? this.color
+                : null
+            : glowColor;
+        if (resolvedGlow) {
+            const glowR = Math.round(Math.min(1, Math.max(0, resolvedGlow.x)) * 255);
+            const glowG = Math.round(Math.min(1, Math.max(0, resolvedGlow.y)) * 255);
+            const glowB = Math.round(Math.min(1, Math.max(0, resolvedGlow.z)) * 255);
             const glowRadius = radius * 1.5;
             ctx.fillStyle = `rgba(${glowR}, ${glowG}, ${glowB}, 0.35)`;
             if (this.id === "landmark") {
@@ -189,7 +235,7 @@ export class Point2D {
     }
 
     hitTest(px: number, py: number, width: number, height: number, yOffset: number = 0) {
-        if (!this.selectable || this.flashing) {
+        if (!this.selectable || this.flashing || this.errorHighlightActive) {
             return false;
         }
         const x = ((this.nx + 1) / 2) * width;

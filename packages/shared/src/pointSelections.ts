@@ -1,5 +1,6 @@
 import selectionData from "../../../data/point-selections.json";
 import { layoutType } from "./defaultPoints";
+import { getCurrentCounterbalanceProjection } from "./counterbalance";
 
 export type ProjectionType = "equirectangular" | "pca" | "vertical" | "horizontal";
 
@@ -13,10 +14,16 @@ type SelectionEntry = {
 const RANDOM_SELECTION_ENV = (import.meta.env.VITE_RANDOM_SELECTION as string | undefined)?.trim();
 const PROJECTION_ENV = (import.meta.env.VITE_PROJECTION as string | undefined)?.trim();
 
-const resolvedProjection: ProjectionType =
-    PROJECTION_ENV === "pca" || PROJECTION_ENV === "vertical" || PROJECTION_ENV === "horizontal"
-        ? PROJECTION_ENV
-        : "equirectangular";
+function getDefaultProjection(): ProjectionType {
+    const counterbalanceProjection = getCurrentCounterbalanceProjection();
+    if (counterbalanceProjection) {
+        return counterbalanceProjection;
+    }
+    if (PROJECTION_ENV === "pca" || PROJECTION_ENV === "vertical" || PROJECTION_ENV === "horizontal") {
+        return PROJECTION_ENV;
+    }
+    return "equirectangular";
+}
 
 const selectionEntries = selectionData as SelectionEntry[];
 const selectionCache = new Map<string, SelectionEntry[]>();
@@ -46,7 +53,7 @@ export function getPrecomputedTrialSelection(
     options?: { layout?: string; projection?: ProjectionType },
 ): string[] | null {
     const layout = options?.layout ?? layoutType;
-    const projection = options?.projection ?? resolvedProjection;
+    const projection = options?.projection ?? getDefaultProjection();
     const entries = getSelectionsFor(layout, projection);
     const entry = entries.find((item) => item.trial === trial);
     return entry ? [...entry.points] : null;
@@ -57,7 +64,7 @@ export function getPrecomputedTaskSelection(
     options?: { layout?: string; projection?: ProjectionType },
 ): string[] | null {
     const layout = options?.layout ?? layoutType;
-    const projection = options?.projection ?? resolvedProjection;
+    const projection = options?.projection ?? getDefaultProjection();
     const entries = getSelectionsFor(layout, projection);
 
     if (taskNumber === 1) {

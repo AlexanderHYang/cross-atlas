@@ -25,9 +25,12 @@ export class Point3D {
     private material: StandardMaterial;
     private defaultColor: Color3;
     private baseColor: Color3;
+    private lastStableColor: Color3;
     private flashHandle: number | null = null;
     private localOverrideColor: Color3 | null = null;
     private selectable: boolean;
+    private errorHighlightActive: boolean;
+    private desiredSelectable: boolean;
 
     constructor(
         id: string,
@@ -39,6 +42,7 @@ export class Point3D {
         this.id = id;
         this.color = options?.color ?? Color3.White();
         this.selectable = options?.selectable ?? true;
+        this.desiredSelectable = this.selectable;
 
         // create a simple primitive to represent the point (landmark is a cube)
         const primitive =
@@ -52,6 +56,8 @@ export class Point3D {
         this.material = mat;
         this.baseColor = this.color.clone();
         this.defaultColor = this.color.clone();
+        this.lastStableColor = this.color.clone();
+        this.errorHighlightActive = false;
 
         if (initialPosition) {
             this.mesh.position = initialPosition.clone();
@@ -81,8 +87,21 @@ export class Point3D {
     }
 
     public applyRemoteData(remoteData: PointSyncData) {
-        // Skip applying remote color if we're currently flashing or showing a local override
-        if (remoteData.color && this.flashHandle === null && !this.localOverrideColor) {
+        // Skip applying remote color if we're currently flashing, showing a local override,
+        // or displaying an error highlight.
+        if (remoteData.color) {
+            this.lastStableColor = new Color3(
+                remoteData.color.x,
+                remoteData.color.y,
+                remoteData.color.z
+            );
+        }
+        if (
+            remoteData.color &&
+            this.flashHandle === null &&
+            !this.localOverrideColor &&
+            !this.errorHighlightActive
+        ) {
             this.material.diffuseColor.set(
                 remoteData.color.x,
                 remoteData.color.y,
@@ -104,6 +123,10 @@ export class Point3D {
         this.material.diffuseColor = color.clone();
     }
 
+    private applyLocalColor(color: Color3) {
+        this.material.diffuseColor = color.clone();
+    }
+
     public setLocalOverrideColor(color: Color3) {
         if (!this.localOverrideColor) {
             this.localOverrideColor = this.material.diffuseColor.clone();
@@ -114,16 +137,24 @@ export class Point3D {
     public setPermanentColor(color: Color3) {
         this.baseColor = color.clone();
         this.defaultColor = color.clone();
+        this.lastStableColor = this.defaultColor.clone();
         this.applyColor(this.defaultColor);
         this.onLocalChange();
     }
 
     public setDisplayColor(color: Color3) {
         this.applyColor(color);
+        if (!this.errorHighlightActive) {
+            this.lastStableColor = color.clone();
+        }
         this.onLocalChange();
     }
 
     public setSelectable(selectable: boolean) {
+        this.desiredSelectable = selectable;
+        if (this.errorHighlightActive) {
+            return;
+        }
         this.selectable = selectable;
         this.mesh.isPickable = selectable;
     }
@@ -135,6 +166,9 @@ export class Point3D {
     public resetToBaseColor() {
         this.defaultColor = this.baseColor.clone();
         this.applyColor(this.defaultColor);
+        if (!this.errorHighlightActive) {
+            this.lastStableColor = this.defaultColor.clone();
+        }
         this.onLocalChange();
         this.localOverrideColor = null;
         this.setSelectable(true);
@@ -151,8 +185,19 @@ export class Point3D {
         return this.defaultColor.clone();
     }
 
+    public getStableColor(): Color3 {
+        return this.lastStableColor.clone();
+    }
+
+    public getDisplayColor(): Color3 {
+        return this.material.diffuseColor.clone();
+    }
+
     public resetColor() {
         this.applyColor(this.defaultColor);
+        if (!this.errorHighlightActive) {
+            this.lastStableColor = this.defaultColor.clone();
+        }
     }
 
     public flashColorSynced(color: Color3, durationMs: number) {
@@ -170,5 +215,18 @@ export class Point3D {
             this.onLocalChange();
             this.flashHandle = null;
         }, durationMs);
+    }
+
+    public setErrorHighlight(color: Color3) {
+        this.errorHighlightActive = true;
+        this.selectable = false;
+        this.mesh.isPickable = false;
+        this.applyLocalColor(color);
+    }
+
+    public clearErrorHighlight() {
+        this.errorHighlightActive = false;
+        this.selectable = this.desiredSelectable;
+        this.mesh.isPickable = this.selectable;
     }
 }

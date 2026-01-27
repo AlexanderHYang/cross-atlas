@@ -28,11 +28,32 @@ The `npm run dev` script supports a few flags that map to Vite env vars:
 - `--tasks=<digits>` or `--task=<digits>`: enable specific tasks by number (e.g. `--tasks=1` for Task 1 only, `--tasks=13` for Tasks 1 and 3).
 - `--require-calibration-orientation=<true|false>` (alias `--calibration-orientation=<true|false>`): require the 3D user to face the landmark during calibration.
 - `--random-selection=<true|false>`: use randomized angular-distance sampling instead of the precomputed point selections.
+- `--counterbalance=<1|2|3|4>` (alias `--cb=<1|2|3|4>`): enable counterbalance mode with the specified sequence (see below).
+
+### Counterbalance Mode
+
+When `--counterbalance` is specified, participants complete all 7 trials for one projection, then automatically restart from trial 1 with the next projection in the sequence. This continues until all 4 projections are completed.
+
+**Sequences (Latin Square design):**
+| Flag | Sequence |
+|------|----------|
+| `--counterbalance=1` (S1) | PCA → Horizontal → Equirectangular → Vertical |
+| `--counterbalance=2` (S2) | Horizontal → Vertical → PCA → Equirectangular |
+| `--counterbalance=3` (S3) | Vertical → Equirectangular → Horizontal → PCA |
+| `--counterbalance=4` (S4) | Equirectangular → PCA → Vertical → Horizontal |
+
+**Note:** When counterbalance mode is enabled, the `--projection` flag is ignored since the projection sequence is controlled by the counterbalance condition.
 
 Example:
 
 ```bash
 npm run dev -- --projection=pca --layout=planar --tasks=1 --require-calibration-orientation=false --random-selection=true
+```
+
+**Counterbalance example** (runs all 4 projections in sequence S2):
+
+```bash
+npm run dev -- --counterbalance=2 --layout=planar
 ```
 
 3. Demo
