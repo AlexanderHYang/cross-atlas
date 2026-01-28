@@ -14,6 +14,17 @@ import type { Logger3D } from "../Logger3d";
 import type { Point3D } from "../Point3D";
 import type { SyncManager3D } from "../SyncManager3D";
 
+const successSoundUrl = new URL("../../../../resources/sound-effect.wav", import.meta.url);
+
+function createSuccessSound(): HTMLAudioElement | null {
+    if (typeof Audio === "undefined") {
+        return null;
+    }
+    const audio = new Audio(successSoundUrl.href);
+    audio.preload = "auto";
+    return audio;
+}
+
 export type TaskController3DDeps = {
     syncManager: SyncManager3D;
     logger: Logger3D;
@@ -28,6 +39,7 @@ export type TaskController3DDeps = {
 type ErrorSource = "local" | "remote";
 
 export class TaskController3D {
+    private readonly successSound = createSuccessSound();
     private lastTrial: number | null = null;
     private lastColorPairIndex: number | null = null;
     private lastProcessedErrorPointId2D: string | null = null;
@@ -62,6 +74,7 @@ export class TaskController3D {
                     pointId: point.id,
                 },
             });
+            this.playSuccessSound();
             this.setLocalError(null);
             const color = selection.successColor ?? this.deps.successColor;
             point.setDisplayColor(color);
@@ -186,6 +199,21 @@ export class TaskController3D {
         this.clearAllErrors({ restore: false });
         this.clearVrHintGlow();
         this.resetAllPointColorsToDefaults();
+    }
+
+    private playSuccessSound() {
+        if (!this.successSound) {
+            return;
+        }
+        try {
+            this.successSound.currentTime = 0;
+        } catch {
+            // Ignore seek errors if metadata isn't ready.
+        }
+        const playPromise = this.successSound.play();
+        if (playPromise) {
+            playPromise.catch(() => {});
+        }
     }
 
     private setLocalError(pointId: string | null) {

@@ -13,6 +13,17 @@ import type { Logger2D } from "../Logger2d";
 import type { Point2D } from "../Point2D";
 import type { SyncManager2D } from "../SyncManager2D";
 
+const successSoundUrl = new URL("../../../../resources/sound-effect.wav", import.meta.url);
+
+function createSuccessSound(): HTMLAudioElement | null {
+    if (typeof Audio === "undefined") {
+        return null;
+    }
+    const audio = new Audio(successSoundUrl.href);
+    audio.preload = "auto";
+    return audio;
+}
+
 export type TaskUIRefs = {
     trialBox: HTMLElement;
     instructionBox: HTMLElement;
@@ -32,6 +43,7 @@ export type TaskController2DDeps = {
 type ErrorSource = "local" | "remote";
 
 export class TaskController2D {
+    private readonly successSound = createSuccessSound();
     private lastTrial: number | null = null;
     private lastColorPairIndex: number | null = null;
     private lastProcessedErrorPointId3D: string | null = null;
@@ -132,6 +144,7 @@ export class TaskController2D {
 
         if (selection.isCorrect) {
             this.deps.logger.logCorrectClick2D(clicked.id);
+            this.playSuccessSound();
             this.setLocalError(null);
             const color = selection.successColor ?? this.deps.successColor;
             clicked.setDisplayColor(color);
@@ -217,6 +230,21 @@ export class TaskController2D {
     ) {
         const showGlow = entry.sources.has("remote");
         point.setErrorHighlight(this.deps.errorColor, showGlow);
+    }
+
+    private playSuccessSound() {
+        if (!this.successSound) {
+            return;
+        }
+        try {
+            this.successSound.currentTime = 0;
+        } catch {
+            // Ignore seek errors if metadata isn't ready.
+        }
+        const playPromise = this.successSound.play();
+        if (playPromise) {
+            playPromise.catch(() => {});
+        }
     }
 
     private clearAllErrors(options?: { restore?: boolean }) {
