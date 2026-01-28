@@ -631,6 +631,9 @@ function drawAll() {
 
 let dragging: Point2D | null = null;
 let dragMoved = false;
+const CURSOR_SAMPLE_INTERVAL_MS = 100;
+let lastCursorPosition: { x: number; y: number } | null = null;
+let cursorInside = false;
 function clampToBounds(px: number, py: number) {
     const b = getBounds();
     const clampedX = Math.min(b.x + b.w, Math.max(b.x, px));
@@ -663,6 +666,24 @@ canvas.addEventListener("pointerdown", (ev) => {
     }
 });
 
+canvas.addEventListener("pointermove", (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    const px = ev.clientX - rect.left;
+    const py = ev.clientY - rect.top;
+    const b = getBounds();
+    const inside =
+        px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h;
+    cursorInside = inside;
+    if (inside) {
+        const clamped = clampToBounds(px, py);
+        lastCursorPosition = { x: clamped.x, y: clamped.y };
+    }
+});
+
+canvas.addEventListener("pointerleave", () => {
+    cursorInside = false;
+});
+
 canvas.addEventListener("pointerup", (ev) => {
     if (!studyStarted || calibrationPending) {
         return;
@@ -693,6 +714,24 @@ function tryHandle2DSelection(px: number, py: number) {
     }
     taskController2D.tryHandleSelection(px, py, width, height, getYOffset());
 }
+
+window.setInterval(() => {
+    if (!studyStarted || calibrationPending) {
+        return;
+    }
+    if (!cursorInside || !lastCursorPosition) {
+        return;
+    }
+    const b = getBounds();
+    if (b.w <= 0 || b.h <= 0) {
+        return;
+    }
+    const relX = lastCursorPosition.x - b.x;
+    const relY = b.y + b.h - lastCursorPosition.y;
+    const normX = Math.min(1, Math.max(0, relX / b.w));
+    const normY = Math.min(1, Math.max(0, relY / b.h));
+    logger2d.logCursorSample(Date.now(), normX, normY);
+}, CURSOR_SAMPLE_INTERVAL_MS);
 
 // animate
 function loop() {

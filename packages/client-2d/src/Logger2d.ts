@@ -108,6 +108,14 @@ export class Logger2D {
     private timeSeriesHeaderWritten = false;
     private lastTrialKeyForTimeSeries: string | null = null;
     private suppressTimeSeriesLogs = false;
+    // Cursor time-series logging (2D)
+    private cursorSessionId = "";
+    private pendingCursorTimeSeries: string[] = [];
+    private cursorTimeSeriesSendInFlight = false;
+    private cursorTimeSeriesHeaderWritten = false;
+    private lastTrialKeyForCursorTimeSeries: string | null = null;
+    private cursorTrialStartTimes: Map<string, number> = new Map();
+    private suppressCursorTimeSeriesLogs = false;
 
     // Counterbalance tracking
     private currentProjectionIndex = 0;
@@ -167,6 +175,14 @@ export class Logger2D {
         this.timeSeriesHeaderWritten = true;
         this.suppressTimeSeriesLogs = false;
 
+        this.cursorSessionId = Logger2D.formatLocalTimestampForFile(new Date());
+        this.queueCursorTimeSeries(
+            `=== Time Series Data session=${this.cursorSessionId} ===\n` +
+                `Generated: ${Logger2D.formatLocalTimestamp(new Date())}\n\n`,
+        );
+        this.cursorTimeSeriesHeaderWritten = true;
+        this.suppressCursorTimeSeriesLogs = false;
+
         if (isCounterbalanceEnabled()) {
             const projIndex = getCurrentProjectionIndex();
             this.logTimeSeriesProjectionStart(
@@ -174,6 +190,7 @@ export class Logger2D {
                 projIndex + 1,
                 getTotalProjections(),
             );
+            this.logCursorProjectionStart(projection, projIndex + 1, getTotalProjections());
         }
         this.beginReceivingRemoteLogs();
     }
@@ -397,6 +414,41 @@ export class Logger2D {
         }
     }
 
+    private queueCursorTimeSeries(text: string) {
+        this.pendingCursorTimeSeries.push(text);
+        void this.sendPendingCursorTimeSeries();
+    }
+
+    private async sendPendingCursorTimeSeries(): Promise<void> {
+        if (this.cursorTimeSeriesSendInFlight || this.pendingCursorTimeSeries.length === 0) {
+            return;
+        }
+
+        this.cursorTimeSeriesSendInFlight = true;
+        const text = this.pendingCursorTimeSeries.join("");
+        this.pendingCursorTimeSeries = [];
+
+        try {
+            const response = await fetch("/api/logs/cursor-movement", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sessionId: this.cursorSessionId, text }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        } catch (error) {
+            console.warn("[2D] Failed to write cursor time-series:", error);
+            this.pendingCursorTimeSeries = [text, ...this.pendingCursorTimeSeries];
+        } finally {
+            this.cursorTimeSeriesSendInFlight = false;
+            if (this.pendingCursorTimeSeries.length > 0) {
+                void this.sendPendingCursorTimeSeries();
+            }
+        }
+    }
+
     private ensureTrialContext(): TrialContext | null {
         if (this.currentTrial) {
             return this.currentTrial;
@@ -557,6 +609,34 @@ export class Logger2D {
         this.trialSummaries.set(context.key, summary);
 
         this.lastRotationSample = sample;
+    }
+
+    public logCursorSample(time: number, x: number, y: number) {
+        if (this.finalized) {
+            return;
+        }
+        if (this.suppressCursorTimeSeriesLogs) {
+            return;
+        }
+        const context = this.ensureTrialContext();
+        if (!context) {
+            return;
+        }
+        if (this.lastTrialKeyForCursorTimeSeries !== context.key) {
+            const trialLabel = Logger2D.formatTrialLabel(
+                context.taskNumber,
+                context.trialNumber,
+                context.totalTrials,
+            );
+            this.queueCursorTimeSeries(`=== ${trialLabel} ===\ntime_ms,x,y\n`);
+            this.lastTrialKeyForCursorTimeSeries = context.key;
+            this.cursorTrialStartTimes.set(context.key, time);
+        }
+        const startTime = this.cursorTrialStartTimes.get(context.key) ?? time;
+        const relativeTime = time - startTime;
+        this.queueCursorTimeSeries(
+            `${relativeTime},${x.toFixed(6)},${y.toFixed(6)}\n`,
+        );
     }
 
     public logTask3PointSolved(params: {
@@ -953,6 +1033,8 @@ export class Logger2D {
 
         this.logTimeSeriesProjectionEnd(previousProjection, projectionIndex, totalProjections);
         this.logTimeSeriesProjectionStart(nextProjection, projectionIndex + 1, totalProjections);
+        this.logCursorProjectionEnd(previousProjection, projectionIndex, totalProjections);
+        this.logCursorProjectionStart(nextProjection, projectionIndex + 1, totalProjections);
 
         // Clear trial data for next projection
         this.trialSamples.clear();
@@ -1037,6 +1119,8 @@ export class Logger2D {
 
         this.logTimeSeriesProjectionEnd(projection, projectionIndex, totalProjections);
         this.suppressTimeSeriesLogs = true;
+        this.logCursorProjectionEnd(projection, projectionIndex, totalProjections);
+        this.suppressCursorTimeSeriesLogs = true;
 
         // Clear trial data for next projection
         this.trialSamples.clear();
@@ -1063,6 +1147,9 @@ export class Logger2D {
         this.suppressLifecycleLogs = false;
         this.currentProjectionIndex = getCurrentProjectionIndex();
         this.lastTrialKeyForTimeSeries = null;
+        this.lastTrialKeyForCursorTimeSeries = null;
+        this.cursorTrialStartTimes.clear();
+        this.suppressCursorTimeSeriesLogs = true;
     }
 
     /**
@@ -1088,6 +1175,8 @@ export class Logger2D {
 
         this.suppressTimeSeriesLogs = false;
         this.logTimeSeriesProjectionStart(projection, projectionIndex, totalProjections);
+        this.suppressCursorTimeSeriesLogs = false;
+        this.logCursorProjectionStart(projection, projectionIndex, totalProjections);
     }
 
     public finalizeStudy() {
@@ -1162,6 +1251,7 @@ export class Logger2D {
         this.finalized = true;
 
         this.flushEndLines(true);
+        this.suppressCursorTimeSeriesLogs = true;
         this.suppressTimeSeriesLogs = true;
 
         const timestamp = Logger2D.formatLocalTimestamp(new Date());
@@ -1196,6 +1286,35 @@ export class Logger2D {
                 `projection_index=${projectionIndex}/${totalProjections} ===\n\n`,
         );
         this.lastTrialKeyForTimeSeries = null;
+    }
+
+    private logCursorProjectionStart(
+        projection: string,
+        projectionIndex: number,
+        totalProjections: number,
+    ) {
+        const timestamp = Logger2D.formatLocalTimestamp(new Date());
+        this.lastTrialKeyForCursorTimeSeries = null;
+        this.cursorTrialStartTimes.clear();
+        this.suppressCursorTimeSeriesLogs = false;
+        this.queueCursorTimeSeries(
+            `=== [${timestamp}] projection_start projection=${projection} layout=${layoutType} ` +
+                `projection_index=${projectionIndex}/${totalProjections} ===\n`,
+        );
+    }
+
+    private logCursorProjectionEnd(
+        projection: string,
+        projectionIndex: number,
+        totalProjections: number,
+    ) {
+        const timestamp = Logger2D.formatLocalTimestamp(new Date());
+        this.queueCursorTimeSeries(
+            `=== [${timestamp}] projection_end projection=${projection} layout=${layoutType} ` +
+                `projection_index=${projectionIndex}/${totalProjections} ===\n\n`,
+        );
+        this.lastTrialKeyForCursorTimeSeries = null;
+        this.cursorTrialStartTimes.clear();
     }
 
     private getSortedSummaries(): TrialSummary[] {

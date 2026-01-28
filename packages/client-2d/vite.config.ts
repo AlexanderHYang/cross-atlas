@@ -17,6 +17,7 @@ function logWriterPlugin() {
                 // Check if this is a time-series request (req.originalUrl has full path)
                 const fullUrl = req.originalUrl || req.url || "";
                 const isTimeSeries = fullUrl.includes("/timeseries");
+                const isCursorSeries = fullUrl.includes("/cursor-movement");
 
                 if (req.method !== "POST") {
                     res.statusCode = 405;
@@ -26,7 +27,7 @@ function logWriterPlugin() {
 
                 let body = "";
                 let tooLarge = false;
-                const maxSize = isTimeSeries ? 10_000_000 : 5_000_000;
+                const maxSize = isTimeSeries || isCursorSeries ? 10_000_000 : 5_000_000;
                 req.on("data", (chunk: any) => {
                     body += chunk.toString();
                     if (body.length > maxSize) {
@@ -62,10 +63,12 @@ function logWriterPlugin() {
                     const safeSessionId = sessionIdRaw.replace(/[^a-zA-Z0-9_-]/g, "");
 
                     // Different folder and filename for time-series vs study logs
-                    const targetDir = isTimeSeries ? timeSeriesDir : studyLogsDir;
-                    const filename = isTimeSeries
-                        ? `vr-movement-${safeSessionId}.log`
-                        : `study-${safeSessionId}.log`;
+                    const targetDir = isTimeSeries || isCursorSeries ? timeSeriesDir : studyLogsDir;
+                    const filename = isCursorSeries
+                        ? `cursor-movement-${safeSessionId}.log`
+                        : isTimeSeries
+                          ? `vr-movement-${safeSessionId}.log`
+                          : `study-${safeSessionId}.log`;
 
                     try {
                         fs.mkdirSync(targetDir, { recursive: true });
