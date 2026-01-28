@@ -14,7 +14,7 @@ import type { Logger3D } from "../Logger3d";
 import type { Point3D } from "../Point3D";
 import type { SyncManager3D } from "../SyncManager3D";
 
-const successSoundUrl = new URL("../../../../resources/sound-effect.wav", import.meta.url);
+const successSoundUrl = new URL("../../../../resources/sound-effect.mp3", import.meta.url);
 
 function createSuccessSound(): HTMLAudioElement | null {
     if (typeof Audio === "undefined") {

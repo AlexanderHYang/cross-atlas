@@ -13,7 +13,7 @@ import type { Logger2D } from "../Logger2d";
 import type { Point2D } from "../Point2D";
 import type { SyncManager2D } from "../SyncManager2D";
 
-const successSoundUrl = new URL("../../../../resources/sound-effect.wav", import.meta.url);
+const successSoundUrl = new URL("../../../../resources/sound-effect.mp3", import.meta.url);
 
 function createSuccessSound(): HTMLAudioElement | null {
     if (typeof Audio === "undefined") {
