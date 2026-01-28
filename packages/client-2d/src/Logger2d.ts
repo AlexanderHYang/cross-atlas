@@ -107,6 +107,7 @@ export class Logger2D {
     private timeSeriesSendInFlight = false;
     private timeSeriesHeaderWritten = false;
     private lastTrialKeyForTimeSeries: string | null = null;
+    private suppressTimeSeriesLogs = false;
 
     // Counterbalance tracking
     private currentProjectionIndex = 0;
@@ -164,6 +165,16 @@ export class Logger2D {
                 `Generated: ${Logger2D.formatLocalTimestamp(new Date())}\n\n`,
         );
         this.timeSeriesHeaderWritten = true;
+        this.suppressTimeSeriesLogs = false;
+
+        if (isCounterbalanceEnabled()) {
+            const projIndex = getCurrentProjectionIndex();
+            this.logTimeSeriesProjectionStart(
+                projection,
+                projIndex + 1,
+                getTotalProjections(),
+            );
+        }
         this.beginReceivingRemoteLogs();
     }
 
@@ -491,19 +502,21 @@ export class Logger2D {
         this.trialSamples.set(context.key, samples);
 
         // Write to time-series file (raw values)
-        if (this.lastTrialKeyForTimeSeries !== context.key) {
-            const trialLabel = Logger2D.formatTrialLabel(
-                context.taskNumber,
-                context.trialNumber,
-                context.totalTrials,
+        if (!this.suppressTimeSeriesLogs) {
+            if (this.lastTrialKeyForTimeSeries !== context.key) {
+                const trialLabel = Logger2D.formatTrialLabel(
+                    context.taskNumber,
+                    context.trialNumber,
+                    context.totalTrials,
+                );
+                this.queueTimeSeries(`=== ${trialLabel} ===\ntime_ms,yaw,pitch\n`);
+                this.lastTrialKeyForTimeSeries = context.key;
+            }
+            const relativeTime = isFirstSampleForTrial ? 0 : sample.time - samples[0].time;
+            this.queueTimeSeries(
+                `${relativeTime},${sample.yaw.toFixed(6)},${sample.pitch.toFixed(6)}\n`,
             );
-            this.queueTimeSeries(`=== ${trialLabel} ===\ntime_ms,yaw,pitch\n`);
-            this.lastTrialKeyForTimeSeries = context.key;
         }
-        const relativeTime = isFirstSampleForTrial ? 0 : sample.time - samples[0].time;
-        this.queueTimeSeries(
-            `${relativeTime},${sample.yaw.toFixed(6)},${sample.pitch.toFixed(6)}\n`,
-        );
 
         const summary =
             this.trialSummaries.get(context.key) ??
@@ -938,6 +951,9 @@ export class Logger2D {
 
         this.queueText(`${lines.join("\n")}\n`);
 
+        this.logTimeSeriesProjectionEnd(previousProjection, projectionIndex, totalProjections);
+        this.logTimeSeriesProjectionStart(nextProjection, projectionIndex + 1, totalProjections);
+
         // Clear trial data for next projection
         this.trialSamples.clear();
         this.trialSummaries.clear();
@@ -1019,6 +1035,9 @@ export class Logger2D {
 
         this.queueText(`${lines.join("\n")}\n`);
 
+        this.logTimeSeriesProjectionEnd(projection, projectionIndex, totalProjections);
+        this.suppressTimeSeriesLogs = true;
+
         // Clear trial data for next projection
         this.trialSamples.clear();
         this.trialSummaries.clear();
@@ -1043,6 +1062,7 @@ export class Logger2D {
         this.finalized = false;
         this.suppressLifecycleLogs = false;
         this.currentProjectionIndex = getCurrentProjectionIndex();
+        this.lastTrialKeyForTimeSeries = null;
     }
 
     /**
@@ -1065,6 +1085,9 @@ export class Logger2D {
         lines.push("=".repeat(80));
         lines.push("");
         this.queueText(`${lines.join("\n")}\n`);
+
+        this.suppressTimeSeriesLogs = false;
+        this.logTimeSeriesProjectionStart(projection, projectionIndex, totalProjections);
     }
 
     public finalizeStudy() {
@@ -1139,12 +1162,40 @@ export class Logger2D {
         this.finalized = true;
 
         this.flushEndLines(true);
+        this.suppressTimeSeriesLogs = true;
 
         const timestamp = Logger2D.formatLocalTimestamp(new Date());
         const lines: string[] = [];
         lines.push(`=== [${timestamp}] study_end session=${this.sessionId} mode=counterbalance ===`);
         lines.push("");
         this.queueText(`${lines.join("\n")}\n`);
+    }
+
+    private logTimeSeriesProjectionStart(
+        projection: string,
+        projectionIndex: number,
+        totalProjections: number,
+    ) {
+        const timestamp = Logger2D.formatLocalTimestamp(new Date());
+        this.lastTrialKeyForTimeSeries = null;
+        this.suppressTimeSeriesLogs = false;
+        this.queueTimeSeries(
+            `=== [${timestamp}] projection_start projection=${projection} layout=${layoutType} ` +
+                `projection_index=${projectionIndex}/${totalProjections} ===\n`,
+        );
+    }
+
+    private logTimeSeriesProjectionEnd(
+        projection: string,
+        projectionIndex: number,
+        totalProjections: number,
+    ) {
+        const timestamp = Logger2D.formatLocalTimestamp(new Date());
+        this.queueTimeSeries(
+            `=== [${timestamp}] projection_end projection=${projection} layout=${layoutType} ` +
+                `projection_index=${projectionIndex}/${totalProjections} ===\n\n`,
+        );
+        this.lastTrialKeyForTimeSeries = null;
     }
 
     private getSortedSummaries(): TrialSummary[] {

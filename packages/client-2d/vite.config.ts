@@ -64,8 +64,8 @@ function logWriterPlugin() {
                     // Different folder and filename for time-series vs study logs
                     const targetDir = isTimeSeries ? timeSeriesDir : studyLogsDir;
                     const filename = isTimeSeries
-                        ? `timeseries-${safeSessionId}.txt`
-                        : `study-${safeSessionId}.txt`;
+                        ? `vr-movement-${safeSessionId}.log`
+                        : `study-${safeSessionId}.log`;
 
                     try {
                         fs.mkdirSync(targetDir, { recursive: true });

@@ -344,6 +344,16 @@ export function evaluateTask3Selection2D(
         return { handled: false };
     }
 
+    const alreadyLocked =
+        taskState.trial7Assignments?.some(
+            (entry) =>
+                (entry.done2D && entry.point2D === selectedPointId) ||
+                (entry.done3D && entry.point3D === selectedPointId),
+        ) ?? false;
+    if (alreadyLocked) {
+        return { handled: false };
+    }
+
     const alreadySolved =
         taskState.trial7Assignments?.some(
             (entry) =>
@@ -386,6 +396,16 @@ export function evaluateTask3Selection3D(
     }
 
     if (selectedPointId === taskState.targetPointId2D) {
+        return { handled: false };
+    }
+
+    const alreadyLocked =
+        taskState.trial7Assignments?.some(
+            (entry) =>
+                (entry.done2D && entry.point2D === selectedPointId) ||
+                (entry.done3D && entry.point3D === selectedPointId),
+        ) ?? false;
+    if (alreadyLocked) {
         return { handled: false };
     }
 
@@ -501,15 +521,18 @@ export function setTrial7Selectability2D(
 ) {
     if (!taskState || taskState.trial !== 7 || !taskState.trial7Assignments) return;
 
-    const solvedIds = new Set<string>();
+    const lockedIds = new Set<string>();
     for (const entry of taskState.trial7Assignments) {
-        if (entry.done2D && entry.done3D) {
-            solvedIds.add(entry.point2D);
+        if (entry.done2D) {
+            lockedIds.add(entry.point2D);
+        }
+        if (entry.done3D) {
+            lockedIds.add(entry.point3D);
         }
     }
 
     for (const p of points) {
-        if (solvedIds.has(p.id)) {
+        if (lockedIds.has(p.id)) {
             p.setSelectable(false);
         } else {
             p.setSelectable(true);
@@ -527,10 +550,8 @@ export function setTrial7Selectability3D(
     for (const entry of taskState.trial7Assignments) {
         const vrTarget = pointMap.get(entry.point3D);
         const pcHintSphere = pointMap.get(entry.point2D);
-        const solved = entry.done2D && entry.done3D;
-
-        vrTarget?.setSelectable(!solved);
-        pcHintSphere?.setSelectable(!solved);
+        vrTarget?.setSelectable(!entry.done3D);
+        pcHintSphere?.setSelectable(!entry.done2D);
     }
 }
 
