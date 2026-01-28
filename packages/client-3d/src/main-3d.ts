@@ -142,6 +142,7 @@ const taskController3D = new TaskController3D({
 
 function activateStudy() {
     if (studyActivated) {
+        logger3D.setLoggingEnabled(true);
         return;
     }
     studyActivated = true;
@@ -310,8 +311,10 @@ syncManager3D.onCalibrationPendingChange((pending) => {
 syncManager3D.onStudyStartedChange((started) => {
     studyStarted = started;
     if (started) {
+        activateStudy();
         return;
     }
+    logger3D.setLoggingEnabled(false);
     landmarkClickStreak = 0;
     calibrationActive = false;
     calibrationClickStreak = 0;

@@ -151,7 +151,7 @@ export function handleTask3Selection2D(
 
     const updated: TaskState = {
         ...currentState,
-        clicked2D: isCorrect,
+        clicked2D: currentState.clicked2D || isCorrect,
         clicked3D: currentState.clicked3D,
         feedback: !isCorrect ? "error" : pairSolved ? "success" : "none",
         completed: pairSolved,
@@ -200,7 +200,7 @@ export function handleTask3Selection3D(
 
     const updated: TaskState = {
         ...currentState,
-        clicked3D: isCorrect,
+        clicked3D: currentState.clicked3D || isCorrect,
         clicked2D: currentState.clicked2D,
         feedback: !isCorrect ? "error" : pairSolved ? "success" : "none",
         completed: pairSolved,
