@@ -79,7 +79,9 @@ export class SyncManager3D implements PointIdProvider {
             Number.parseInt(import.meta.env.VITE_Y_WEBSOCKET_PORT ?? "", 10) ||
             1234;
         const websocketUrl = `${protocol}://${normalizedHost}:${port}`;
-        this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc);
+        this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc, {
+            params: { client: "3d" },
+        });
 
         // 2) create local state maps
         this.localPointsById = new Map<string, Point3D>();

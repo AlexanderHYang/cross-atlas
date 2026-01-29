@@ -90,7 +90,9 @@ export class SyncManager2D implements PointIdProvider {
             1234;
         const websocketUrl = `${protocol}://${normalizedHost}:${port}`;
 
-        this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc);
+        this.provider = new WebsocketProvider(websocketUrl, "chart-room", this.ydoc, {
+            params: { client: "2d" },
+        });
 
         // 2) create local state maps
         this.localPointsById = new Map<string, Point2D>();

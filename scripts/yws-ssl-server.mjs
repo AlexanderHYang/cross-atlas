@@ -19,6 +19,18 @@ const __dirname = dirname(__filename);
 
 const HOST = process.env.HOST?.trim() || "0.0.0.0";
 const PORT = Number.parseInt(process.env.PORT ?? "1234", 10);
+const MAX_TOTAL_CLIENTS = Number.parseInt(
+  process.env.MAX_CLIENTS ?? "2",
+  10
+);
+const MAX_ROOM_CLIENTS = Number.parseInt(
+  process.env.MAX_ROOM_CLIENTS ?? String(MAX_TOTAL_CLIENTS),
+  10
+);
+const ENFORCE_CLIENT_TYPES =
+  (process.env.ENFORCE_CLIENT_TYPES ?? "true").trim().toLowerCase() !== "false";
+
+const VALID_CLIENT_TYPES = new Set(["2d", "3d"]);
 
 function getLocalIpAddress() {
   const interfaces = networkInterfaces();
@@ -70,6 +82,7 @@ server.on("error", handleFatalServerError);
 wss.on("connection", (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const room = url.pathname.slice(1) || "crossdash-room";
+  const clientType = url.searchParams.get("client")?.toLowerCase() ?? "";
 
   if (!docs.has(room)) {
     docs.set(room, new Y.Doc());
@@ -80,16 +93,60 @@ wss.on("connection", (ws, req) => {
   const roomConns = connectionsByRoom.get(room);
   const awareness = new awarenessProtocol.Awareness(doc);
 
-  roomConns.set(ws, { awareness });
-  const remoteAddress = req.socket?.remoteAddress ?? "unknown";
-  const remotePort = req.socket?.remotePort ? `:${req.socket.remotePort}` : "";
   const totalClients = Array.from(connectionsByRoom.values()).reduce(
     (acc, map) => acc + map.size,
     0
   );
+  if (ENFORCE_CLIENT_TYPES) {
+    if (!VALID_CLIENT_TYPES.has(clientType)) {
+      ws.close(1008, "Invalid client type");
+      console.warn(
+        `Rejected client for room "${room}" (invalid client type "${clientType || "none"}").`
+      );
+      return;
+    }
+    const hasSameType = Array.from(roomConns.values()).some(
+      (info) => info.clientType === clientType
+    );
+    if (hasSameType) {
+      ws.close(1008, `Client type "${clientType}" already connected`);
+      console.warn(
+        `Rejected client for room "${room}" (duplicate client type "${clientType}").`
+      );
+      return;
+    }
+  }
+  if (
+    Number.isFinite(MAX_TOTAL_CLIENTS) &&
+    totalClients >= MAX_TOTAL_CLIENTS
+  ) {
+    ws.close(1008, "Server at capacity");
+    console.warn(
+      `Rejected client for room "${room}" (total capacity ${MAX_TOTAL_CLIENTS}).`
+    );
+    return;
+  }
+  if (
+    Number.isFinite(MAX_ROOM_CLIENTS) &&
+    roomConns.size >= MAX_ROOM_CLIENTS
+  ) {
+    ws.close(1008, "Room at capacity");
+    console.warn(
+      `Rejected client for room "${room}" (room capacity ${MAX_ROOM_CLIENTS}).`
+    );
+    return;
+  }
+
+  roomConns.set(ws, { awareness, clientType: clientType || "unknown" });
+  const remoteAddress = req.socket?.remoteAddress ?? "unknown";
+  const remotePort = req.socket?.remotePort ? `:${req.socket.remotePort}` : "";
+  const totalClientsAfter = Array.from(connectionsByRoom.values()).reduce(
+    (acc, map) => acc + map.size,
+    0
+  );
   console.log(
-    `Client connected from ${remoteAddress}${remotePort} -> room "${room}". ` +
-      `Room count: ${roomConns.size}, total clients: ${totalClients}.`
+    `Client connected (${clientType || "unknown"}) from ${remoteAddress}${remotePort} ` +
+      `-> room "${room}". Room count: ${roomConns.size}, total clients: ${totalClientsAfter}.`
   );
 
   const encoder = encoding.createEncoder();
@@ -150,11 +207,20 @@ wss.on("connection", (ws, req) => {
     if (!roomConnections) {
       return;
     }
+    const info = roomConnections.get(ws);
     roomConnections.delete(ws);
     if (roomConnections.size === 0) {
       connectionsByRoom.delete(room);
       docs.delete(room);
     }
+    const totalClientsAfterClose = Array.from(connectionsByRoom.values()).reduce(
+      (acc, map) => acc + map.size,
+      0
+    );
+    console.log(
+      `Client disconnected (${info?.clientType || "unknown"}) from room "${room}". ` +
+        `Room count: ${roomConnections.size}, total clients: ${totalClientsAfterClose}.`
+    );
   });
 
   ws.on("error", (error) => {
@@ -204,6 +270,8 @@ server.on("request", (_req, res) => {
             <li>Local URL: <code>${protocol}://localhost:${PORT}/</code></li>
             <li>Network URL: <code>${protocol}://${getLocalIpAddress()}:${PORT}/</code></li>
             <li>Active Rooms: <strong>${docs.size}</strong></li>
+            <li>Max Clients: <strong>${MAX_TOTAL_CLIENTS}</strong></li>
+            <li>Max Clients per Room: <strong>${MAX_ROOM_CLIENTS}</strong></li>
           </ul>
         </div>
       </body>
