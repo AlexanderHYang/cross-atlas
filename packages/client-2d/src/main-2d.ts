@@ -284,6 +284,7 @@ let startReady2D = syncManager.isStartReady2D();
 let startReady3D = syncManager.isStartReady3D();
 let calibrationPending = syncManager.isCalibrationPending();
 let awaitingNextTaskState = false;
+let uiLockedForCompletion = false;
 let startCountdownUntil: number | null = null;
 function setLandmarkSelectableForStart(waiting: boolean) {
     const landmark = syncManager.getLocalPoints().find((p) => p.id === "landmark");
@@ -424,6 +425,9 @@ syncManager.onTaskStateChange((taskState) => {
     }
     if (awaitingNextTaskState) {
         awaitingNextTaskState = false;
+    }
+    if (uiLockedForCompletion) {
+        return;
     }
     // Don't update UI during projection transitions to preserve transition message
     if (isProjectionTransitioning()) {
@@ -581,12 +585,14 @@ syncManager.onTaskStateChange((taskState) => {
                 trialBox.style.display = "none";
                 instructionBox.style.left = "16px";
                 instructionBox.innerHTML = `<span style='color: #2ecc71; font-weight: 600;'>Study complete <span style='opacity: 0.5; margin: 0 8px;'>|</span> All ${totalProj} projections finished</span>`;
+                uiLockedForCompletion = true;
             } else {
                 // Hide trial box and move instruction box to left
                 trialBox.style.display = "none";
                 instructionBox.style.left = "16px";
                 instructionBox.innerHTML = `<span style='color: #2ecc71; font-weight: 600;'>Session complete</span>`;
                 logger2d.finalizeStudy();
+                uiLockedForCompletion = true;
             }
             instructionBox.style.display = "block";
         }

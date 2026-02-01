@@ -83,6 +83,9 @@ wss.on("connection", (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const room = url.pathname.slice(1) || "crossdash-room";
   const clientType = url.searchParams.get("client")?.toLowerCase() ?? "";
+  const remoteAddress = req.socket?.remoteAddress ?? "unknown";
+  const remotePort = req.socket?.remotePort ? `:${req.socket.remotePort}` : "";
+  const remoteLabel = `${remoteAddress}${remotePort}`;
 
   if (!docs.has(room)) {
     docs.set(room, new Y.Doc());
@@ -101,7 +104,8 @@ wss.on("connection", (ws, req) => {
     if (!VALID_CLIENT_TYPES.has(clientType)) {
       ws.close(1008, "Invalid client type");
       console.warn(
-        `Rejected client for room "${room}" (invalid client type "${clientType || "none"}").`
+        `Rejected client for room "${room}" from ${remoteLabel} ` +
+          `(invalid client type "${clientType || "none"}").`
       );
       return;
     }
@@ -111,7 +115,8 @@ wss.on("connection", (ws, req) => {
     if (hasSameType) {
       ws.close(1008, `Client type "${clientType}" already connected`);
       console.warn(
-        `Rejected client for room "${room}" (duplicate client type "${clientType}").`
+        `Rejected client for room "${room}" from ${remoteLabel} ` +
+          `(duplicate client type "${clientType}").`
       );
       return;
     }
@@ -122,7 +127,8 @@ wss.on("connection", (ws, req) => {
   ) {
     ws.close(1008, "Server at capacity");
     console.warn(
-      `Rejected client for room "${room}" (total capacity ${MAX_TOTAL_CLIENTS}).`
+      `Rejected client for room "${room}" from ${remoteLabel} ` +
+        `(total capacity ${MAX_TOTAL_CLIENTS}).`
     );
     return;
   }
@@ -132,14 +138,13 @@ wss.on("connection", (ws, req) => {
   ) {
     ws.close(1008, "Room at capacity");
     console.warn(
-      `Rejected client for room "${room}" (room capacity ${MAX_ROOM_CLIENTS}).`
+      `Rejected client for room "${room}" from ${remoteLabel} ` +
+        `(room capacity ${MAX_ROOM_CLIENTS}).`
     );
     return;
   }
 
   roomConns.set(ws, { awareness, clientType: clientType || "unknown" });
-  const remoteAddress = req.socket?.remoteAddress ?? "unknown";
-  const remotePort = req.socket?.remotePort ? `:${req.socket.remotePort}` : "";
   const totalClientsAfter = Array.from(connectionsByRoom.values()).reduce(
     (acc, map) => acc + map.size,
     0
