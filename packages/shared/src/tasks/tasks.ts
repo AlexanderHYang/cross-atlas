@@ -259,6 +259,8 @@ export { TASK3_ID } from "./task3";
 export type TaskMeta = {
     activeTaskId?: TaskId;
     studyStarted?: boolean;
+    startReady2D?: boolean;
+    startReady3D?: boolean;
     calibrationPending?: boolean;
     calibrationTaskId?: TaskId;
     calibrationTrial?: TaskTrial;

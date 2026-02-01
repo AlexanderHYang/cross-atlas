@@ -57,9 +57,12 @@ export class SyncManager3D implements PointIdProvider {
     private activeTaskId: TaskId = TASK1_ID;
     private updatingMeta = false;
     private studyStarted = false;
+    private startReady2D = false;
+    private startReady3D = false;
     private calibrationPending = false;
     private calibrationListeners: Set<(pending: boolean) => void> = new Set();
     private studyListeners: Set<(started: boolean) => void> = new Set();
+    private startReadyListeners: Set<(ready2D: boolean, ready3D: boolean) => void> = new Set();
     private currentProjectionType: ProjectionType = "equirectangular";
     private pendingCalibrationCompletion = false;
 
@@ -147,6 +150,17 @@ export class SyncManager3D implements PointIdProvider {
         this.studyStarted = started;
         for (const listener of this.studyListeners) {
             listener(started);
+        }
+    }
+
+    private updateStartReady(ready2D: boolean, ready3D: boolean) {
+        if (this.startReady2D === ready2D && this.startReady3D === ready3D) {
+            return;
+        }
+        this.startReady2D = ready2D;
+        this.startReady3D = ready3D;
+        for (const listener of this.startReadyListeners) {
+            listener(ready2D, ready3D);
         }
     }
 
@@ -259,6 +273,7 @@ export class SyncManager3D implements PointIdProvider {
 
             const studyMeta = this.taskMetaMap.get("study");
             this.updateStudyStarted(!!studyMeta?.studyStarted);
+            this.updateStartReady(!!studyMeta?.startReady2D, !!studyMeta?.startReady3D);
 
             const calibrationMeta = this.taskMetaMap.get("calibration");
             this.updateCalibrationPending(!!calibrationMeta?.calibrationPending);
@@ -309,10 +324,19 @@ export class SyncManager3D implements PointIdProvider {
             manager.taskMetaMap.set("active", { activeTaskId: manager.activeTaskId });
         }
         manager.currentTask = manager.normalizeTaskState(manager.taskMap.get(manager.activeTaskId));
-        manager.studyStarted = !!manager.taskMetaMap.get("study")?.studyStarted;
-        if (!manager.taskMetaMap.get("study")) {
-            manager.taskMetaMap.set("study", { studyStarted: false });
+        const studyMeta = manager.taskMetaMap.get("study");
+        manager.studyStarted = !!studyMeta?.studyStarted;
+        manager.startReady2D = !!studyMeta?.startReady2D;
+        manager.startReady3D = !!studyMeta?.startReady3D;
+        if (!studyMeta) {
+            manager.taskMetaMap.set("study", {
+                studyStarted: false,
+                startReady2D: false,
+                startReady3D: false,
+            });
             manager.studyStarted = false;
+            manager.startReady2D = false;
+            manager.startReady3D = false;
         }
         manager.calibrationPending = !!manager.taskMetaMap.get("calibration")?.calibrationPending;
         if (!manager.taskMetaMap.get("calibration")) {
@@ -404,14 +428,57 @@ export class SyncManager3D implements PointIdProvider {
         };
     }
 
+    public onStartReadyChange(listener: (ready2D: boolean, ready3D: boolean) => void) {
+        this.startReadyListeners.add(listener);
+        listener(this.startReady2D, this.startReady3D);
+        return () => {
+            this.startReadyListeners.delete(listener);
+        };
+    }
+
+    private setStudyMeta(next: TaskMeta) {
+        const prev = this.taskMetaMap.get("study") ?? {};
+        this.taskMetaMap.set("study", { ...prev, ...next });
+    }
+
     public setStudyStarted(started: boolean) {
         if (this.studyStarted === started) {
             return;
         }
         this.updatingMeta = true;
-        this.taskMetaMap.set("study", { studyStarted: started });
+        const next: TaskMeta = { studyStarted: started };
+        if (!started) {
+            next.startReady2D = false;
+            next.startReady3D = false;
+        }
+        this.setStudyMeta(next);
         this.updatingMeta = false;
         this.updateStudyStarted(started);
+        if (!started) {
+            this.updateStartReady(false, false);
+        }
+    }
+
+    public setStartReady3D(ready: boolean) {
+        if (this.startReady3D === ready) {
+            return;
+        }
+        this.updatingMeta = true;
+        this.setStudyMeta({ startReady3D: ready });
+        this.updatingMeta = false;
+        this.updateStartReady(this.startReady2D, ready);
+    }
+
+    public isStartReady2D(): boolean {
+        return this.startReady2D;
+    }
+
+    public isStartReady3D(): boolean {
+        return this.startReady3D;
+    }
+
+    public areBothStartReady(): boolean {
+        return this.startReady2D && this.startReady3D;
     }
 
     public isStudyStarted(): boolean {

@@ -111,6 +111,8 @@ const TOP_UI_HEIGHT = 80;
 const TOP_UI_GAP = 12;
 const SUCCESS_COLOR_VEC = new Vector3(0x2e / 255, 0xcc / 255, 0x71 / 255);
 const ERROR_COLOR_VEC = new Vector3(0xc0 / 255, 0x39 / 255, 0x2b / 255);
+const START_PULSE_SPEED = 0.004;
+const START_LANDMARK_COLOR = new Vector3(0, 0, 1);
 const colorConfig2D: TaskColorConfig2D = {
     success: SUCCESS_COLOR_VEC,
     error: ERROR_COLOR_VEC,
@@ -278,34 +280,83 @@ for (const p of syncManager.getLocalPoints()) {
 }
 
 let studyStarted = syncManager.isStudyStarted();
+let startReady2D = syncManager.isStartReady2D();
+let startReady3D = syncManager.isStartReady3D();
 let calibrationPending = syncManager.isCalibrationPending();
 let awaitingNextTaskState = false;
+let startCountdownUntil: number | null = null;
+function setLandmarkSelectableForStart(waiting: boolean) {
+    const landmark = syncManager.getLocalPoints().find((p) => p.id === "landmark");
+    if (!landmark) {
+        return;
+    }
+    if (waiting) {
+        landmark.setSelectable(true);
+        return;
+    }
+    const cfg = getDefaultPointConfig("landmark");
+    if (cfg?.selectable === false) {
+        landmark.setSelectable(false);
+    }
+}
+
 function setWaitingUI() {
-    trialBox.textContent = "Waiting for 3D user to initialize the study";
+    trialBox.textContent = "Waiting for both users to click the landmark to start";
+    trialBox.style.display = "block";
     instructionBox.textContent = "";
     instructionBox.style.display = "none";
+    instructionBox.style.left = "220px";
 }
 function setCalibrationUI() {
     trialBox.textContent = "Waiting for 3D user to recalibrate";
     instructionBox.textContent = "";
     instructionBox.style.display = "none";
 }
+function setStartCountdownUI() {
+    instructionBox.textContent = "Starting the study...";
+    instructionBox.style.display = "block";
+    instructionBox.style.left = "16px";
+    trialBox.style.display = "none";
+}
 
 if (!studyStarted) {
     setWaitingUI();
+    setLandmarkSelectableForStart(true);
     logger2d.addLogEvent({
         eventName: "awaiting_start_sequence",
         eventDetails: { status: "waiting" },
     });
 }
 
+syncManager.onStartReadyChange((ready2D, ready3D) => {
+    startReady2D = ready2D;
+    startReady3D = ready3D;
+    if (studyStarted) {
+        return;
+    }
+    if (ready2D && ready3D) {
+        if (startCountdownUntil === null) {
+            startCountdownUntil = Date.now() + 1000;
+        }
+        setStartCountdownUI();
+    } else {
+        startCountdownUntil = null;
+        setWaitingUI();
+    }
+});
+
 syncManager.onStudyStartedChange((started) => {
     studyStarted = started;
     if (!started) {
         syncManager.resetPointsToDefaultConfig();
         setWaitingUI();
+        setLandmarkSelectableForStart(true);
+        startCountdownUntil = null;
         return;
     }
+
+    startCountdownUntil = null;
+    setLandmarkSelectableForStart(false);
 
     if (isCounterbalanceEnabled() && isProjectionTransitioning()) {
         const nextProjection =
@@ -593,6 +644,9 @@ function getBounds() {
 
 // Draw loop
 function drawAll() {
+    if (startCountdownUntil !== null && Date.now() > startCountdownUntil) {
+        startCountdownUntil = null;
+    }
     // clear
     ctx.clearRect(0, 0, width, height);
     // background fill
@@ -612,8 +666,30 @@ function drawAll() {
             ? syncManager.getCurrentTask()
             : null;
     const yOffset = getYOffset();
+    const waitingForStart = !studyStarted;
+    const pulse = waitingForStart ? 0.8 + 0.2 * Math.sin(Date.now() * START_PULSE_SPEED) : 1;
+    const glowPulseColor = new Vector3(pulse, pulse, pulse);
+    const showStartGreen =
+        waitingForStart && startReady2D && (!startReady3D || startCountdownUntil !== null);
+    const showWhitePulse = waitingForStart && !startReady2D;
+    const showCalibrationLandmark = studyStarted && calibrationPending;
     for (const p of points) {
         const visuals = getPointVisual2D(taskState, p.id, colorConfig2D);
+        let overrideColor = visuals.overrideColor;
+        let glowColor = visuals.glowColor;
+        if (showCalibrationLandmark && p.id === "landmark") {
+            overrideColor = START_LANDMARK_COLOR;
+            glowColor = null;
+        } else if (waitingForStart && p.id === "landmark") {
+            overrideColor = START_LANDMARK_COLOR;
+            if (showStartGreen) {
+                glowColor = SUCCESS_COLOR_VEC;
+            } else if (showWhitePulse) {
+                glowColor = glowPulseColor;
+            } else {
+                glowColor = null;
+            }
+        }
         const isCompleted = !!taskState?.completed;
         p.draw(
             ctx,
@@ -622,8 +698,8 @@ function drawAll() {
             visuals.isTarget,
             isCompleted,
             visuals.hideColor,
-            visuals.overrideColor,
-            visuals.glowColor,
+            overrideColor,
+            glowColor,
             yOffset,
         );
     }
@@ -686,6 +762,12 @@ canvas.addEventListener("pointerleave", () => {
 
 canvas.addEventListener("pointerup", (ev) => {
     if (!studyStarted || calibrationPending) {
+        const rect = canvas.getBoundingClientRect();
+        const px = ev.clientX - rect.left;
+        const py = ev.clientY - rect.top;
+        if (tryHandleStartSelection(px, py)) {
+            return;
+        }
         return;
     }
     const wasDragging = !!dragging;
@@ -707,6 +789,28 @@ canvas.addEventListener("pointerup", (ev) => {
     const py = ev.clientY - rect.top;
     tryHandle2DSelection(px, py);
 });
+
+function tryHandleStartSelection(px: number, py: number): boolean {
+    if (studyStarted || calibrationPending) {
+        return false;
+    }
+    const landmark = syncManager.getLocalPoints().find((p) => p.id === "landmark");
+    if (!landmark) {
+        return false;
+    }
+    const yOffset = getYOffset();
+    if (!landmark.hitTest(px, py, width, height, yOffset)) {
+        return false;
+    }
+    if (!startReady2D) {
+        syncManager.setStartReady2D(true);
+        logger2d.addLogEvent({
+            eventName: "start_sequence_ready_2d",
+            eventDetails: { status: "ready", otherReady: startReady3D },
+        });
+    }
+    return true;
+}
 
 function tryHandle2DSelection(px: number, py: number) {
     if (!studyStarted || calibrationPending) {

@@ -548,8 +548,23 @@ export class Logger2D {
             key: context.key,
         };
 
+        const summary =
+            this.trialSummaries.get(context.key) ??
+            this.createTrialSummary(context.taskNumber, context.trialNumber, context.totalTrials);
+        const trialStartTime = summary.trialStartTime ?? logEvent.time;
+        if (!summary.trialStartTime) {
+            summary.trialStartTime = trialStartTime;
+            this.trialSummaries.set(context.key, summary);
+        }
+
+        if (logEvent.time < trialStartTime) {
+            return;
+        }
+        if (summary.trialEndTime !== undefined && logEvent.time > summary.trialEndTime) {
+            return;
+        }
+
         const samples = this.trialSamples.get(context.key) ?? [];
-        const isFirstSampleForTrial = samples.length === 0;
         samples.push(sample);
         this.trialSamples.set(context.key, samples);
 
@@ -564,15 +579,11 @@ export class Logger2D {
                 this.queueTimeSeries(`=== ${trialLabel} ===\ntime_ms,yaw,pitch\n`);
                 this.lastTrialKeyForTimeSeries = context.key;
             }
-            const relativeTime = isFirstSampleForTrial ? 0 : sample.time - samples[0].time;
+            const relativeTime = sample.time - trialStartTime;
             this.queueTimeSeries(
                 `${relativeTime},${sample.yaw.toFixed(6)},${sample.pitch.toFixed(6)}\n`,
             );
         }
-
-        const summary =
-            this.trialSummaries.get(context.key) ??
-            this.createTrialSummary(context.taskNumber, context.trialNumber, context.totalTrials);
         if (summary.sampleCount === 0) {
             summary.startTime = sample.time;
             summary.startYaw = sample.yaw;
@@ -622,6 +633,21 @@ export class Logger2D {
         if (!context) {
             return;
         }
+        const summary =
+            this.trialSummaries.get(context.key) ??
+            this.createTrialSummary(context.taskNumber, context.trialNumber, context.totalTrials);
+        const trialStartTime =
+            summary.trialStartTime ?? this.cursorTrialStartTimes.get(context.key) ?? time;
+        if (!summary.trialStartTime) {
+            summary.trialStartTime = trialStartTime;
+            this.trialSummaries.set(context.key, summary);
+        }
+        if (summary.trialEndTime !== undefined && time > summary.trialEndTime) {
+            return;
+        }
+        if (time < trialStartTime) {
+            return;
+        }
         if (this.lastTrialKeyForCursorTimeSeries !== context.key) {
             const trialLabel = Logger2D.formatTrialLabel(
                 context.taskNumber,
@@ -630,10 +656,9 @@ export class Logger2D {
             );
             this.queueCursorTimeSeries(`=== ${trialLabel} ===\ntime_ms,x,y\n`);
             this.lastTrialKeyForCursorTimeSeries = context.key;
-            this.cursorTrialStartTimes.set(context.key, time);
+            this.cursorTrialStartTimes.set(context.key, trialStartTime);
         }
-        const startTime = this.cursorTrialStartTimes.get(context.key) ?? time;
-        const relativeTime = time - startTime;
+        const relativeTime = time - trialStartTime;
         this.queueCursorTimeSeries(
             `${relativeTime},${x.toFixed(6)},${y.toFixed(6)}\n`,
         );
@@ -819,20 +844,34 @@ export class Logger2D {
         return summary;
     }
 
-    public setTrialContext(taskNumber: number, trialNumber: number, totalTrials: number) {
+    public setTrialContext(
+        taskNumber: number,
+        trialNumber: number,
+        totalTrials: number,
+        startTime?: number,
+    ) {
         const key = Logger2D.buildTrialKey(taskNumber, trialNumber, totalTrials);
         if (this.currentTrial?.key === key) {
+            if (startTime !== undefined) {
+                const summary =
+                    this.trialSummaries.get(key) ??
+                    this.createTrialSummary(taskNumber, trialNumber, totalTrials);
+                summary.trialStartTime = startTime;
+                this.trialSummaries.set(key, summary);
+                this.cursorTrialStartTimes.set(key, startTime);
+            }
             return;
         }
         this.currentTrial = { key, taskNumber, trialNumber, totalTrials };
         this.suppressRotationLogs = false;
+        this.suppressCursorTimeSeriesLogs = false;
         const summary =
             this.trialSummaries.get(key) ??
             this.createTrialSummary(taskNumber, trialNumber, totalTrials);
-        if (!summary.trialStartTime) {
-            summary.trialStartTime = Date.now();
-            this.trialSummaries.set(key, summary);
-        }
+        const resolvedStartTime = startTime ?? Date.now();
+        summary.trialStartTime = resolvedStartTime;
+        this.trialSummaries.set(key, summary);
+        this.cursorTrialStartTimes.set(key, resolvedStartTime);
         if (this.pendingRotationLogs.length > 0 && this.currentTrial) {
             const pending = this.pendingRotationLogs;
             this.pendingRotationLogs = [];
@@ -866,6 +905,12 @@ export class Logger2D {
         }
 
         if (trialChanged) {
+            this.setTrialContext(
+                nextInfo.taskNumber,
+                nextInfo.trialNumber,
+                nextInfo.totalTrials,
+                time,
+            );
             this.queueText(
                 `[${timestamp}] [2D][${nextState.id}] Task ${nextInfo.taskNumber} trial ` +
                     `${nextInfo.trialNumber}/${nextInfo.totalTrials} start\n`,
@@ -987,9 +1032,11 @@ export class Logger2D {
             this.trialSummaries.set(key, summary);
         }
         this.suppressRotationLogs = true;
+        this.suppressCursorTimeSeriesLogs = true;
 
         // Add blank line after trial in time-series
         this.queueTimeSeries("\n");
+        this.queueCursorTimeSeries("\n");
     }
 
     /**

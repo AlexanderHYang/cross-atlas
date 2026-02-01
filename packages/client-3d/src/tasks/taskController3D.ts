@@ -120,6 +120,9 @@ export class TaskController3D {
         if (this.suppressVisuals) {
             return;
         }
+        if (!this.deps.syncManager.isStudyStarted()) {
+            return;
+        }
         const trial = task?.trial ?? 1;
         console.debug("3D Task state changed:", {
             trial,
@@ -133,10 +136,16 @@ export class TaskController3D {
         const isNewPair =
             trial === 7 && colorPairIndex !== null && colorPairIndex !== this.lastColorPairIndex;
         const trialChanged = this.lastTrial !== null && this.lastTrial !== trial;
+        const leavingTask3 = this.lastTrial === 7 && trial !== 7;
 
         if (trialChanged || isNewPair) {
             this.clearAllErrors({ restore: true });
             this.lastProcessedErrorPointId2D = null;
+        }
+
+        if (leavingTask3) {
+            this.resetAllPointColorsToDefaults();
+            this.clearLocalHints();
         }
 
         if (trial !== 7) {

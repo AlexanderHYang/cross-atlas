@@ -34,6 +34,11 @@ errorGlow.outerGlow = true;
 errorGlow.blurHorizontalSize = 1.5;
 errorGlow.blurVerticalSize = 1.5;
 
+function setStartGlowMode(active: boolean) {
+    highlighter.innerGlow = true;
+    highlighter.outerGlow = true;
+}
+
 const liftOffset = 0.5;
 const env = sceneManager.createEnvironment({ bigRadius: DEFAULT_SPHERE_RADIUS });
 const { bigRadius, plane } = env;
@@ -74,6 +79,11 @@ const STUDY_START_CLICKS = 1;
 const STUDY_SUCCESS_GLOW_MS = 1000;
 const CALIBRATION_CLICKS = 1;
 const CALIBRATION_ANGLE_DEG = 10;
+const START_PULSE_SPEED = 0.004;
+const START_READY_COLOR = new Color3(0, 0, 1);
+const START_GLOW_BASE = new Color3(1, 1, 1);
+const START_GLOW_SUCCESS = new Color3(0x2e / 255, 0xcc / 255, 0x71 / 255);
+const START_COUNTDOWN_MS = 1000;
 function parseBooleanFlag(value: string | undefined, fallback: boolean) {
     if (value === undefined || value === "") {
         return fallback;
@@ -96,18 +106,42 @@ const CALIBRATION_FEEDBACK_MS = 1000;
 let studyStarted = syncManager3D.isStudyStarted();
 let studyActivated = false;
 let landmarkClickStreak = 0;
+let startReady2D = syncManager3D.isStartReady2D();
+let startReady3D = syncManager3D.isStartReady3D();
 let calibrationPending = syncManager3D.isCalibrationPending();
 let calibrationActive = false;
 let calibrationClickStreak = 0;
 const landmarkSelectableAfterStart = landmarkPoint?.isSelectable() ?? true;
+let startCountdownHandle: number | null = null;
+
+setStartGlowMode(!studyStarted);
 
 if (landmarkPoint) {
     landmarkPoint.setSelectable(true);
     if (!studyStarted) {
-        highlighter.addMesh(landmarkPoint.mesh, Color3.White());
+        highlighter.addMesh(landmarkPoint.mesh, START_GLOW_BASE);
     } else {
         landmarkPoint.setSelectable(landmarkSelectableAfterStart);
     }
+}
+
+if (landmarkPoint) {
+    const glowPulse = new Color3(1, 1, 1);
+    scene.onBeforeRenderObservable.add(() => {
+        if (studyStarted) {
+            return;
+        }
+        landmarkPoint.setLocalOverrideColor(START_READY_COLOR);
+        if (startReady3D) {
+            highlighter.addMesh(landmarkPoint.mesh, START_GLOW_SUCCESS);
+            return;
+        }
+        const pulse = 0.8 + 0.2 * Math.sin(performance.now() * START_PULSE_SPEED);
+        glowPulse.r = pulse;
+        glowPulse.g = pulse;
+        glowPulse.b = pulse;
+        highlighter.addMesh(landmarkPoint.mesh, glowPulse);
+    });
 }
 
 // initialize XR now that we know the landmark target
@@ -156,6 +190,30 @@ function activateStudy() {
             logger3D.setLoggingEnabled(false);
         }
     });
+}
+
+function clearStartCountdown() {
+    if (startCountdownHandle === null) {
+        return;
+    }
+    window.clearTimeout(startCountdownHandle);
+    startCountdownHandle = null;
+}
+
+function beginStartCountdown() {
+    if (startCountdownHandle !== null) {
+        return;
+    }
+    startCountdownHandle = window.setTimeout(() => {
+        startCountdownHandle = null;
+        if (!studyStarted && syncManager3D.areBothStartReady()) {
+            if (landmarkPoint) {
+                highlighter.removeMesh(landmarkPoint.mesh);
+                landmarkPoint.clearLocalOverrideColor();
+            }
+            startStudy({ skipGlow: true });
+        }
+    }, START_COUNTDOWN_MS);
 }
 
 function beginCalibration() {
@@ -216,18 +274,23 @@ function isLookingAtLandmark(): boolean {
     return angleDeg <= CALIBRATION_ANGLE_DEG;
 }
 
-function startStudy() {
+function startStudy(options: { skipGlow?: boolean } = {}) {
     if (studyStarted) {
         return;
     }
     studyStarted = true;
     landmarkClickStreak = 0;
     if (landmarkPoint) {
-        highlighter.removeMesh(landmarkPoint.mesh);
-        highlighter.addMesh(landmarkPoint.mesh, Color3.Green());
-        window.setTimeout(() => {
+        if (!options.skipGlow) {
             highlighter.removeMesh(landmarkPoint.mesh);
-        }, STUDY_SUCCESS_GLOW_MS);
+            highlighter.addMesh(landmarkPoint.mesh, Color3.Green());
+            window.setTimeout(() => {
+                highlighter.removeMesh(landmarkPoint.mesh);
+            }, STUDY_SUCCESS_GLOW_MS);
+        } else {
+            highlighter.removeMesh(landmarkPoint.mesh);
+        }
+        landmarkPoint.clearLocalOverrideColor();
         landmarkPoint.setSelectable(landmarkSelectableAfterStart);
     }
     syncManager3D.setCalibrationPending(false);
@@ -240,7 +303,11 @@ function handlePointSelection(point: Point3D) {
         if (point.id === "landmark") {
             landmarkClickStreak += 1;
             if (landmarkClickStreak >= STUDY_START_CLICKS) {
-                startStudy();
+                syncManager3D.setStartReady3D(true);
+                startReady3D = true;
+                if (syncManager3D.areBothStartReady()) {
+                    beginStartCountdown();
+                }
             }
         } else {
             landmarkClickStreak = 0;
@@ -291,6 +358,16 @@ if (studyStarted) {
     activateStudy();
 }
 
+syncManager3D.onStartReadyChange((ready2D, ready3D) => {
+    startReady2D = ready2D;
+    startReady3D = ready3D;
+    if (!studyStarted && ready2D && ready3D) {
+        beginStartCountdown();
+    } else {
+        clearStartCountdown();
+    }
+});
+
 syncManager3D.onCalibrationPendingChange((pending) => {
     calibrationPending = pending;
     if (!studyStarted) {
@@ -310,10 +387,16 @@ syncManager3D.onCalibrationPendingChange((pending) => {
 
 syncManager3D.onStudyStartedChange((started) => {
     studyStarted = started;
+    setStartGlowMode(!started);
     if (started) {
+        clearStartCountdown();
+        if (landmarkPoint) {
+            landmarkPoint.clearLocalOverrideColor();
+        }
         activateStudy();
         return;
     }
+    clearStartCountdown();
     logger3D.setLoggingEnabled(false);
     landmarkClickStreak = 0;
     calibrationActive = false;
@@ -323,7 +406,7 @@ syncManager3D.onStudyStartedChange((started) => {
     if (landmarkPoint) {
         landmarkPoint.setSelectable(true);
         highlighter.removeMesh(landmarkPoint.mesh);
-        highlighter.addMesh(landmarkPoint.mesh, Color3.White());
+        highlighter.addMesh(landmarkPoint.mesh, START_GLOW_BASE);
     }
 });
 

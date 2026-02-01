@@ -67,10 +67,13 @@ export class SyncManager2D implements PointIdProvider {
     private taskListeners: Set<(task: TaskState | null) => void> = new Set();
     private studyListeners: Set<(started: boolean) => void> = new Set();
     private calibrationListeners: Set<(pending: boolean) => void> = new Set();
+    private startReadyListeners: Set<(ready2D: boolean, ready3D: boolean) => void> = new Set();
     private activeTaskId: TaskId = TASK1_ID;
     private transitionTimeout: number | null = null;
     private updatingMeta = false;
     private studyStarted = false;
+    private startReady2D = false;
+    private startReady3D = false;
     private calibrationPending = false;
 
     private constructor() {
@@ -281,6 +284,7 @@ export class SyncManager2D implements PointIdProvider {
 
             const studyMeta = this.taskMetaMap.get("study");
             this.updateStudyStarted(!!studyMeta?.studyStarted);
+            this.updateStartReady(!!studyMeta?.startReady2D, !!studyMeta?.startReady3D);
 
             const calibrationMeta = this.taskMetaMap.get("calibration");
             this.updateCalibrationPending(!!calibrationMeta?.calibrationPending);
@@ -343,7 +347,20 @@ export class SyncManager2D implements PointIdProvider {
             manager.taskMetaMap.set("active", { activeTaskId: manager.activeTaskId });
         }
         manager.currentTask = manager.normalizeTaskState(manager.taskMap.get(manager.activeTaskId));
-        manager.studyStarted = !!manager.taskMetaMap.get("study")?.studyStarted;
+        const studyMeta = manager.taskMetaMap.get("study");
+        manager.studyStarted = !!studyMeta?.studyStarted;
+        manager.startReady2D = !!studyMeta?.startReady2D;
+        manager.startReady3D = !!studyMeta?.startReady3D;
+        if (!studyMeta) {
+            manager.taskMetaMap.set("study", {
+                studyStarted: false,
+                startReady2D: false,
+                startReady3D: false,
+            });
+            manager.studyStarted = false;
+            manager.startReady2D = false;
+            manager.startReady3D = false;
+        }
         manager.calibrationPending = !!manager.taskMetaMap.get("calibration")?.calibrationPending;
         if (!manager.taskMetaMap.get("calibration")) {
             manager.taskMetaMap.set("calibration", { calibrationPending: false });
@@ -457,7 +474,7 @@ export class SyncManager2D implements PointIdProvider {
      * Start Task 1 from the beginning
      */
     private startTask1() {
-        this.resetAllPointColors();
+        this.resetAllPointColors({ resetBaseToDefault: true });
 
         const taskState = createInitialTask1State(this, {
             projection: this.getSelectionProjection(),
@@ -479,7 +496,7 @@ export class SyncManager2D implements PointIdProvider {
      * Start Task 2 from the beginning
      */
     private startTask2() {
-        this.resetAllPointColors();
+        this.resetAllPointColors({ resetBaseToDefault: true });
 
         const taskState = createInitialTask2State(this, {
             projection: this.getSelectionProjection(),
@@ -499,7 +516,7 @@ export class SyncManager2D implements PointIdProvider {
      * Start Task 3 from the beginning
      */
     private startTask3() {
-        this.resetAllPointColors();
+        this.resetAllPointColors({ resetBaseToDefault: true });
 
         const taskState = createInitialTask3State(this, 5, {
             projection: this.getSelectionProjection(),
@@ -645,7 +662,8 @@ export class SyncManager2D implements PointIdProvider {
         }
     }
 
-    private resetAllPointColors() {
+    private resetAllPointColors(options?: { resetBaseToDefault?: boolean }) {
+        const resetBaseToDefault = options?.resetBaseToDefault ?? false;
         for (const p of this.localPointsById.values()) {
             p.clearErrorHighlight();
             const cfg = getDefaultPointConfig(p.id);
@@ -657,6 +675,12 @@ export class SyncManager2D implements PointIdProvider {
                 }
                 p.setSelectable(false);
                 continue;
+            }
+            if (resetBaseToDefault) {
+                const base = cfg?.color
+                    ? new Vector3(cfg.color.x, cfg.color.y, cfg.color.z)
+                    : new Vector3(1, 1, 1);
+                p.setBaseColor(base);
             }
             p.resetToBaseColor();
             p.setSelectable(true);
@@ -685,6 +709,20 @@ export class SyncManager2D implements PointIdProvider {
             if (cfg) {
                 p.pos3d = new Vector3(cfg.direction.x, cfg.direction.y, cfg.direction.z);
             }
+        }
+    }
+
+    public resetPointColorsToDefault() {
+        for (const p of this.localPointsById.values()) {
+            p.clearErrorHighlight();
+            const cfg = getDefaultPointConfig(p.id);
+            const baseColor = cfg?.color
+                ? new Vector3(cfg.color.x, cfg.color.y, cfg.color.z)
+                : new Vector3(1, 1, 1);
+            p.setBaseColor(baseColor);
+            p.setDisplayColor(baseColor);
+            p.setSelectable(cfg?.selectable !== false);
+            p.clearLockedColor();
         }
     }
 
@@ -723,7 +761,7 @@ export class SyncManager2D implements PointIdProvider {
 
     public setTrial(trial: 1 | 2 | 3 | 4, taskId: string = TASK1_ID) {
         this.setActiveTask(taskId as TaskId);
-        this.resetAllPointColors();
+        this.resetAllPointColors({ resetBaseToDefault: true });
 
         const precomputed = !isRandomSelectionEnabled()
             ? getPrecomputedTrialSelection(trial, { projection: this.getSelectionProjection() })
@@ -839,6 +877,17 @@ export class SyncManager2D implements PointIdProvider {
         }
     }
 
+    private updateStartReady(ready2D: boolean, ready3D: boolean) {
+        if (this.startReady2D === ready2D && this.startReady3D === ready3D) {
+            return;
+        }
+        this.startReady2D = ready2D;
+        this.startReady3D = ready3D;
+        for (const listener of this.startReadyListeners) {
+            listener(ready2D, ready3D);
+        }
+    }
+
     private updateCalibrationPending(pending: boolean) {
         if (this.calibrationPending === pending) {
             return;
@@ -865,8 +914,29 @@ export class SyncManager2D implements PointIdProvider {
         };
     }
 
+    public onStartReadyChange(listener: (ready2D: boolean, ready3D: boolean) => void) {
+        this.startReadyListeners.add(listener);
+        listener(this.startReady2D, this.startReady3D);
+        return () => {
+            this.startReadyListeners.delete(listener);
+        };
+    }
+
     public isStudyStarted(): boolean {
         return this.studyStarted;
+    }
+
+    public isStartReady2D(): boolean {
+        return this.startReady2D;
+    }
+
+    public isStartReady3D(): boolean {
+        return this.startReady3D;
+    }
+
+    private setStudyMeta(next: TaskMeta) {
+        const prev = this.taskMetaMap.get("study") ?? {};
+        this.taskMetaMap.set("study", { ...prev, ...next });
     }
 
     public setStudyStarted(started: boolean) {
@@ -874,9 +944,27 @@ export class SyncManager2D implements PointIdProvider {
             return;
         }
         this.updatingMeta = true;
-        this.taskMetaMap.set("study", { studyStarted: started });
+        const next: TaskMeta = { studyStarted: started };
+        if (!started) {
+            next.startReady2D = false;
+            next.startReady3D = false;
+        }
+        this.setStudyMeta(next);
         this.updatingMeta = false;
         this.updateStudyStarted(started);
+        if (!started) {
+            this.updateStartReady(false, false);
+        }
+    }
+
+    public setStartReady2D(ready: boolean) {
+        if (this.startReady2D === ready) {
+            return;
+        }
+        this.updatingMeta = true;
+        this.setStudyMeta({ startReady2D: ready });
+        this.updatingMeta = false;
+        this.updateStartReady(ready, this.startReady3D);
     }
 
     public onCalibrationPendingChange(listener: (pending: boolean) => void) {
@@ -938,6 +1026,7 @@ export class SyncManager2D implements PointIdProvider {
             `[SyncManager2D] Switching to projection: ${projectionType} and restarting tasks`,
         );
 
+        this.resetPointColorsToDefault();
         this.applyProjection(projectionType);
 
         // Start fresh from Task 1

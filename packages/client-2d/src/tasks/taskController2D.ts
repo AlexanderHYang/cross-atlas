@@ -83,6 +83,7 @@ export class TaskController2D {
         });
 
         const trialChanged = this.lastTrial !== null && this.lastTrial !== trial;
+        const leavingTask3 = this.lastTrial === 7 && trial !== 7;
         const colorPairIndex = taskState?.colorPairIndex ?? null;
         const isNewPair =
             isTask3Trial(trial) &&
@@ -92,6 +93,10 @@ export class TaskController2D {
         if (trialChanged || isNewPair) {
             this.clearAllErrors({ restore: true });
             this.lastProcessedErrorPointId3D = null;
+        }
+
+        if (leavingTask3) {
+            this.deps.syncManager.resetPointColorsToDefault();
         }
 
         if (isTask3Trial(trial) && this.lastTrial !== 7) {
