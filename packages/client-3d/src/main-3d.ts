@@ -111,6 +111,7 @@ let startReady3D = syncManager3D.isStartReady3D();
 let calibrationPending = syncManager3D.isCalibrationPending();
 let calibrationActive = false;
 let calibrationClickStreak = 0;
+let calibrationFeedbackActive = false;
 const landmarkSelectableAfterStart = landmarkPoint?.isSelectable() ?? true;
 let startCountdownHandle: number | null = null;
 
@@ -234,11 +235,13 @@ function endCalibrationSuccess() {
     }
     calibrationActive = false;
     calibrationClickStreak = 0;
+    calibrationFeedbackActive = true;
     highlighter.removeMesh(landmarkPoint.mesh);
     highlighter.addMesh(landmarkPoint.mesh, Color3.Green());
     window.setTimeout(() => {
         highlighter.removeMesh(landmarkPoint.mesh);
         landmarkPoint.setSelectable(landmarkSelectableAfterStart);
+        calibrationFeedbackActive = false;
     }, CALIBRATION_FEEDBACK_MS);
     syncManager3D.completeCalibration();
 }
@@ -248,11 +251,13 @@ function showCalibrationError() {
         return;
     }
     calibrationClickStreak = 0;
+    calibrationFeedbackActive = true;
     highlighter.removeMesh(landmarkPoint.mesh);
     highlighter.addMesh(landmarkPoint.mesh, Color3.Red());
     window.setTimeout(() => {
         highlighter.removeMesh(landmarkPoint.mesh);
         highlighter.addMesh(landmarkPoint.mesh, Color3.White());
+        calibrationFeedbackActive = false;
     }, CALIBRATION_FEEDBACK_MS);
 }
 
@@ -315,6 +320,9 @@ function handlePointSelection(point: Point3D) {
         return;
     }
     if (calibrationActive) {
+        if (calibrationFeedbackActive) {
+            return;
+        }
         if (point.id !== "landmark") {
             calibrationClickStreak = 0;
             return;
