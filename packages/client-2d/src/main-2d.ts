@@ -310,6 +310,7 @@ function setWaitingUI() {
 }
 function setCalibrationUI() {
     trialBox.textContent = "Waiting for 3D user to recalibrate";
+    trialBox.style.display = "block";
     instructionBox.textContent = "";
     instructionBox.style.display = "none";
 }
@@ -358,6 +359,7 @@ syncManager.onStudyStartedChange((started) => {
 
     startCountdownUntil = null;
     setLandmarkSelectableForStart(false);
+    trialBox.style.display = "block";
 
     if (isCounterbalanceEnabled() && isProjectionTransitioning()) {
         const nextProjection =
