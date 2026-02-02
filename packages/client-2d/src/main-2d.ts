@@ -378,6 +378,20 @@ syncManager.onStudyStartedChange((started) => {
 
         logger2d.resetForNewProjection();
         logger2d.logProjectionStart(nextProjection, projIndex + 1, totalProj);
+        if (pendingStartSequenceReady2D) {
+            logger2d.addLogEventWithTimestamp(
+                {
+                    eventName: "start_sequence_ready_2d",
+                    eventDetails: {
+                        status: "ready",
+                        otherReady: pendingStartSequenceReady2D.otherReady,
+                    },
+                },
+                pendingStartSequenceReady2D.time,
+                "task=unknown trial=unknown",
+            );
+            pendingStartSequenceReady2D = null;
+        }
         loggedSelectionTasks.clear();
         syncManager.switchProjectionAndRestartTasks(nextProjection);
         updateInfoBox();
@@ -412,6 +426,9 @@ syncManager.onStudyStartedChange((started) => {
 
 syncManager.onTaskStateChange((taskState) => {
     if (!studyStarted) {
+        return;
+    }
+    if (isCounterbalanceEnabled() && isProjectionTransitioning()) {
         return;
     }
     if (taskState) {
@@ -454,6 +471,7 @@ syncManager.onTaskStateChange((taskState) => {
 });
 
 let lastTaskState: TaskState | null = null;
+let pendingStartSequenceReady2D: { time: number; otherReady: boolean } | null = null;
 syncManager.onTaskStateChange((taskState) => {
     if (!taskState) {
         lastTaskState = taskState;
@@ -461,6 +479,11 @@ syncManager.onTaskStateChange((taskState) => {
     }
 
     if (!studyStarted || calibrationPending) {
+        lastTaskState = taskState;
+        return;
+    }
+
+    if (isCounterbalanceEnabled() && isProjectionTransitioning()) {
         lastTaskState = taskState;
         return;
     }
@@ -861,10 +884,14 @@ function tryHandleStartSelection(px: number, py: number): boolean {
     }
     if (!startReady2D) {
         syncManager.setStartReady2D(true);
-        logger2d.addLogEvent({
-            eventName: "start_sequence_ready_2d",
-            eventDetails: { status: "ready", otherReady: startReady3D },
-        });
+        if (isCounterbalanceEnabled() && isProjectionTransitioning()) {
+            pendingStartSequenceReady2D = { time: Date.now(), otherReady: startReady3D };
+        } else {
+            logger2d.addLogEvent({
+                eventName: "start_sequence_ready_2d",
+                eventDetails: { status: "ready", otherReady: startReady3D },
+            });
+        }
     }
     return true;
 }
