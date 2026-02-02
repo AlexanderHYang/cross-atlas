@@ -7,10 +7,10 @@
 | horizontal | planar | 164.69 | 162.04 | 410.32 |
 | pca | planar | 162.15 | 165.65 | 408.18 |
 | vertical | planar | 162.63 | 162.84 | 405.28 |
-| equirectangular | semiSpherical | 194.90 | 197.97 | 487.83 |
-| horizontal | semiSpherical | 197.68 | 197.89 | 494.65 |
-| pca | semiSpherical | 190.29 | 196.73 | 494.81 |
-| vertical | semiSpherical | 194.36 | 197.69 | 493.97 |
+| equirectangular | hemispherical | 194.90 | 197.97 | 487.83 |
+| horizontal | hemispherical | 197.68 | 197.89 | 494.65 |
+| pca | hemispherical | 190.29 | 196.73 | 494.81 |
+| vertical | hemispherical | 194.36 | 197.69 | 493.97 |
 | equirectangular | spherical | 197.47 | 197.32 | 492.97 |
 | horizontal | spherical | 196.53 | 191.78 | 493.33 |
 | pca | spherical | 194.37 | 195.19 | 494.22 |
@@ -47,34 +47,34 @@
 | vertical | planar | 5 | point18, point19 | point18 34.28°, point19 47.47° |
 | vertical | planar | 6 | point21, point7 | point21 48.20°, point7 32.89° |
 | vertical | planar | 7 | point10, point13, point14, point16, point20, point23, point25, point27, point30, point9 | point10 54.34°, point13 30.28°, point14 51.52°, point16 43.75°, point20 43.57°, point23 32.62°, point25 33.22°, point27 41.27°, point30 40.07°, point9 34.65° |
-| equirectangular | semiSpherical | 1 | point12 | point12 73.22° |
-| equirectangular | semiSpherical | 2 | point19 | point19 18.78° |
-| equirectangular | semiSpherical | 3 | point2 | point2 83.89° |
-| equirectangular | semiSpherical | 4 | point8 | point8 19.00° |
-| equirectangular | semiSpherical | 5 | point10, point16 | point10 51.19°, point16 34.44° |
-| equirectangular | semiSpherical | 6 | point18, point5 | point18 46.61°, point5 65.73° |
-| equirectangular | semiSpherical | 7 | point10, point15, point17, point20, point22, point23, point27, point29, point3, point5 | point10 51.19°, point15 56.87°, point17 37.71°, point20 36.96°, point22 36.00°, point23 30.22°, point27 44.92°, point29 78.36°, point3 49.88°, point5 65.73° |
-| horizontal | semiSpherical | 1 | point17 | point17 37.71° |
-| horizontal | semiSpherical | 2 | point22 | point22 36.00° |
-| horizontal | semiSpherical | 3 | point24 | point24 65.34° |
-| horizontal | semiSpherical | 4 | point25 | point25 58.63° |
-| horizontal | semiSpherical | 5 | point15, point26 | point15 56.87°, point26 72.14° |
-| horizontal | semiSpherical | 6 | point3, point8 | point3 49.88°, point8 19.00° |
-| horizontal | semiSpherical | 7 | point10, point15, point16, point18, point19, point20, point26, point4, point8, point9 | point10 51.19°, point15 56.87°, point16 34.44°, point18 46.61°, point19 18.78°, point20 36.96°, point26 72.14°, point4 86.75°, point8 19.00°, point9 71.90° |
-| pca | semiSpherical | 1 | point16 | point16 34.44° |
-| pca | semiSpherical | 2 | point3 | point3 49.88° |
-| pca | semiSpherical | 3 | point30 | point30 86.97° |
-| pca | semiSpherical | 4 | point8 | point8 19.00° |
-| pca | semiSpherical | 5 | point17, point2 | point17 37.71°, point2 83.89° |
-| pca | semiSpherical | 6 | point23, point27 | point23 30.22°, point27 44.92° |
-| pca | semiSpherical | 7 | point11, point16, point18, point19, point21, point23, point25, point28, point6, point8 | point11 72.88°, point16 34.44°, point18 46.61°, point19 18.78°, point21 81.92°, point23 30.22°, point25 58.63°, point28 59.83°, point6 72.50°, point8 19.00° |
-| vertical | semiSpherical | 1 | point14 | point14 52.83° |
-| vertical | semiSpherical | 2 | point23 | point23 30.22° |
-| vertical | semiSpherical | 3 | point3 | point3 49.88° |
-| vertical | semiSpherical | 4 | point7 | point7 61.44° |
-| vertical | semiSpherical | 5 | point14, point20 | point14 52.83°, point20 36.96° |
-| vertical | semiSpherical | 6 | point22, point9 | point22 36.00°, point9 71.90° |
-| vertical | semiSpherical | 7 | point13, point14, point17, point19, point20, point22, point24, point27, point28, point7 | point13 80.16°, point14 52.83°, point17 37.71°, point19 18.78°, point20 36.96°, point22 36.00°, point24 65.34°, point27 44.92°, point28 59.83°, point7 61.44° |
+| equirectangular | hemispherical | 1 | point12 | point12 73.22° |
+| equirectangular | hemispherical | 2 | point19 | point19 18.78° |
+| equirectangular | hemispherical | 3 | point2 | point2 83.89° |
+| equirectangular | hemispherical | 4 | point8 | point8 19.00° |
+| equirectangular | hemispherical | 5 | point10, point16 | point10 51.19°, point16 34.44° |
+| equirectangular | hemispherical | 6 | point18, point5 | point18 46.61°, point5 65.73° |
+| equirectangular | hemispherical | 7 | point10, point15, point17, point20, point22, point23, point27, point29, point3, point5 | point10 51.19°, point15 56.87°, point17 37.71°, point20 36.96°, point22 36.00°, point23 30.22°, point27 44.92°, point29 78.36°, point3 49.88°, point5 65.73° |
+| horizontal | hemispherical | 1 | point17 | point17 37.71° |
+| horizontal | hemispherical | 2 | point22 | point22 36.00° |
+| horizontal | hemispherical | 3 | point24 | point24 65.34° |
+| horizontal | hemispherical | 4 | point25 | point25 58.63° |
+| horizontal | hemispherical | 5 | point15, point26 | point15 56.87°, point26 72.14° |
+| horizontal | hemispherical | 6 | point3, point8 | point3 49.88°, point8 19.00° |
+| horizontal | hemispherical | 7 | point10, point15, point16, point18, point19, point20, point26, point4, point8, point9 | point10 51.19°, point15 56.87°, point16 34.44°, point18 46.61°, point19 18.78°, point20 36.96°, point26 72.14°, point4 86.75°, point8 19.00°, point9 71.90° |
+| pca | hemispherical | 1 | point16 | point16 34.44° |
+| pca | hemispherical | 2 | point3 | point3 49.88° |
+| pca | hemispherical | 3 | point30 | point30 86.97° |
+| pca | hemispherical | 4 | point8 | point8 19.00° |
+| pca | hemispherical | 5 | point17, point2 | point17 37.71°, point2 83.89° |
+| pca | hemispherical | 6 | point23, point27 | point23 30.22°, point27 44.92° |
+| pca | hemispherical | 7 | point11, point16, point18, point19, point21, point23, point25, point28, point6, point8 | point11 72.88°, point16 34.44°, point18 46.61°, point19 18.78°, point21 81.92°, point23 30.22°, point25 58.63°, point28 59.83°, point6 72.50°, point8 19.00° |
+| vertical | hemispherical | 1 | point14 | point14 52.83° |
+| vertical | hemispherical | 2 | point23 | point23 30.22° |
+| vertical | hemispherical | 3 | point3 | point3 49.88° |
+| vertical | hemispherical | 4 | point7 | point7 61.44° |
+| vertical | hemispherical | 5 | point14, point20 | point14 52.83°, point20 36.96° |
+| vertical | hemispherical | 6 | point22, point9 | point22 36.00°, point9 71.90° |
+| vertical | hemispherical | 7 | point13, point14, point17, point19, point20, point22, point24, point27, point28, point7 | point13 80.16°, point14 52.83°, point17 37.71°, point19 18.78°, point20 36.96°, point22 36.00°, point24 65.34°, point27 44.92°, point28 59.83°, point7 61.44° |
 | equirectangular | spherical | 1 | point13 | point13 79.18° |
 | equirectangular | spherical | 2 | point18 | point18 13.70° |
 | equirectangular | spherical | 3 | point6 | point6 63.93° |
@@ -138,7 +138,7 @@
 | point29 | 31.24 |
 | point30 | 24.11 |
 
-### semiSpherical
+### hemispherical
 | Point | Angular Distance (°) |
 |---|---|
 | point2 | 83.89 |
@@ -240,7 +240,7 @@
 
 **Frequency range:** 1–9 (avg 2.48)
 
-### semiSpherical
+### hemispherical
 | Point | Count |
 |---|---|
 | point2 | 2 |

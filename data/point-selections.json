@@ -268,7 +268,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "equirectangular",
     "trial": 1,
     "points": [
@@ -276,7 +276,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "equirectangular",
     "trial": 2,
     "points": [
@@ -284,7 +284,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "equirectangular",
     "trial": 3,
     "points": [
@@ -292,7 +292,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "equirectangular",
     "trial": 4,
     "points": [
@@ -300,7 +300,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "equirectangular",
     "trial": 5,
     "points": [
@@ -309,7 +309,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "equirectangular",
     "trial": 6,
     "points": [
@@ -318,7 +318,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "equirectangular",
     "trial": 7,
     "points": [
@@ -335,7 +335,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "pca",
     "trial": 1,
     "points": [
@@ -343,7 +343,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "pca",
     "trial": 2,
     "points": [
@@ -351,7 +351,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "pca",
     "trial": 3,
     "points": [
@@ -359,7 +359,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "pca",
     "trial": 4,
     "points": [
@@ -367,7 +367,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "pca",
     "trial": 5,
     "points": [
@@ -376,7 +376,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "pca",
     "trial": 6,
     "points": [
@@ -385,7 +385,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "pca",
     "trial": 7,
     "points": [
@@ -402,7 +402,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "vertical",
     "trial": 1,
     "points": [
@@ -410,7 +410,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "vertical",
     "trial": 2,
     "points": [
@@ -418,7 +418,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "vertical",
     "trial": 3,
     "points": [
@@ -426,7 +426,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "vertical",
     "trial": 4,
     "points": [
@@ -434,7 +434,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "vertical",
     "trial": 5,
     "points": [
@@ -443,7 +443,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "vertical",
     "trial": 6,
     "points": [
@@ -452,7 +452,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "vertical",
     "trial": 7,
     "points": [
@@ -469,7 +469,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "horizontal",
     "trial": 1,
     "points": [
@@ -477,7 +477,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "horizontal",
     "trial": 2,
     "points": [
@@ -485,7 +485,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "horizontal",
     "trial": 3,
     "points": [
@@ -493,7 +493,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "horizontal",
     "trial": 4,
     "points": [
@@ -501,7 +501,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "horizontal",
     "trial": 5,
     "points": [
@@ -510,7 +510,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "horizontal",
     "trial": 6,
     "points": [
@@ -519,7 +519,7 @@
     ]
   },
   {
-    "layout": "semiSpherical",
+    "layout": "hemispherical",
     "projection": "horizontal",
     "trial": 7,
     "points": [

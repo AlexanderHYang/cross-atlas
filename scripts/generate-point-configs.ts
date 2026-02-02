@@ -181,7 +181,7 @@ async function main() {
 
     const results = {
         spherical: formatPoints(generateConfiguration("spherical", NUM_POINTS)),
-        semiSpherical: formatPoints(generateConfiguration("half-spherical", NUM_POINTS)),
+        hemispherical: formatPoints(generateConfiguration("half-spherical", NUM_POINTS)),
         planar: formatPoints(generateConfiguration("planar", NUM_POINTS)),
     };
 

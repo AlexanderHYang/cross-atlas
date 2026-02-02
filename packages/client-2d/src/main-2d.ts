@@ -167,10 +167,10 @@ if (isCounterbalanceEnabled()) {
 
 // layoutType is imported from defaultPoints.ts (handles training mode override)
 
-// Helper to compute y-offset for semiSpherical + horizontal layout
+// Helper to compute y-offset for hemispherical + horizontal layout
 function getYOffset(): number {
     const projectionType = syncManager.getProjectionManager().getCurrentProjectionType();
-    return layoutType === "semiSpherical" && projectionType === "horizontal" ? 50 : 0;
+    return layoutType === "hemispherical" && projectionType === "horizontal" ? 50 : 0;
 }
 
 const updateInfoBox = () => {

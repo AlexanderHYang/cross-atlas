@@ -140,7 +140,7 @@ function parseArguments() {
     const envVars = {};
 
     const allowedProjections = new Set(["equirectangular", "pca", "vertical", "horizontal"]);
-    const allowedLayouts = new Set(["spherical", "semiSpherical", "planar"]);
+    const allowedLayouts = new Set(["spherical", "hemispherical", "planar"]);
     const allowedCounterbalance = new Set(["1", "2", "3", "4"]);
     let tasksArg;
     let calibrationOrientationArg;
