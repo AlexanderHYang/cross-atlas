@@ -6,6 +6,7 @@ import {
     DEFAULT_POINT_CONFIGS,
     DEFAULT_SPHERE_RADIUS,
     getDefaultPointConfig,
+    layoutType,
 } from "../../shared/src/defaultPoints";
 import { LANDMARK_POS } from "../../shared/src/angularPointSelection";
 import {
@@ -31,6 +32,11 @@ import {
     isProjectionTransitioning,
     setProjectionTransitioning,
 } from "../../shared/src/counterbalance";
+import {
+    isTrainingModeEnabled,
+    setTrainingModeLoopPending,
+    isTrainingModeLoopPending,
+} from "../../shared/src/trainingMode";
 
 const DASHBOARD_BG = "#707070";
 
@@ -73,7 +79,7 @@ html, body { height:100%; background: ${DASHBOARD_BG}; }
 #instruction-box {
 	position: absolute;
 	top: 25px;
-	left: 220px;
+	left: 140px;
 	padding: 10px 14px;
 	background: linear-gradient(135deg, rgba(60, 120, 180, 0.4), rgba(40, 80, 140, 0.4));
 	color: #e0f0ff;
@@ -159,9 +165,7 @@ if (isCounterbalanceEnabled()) {
     }
 }
 
-// Get layout type for info box
-const layoutEnv = (import.meta.env.VITE_LAYOUT_TYPE as string | undefined)?.trim();
-const layoutType = layoutEnv || "spherical";
+// layoutType is imported from defaultPoints.ts (handles training mode override)
 
 // Helper to compute y-offset for semiSpherical + horizontal layout
 function getYOffset(): number {
@@ -175,8 +179,12 @@ const updateInfoBox = () => {
 };
 updateInfoBox();
 
-// create logger
-const logger2d = new Logger2D(syncManager);
+// create logger (disabled in training mode)
+const logger2d = new Logger2D(syncManager, { disabled: isTrainingModeEnabled() });
+
+if (isTrainingModeEnabled()) {
+    console.log("[Training Mode] Logging disabled");
+}
 
 const taskController2D = new TaskController2D({
     syncManager,
@@ -379,13 +387,20 @@ syncManager.onStudyStartedChange((started) => {
             `[Counterbalance] Started projection ${projIndex + 1}/${totalProj}: ${nextProjection}`,
         );
         setProjectionTransitioning(false);
+    } else if (isTrainingModeEnabled()) {
+        // Training mode: always restart tasks fresh to clear previous trial state
+        loggedSelectionTasks.clear();
+        syncManager.restartTasksForTraining();
+        instructionBox.style.display = "none";
+        console.log("[Training Mode] Restarted tasks from trial 1");
+    } else {
+        syncManager.ensureTaskTarget();
     }
 
     logger2d.addLogEvent({
         eventName: "start_sequence_completed",
         eventDetails: { status: "started" },
     });
-    syncManager.ensureTaskTarget();
     const currentTask = syncManager.getCurrentTask();
     if (currentTask) {
         const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(currentTask.trial);
@@ -512,6 +527,40 @@ syncManager.onTaskStateChange((taskState) => {
 
         // Handle counterbalance projection transitions
         if (action.action === "all-complete") {
+            // Training mode: loop back to trial 1 and restart
+            if (isTrainingModeEnabled()) {
+                console.log("[Training Mode] All trials complete, restarting from trial 1");
+                setTrainingModeLoopPending(true);
+
+                // Brief transition message
+                trialBox.style.display = "none";
+                instructionBox.style.left = "16px";
+                instructionBox.innerHTML = `<span style='color: #a8d5ff;'>Training round complete</span> <span style='opacity: 0.5; margin: 0 8px;'>|</span> Restarting in 3s...`;
+                instructionBox.style.display = "block";
+
+                let countdown = 3;
+                const countdownInterval = window.setInterval(() => {
+                    countdown--;
+                    if (countdown > 0) {
+                        instructionBox.innerHTML = `<span style='color: #a8d5ff;'>Training round complete</span> <span style='opacity: 0.5; margin: 0 8px;'>|</span> Restarting in ${countdown}s...`;
+                    } else {
+                        window.clearInterval(countdownInterval);
+                    }
+                }, 1000);
+
+                window.setTimeout(() => {
+                    window.clearInterval(countdownInterval);
+                    instructionBox.style.left = "220px";
+                    trialBox.style.display = "block";
+                    setTrainingModeLoopPending(false);
+                    // Restart the study start sequence
+                    syncManager.setStudyStarted(false);
+                }, 3000);
+
+                lastTaskState = taskState;
+                return;
+            }
+
             // Check if counterbalance mode is enabled and there are more projections
             if (isCounterbalanceEnabled() && hasMoreProjections() && !isProjectionTransitioning()) {
                 // Set transitioning flag to prevent race conditions

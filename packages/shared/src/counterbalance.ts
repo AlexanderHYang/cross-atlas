@@ -10,7 +10,11 @@
  * - S2: Horizontal → Vertical → PCA → Equirectangular
  * - S3: Vertical → Equirectangular → Horizontal → PCA
  * - S4: Equirectangular → PCA → Vertical → Horizontal
+ *
+ * Note: Counterbalance is disabled when training mode is enabled.
  */
+
+import { isTrainingModeEnabled } from "./trainingMode";
 
 export type ProjectionType = "equirectangular" | "pca" | "vertical" | "horizontal";
 
@@ -85,8 +89,12 @@ export function getCounterbalanceConfig() {
 
 /**
  * Check if counterbalance mode is enabled.
+ * Returns false if training mode is enabled (training mode disables counterbalance).
  */
 export function isCounterbalanceEnabled(): boolean {
+    if (isTrainingModeEnabled()) {
+        return false;
+    }
     return counterbalanceConfig.enabled;
 }
 

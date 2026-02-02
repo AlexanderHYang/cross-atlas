@@ -11,6 +11,7 @@ import {
     parseTaskSelection,
     setTaskFlowConfig,
 } from "../../shared/src/tasks";
+import { isTrainingModeEnabled } from "../../shared/src/trainingMode";
 import { Logger3D } from "./Logger3d";
 import { TaskController3D } from "./tasks/taskController3D";
 
@@ -176,19 +177,31 @@ const taskController3D = new TaskController3D({
 });
 
 function activateStudy() {
+    // Training mode: never enable logging
+    const enableLogging = !isTrainingModeEnabled();
+
     if (studyActivated) {
-        logger3D.setLoggingEnabled(true);
+        logger3D.setLoggingEnabled(enableLogging);
         return;
     }
     studyActivated = true;
-    logger3D.setLoggingEnabled(true);
+    logger3D.setLoggingEnabled(enableLogging);
+
+    if (isTrainingModeEnabled()) {
+        console.log("[Training Mode] 3D logging disabled");
+    }
+
     syncManager3D.onTaskStateChange(taskController3D.handleTaskStateChange);
     syncManager3D.onTaskStateChange((taskState) => {
         if (!taskState) {
             return;
         }
         if (taskState.completed && determineNextAction(taskState).action === "all-complete") {
-            logger3D.setLoggingEnabled(false);
+            // In training mode, keep logging disabled (it was never enabled)
+            // In normal mode, disable logging when study completes
+            if (!isTrainingModeEnabled()) {
+                logger3D.setLoggingEnabled(false);
+            }
         }
     });
 }

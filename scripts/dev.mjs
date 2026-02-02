@@ -147,6 +147,7 @@ function parseArguments() {
     let layoutArg;
     let randomSelectionArg;
     let counterbalanceArg;
+    let trainingArg;
 
     for (const arg of args) {
         // parse --projection option
@@ -206,6 +207,11 @@ function parseArguments() {
                 process.exit(1);
             }
         }
+
+        if (arg === "--training" || arg === "training" || arg.startsWith("--training=")) {
+            const value = arg.includes("=") ? arg.split("=")[1] : "true";
+            trainingArg = value;
+        }
     }
 
     const envTasks =
@@ -262,6 +268,16 @@ function parseArguments() {
         process.env.npm_config_counterbalance;
     if (envCounterbalance !== undefined) {
         envVars["VITE_COUNTERBALANCE"] = envCounterbalance;
+    }
+
+    const envTraining =
+        trainingArg ??
+        process.env.VITE_TRAINING_MODE ??
+        process.env.TRAINING_MODE ??
+        process.env.training_mode ??
+        process.env.npm_config_training_mode;
+    if (envTraining !== undefined) {
+        envVars["VITE_TRAINING_MODE"] = envTraining;
     }
 
     return envVars;

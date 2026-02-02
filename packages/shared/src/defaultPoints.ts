@@ -1,5 +1,6 @@
 import { Vector3SyncData } from "./sync";
 import generatedConfigs from "../../../scripts/generated-point-configs.json";
+import { isTrainingModeEnabled, getTrainingModeLayout } from "./trainingMode";
 
 export type DefaultPointConfig = {
     id: string;
@@ -30,11 +31,20 @@ const layoutEnv = (import.meta.env.VITE_LAYOUT_TYPE ?? import.meta.env.VITE_LAYO
     | string
     | undefined;
 const normalizedLayout = layoutEnv?.trim();
-const resolvedLayout = allowedLayouts.includes(normalizedLayout as LayoutType)
-    ? (normalizedLayout as LayoutType)
-    : "spherical";
-if (layoutEnv && resolvedLayout !== normalizedLayout) {
+
+// Training mode forces planar layout
+const resolvedLayout: LayoutType = isTrainingModeEnabled()
+    ? getTrainingModeLayout()
+    : allowedLayouts.includes(normalizedLayout as LayoutType)
+      ? (normalizedLayout as LayoutType)
+      : "spherical";
+
+if (!isTrainingModeEnabled() && layoutEnv && resolvedLayout !== normalizedLayout) {
     console.warn(`[Layout] Invalid VITE_LAYOUT_TYPE="${layoutEnv}". Falling back to "spherical".`);
+}
+
+if (isTrainingModeEnabled()) {
+    console.log(`[Training Mode] Layout forced to: ${resolvedLayout}`);
 }
 
 export const layoutType: LayoutType = resolvedLayout;

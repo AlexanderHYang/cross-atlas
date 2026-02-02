@@ -42,6 +42,10 @@ import {
     isCounterbalanceEnabled,
     syncCounterbalanceIndex,
 } from "../../shared/src/counterbalance";
+import {
+    isTrainingModeEnabled,
+    getTrainingModeProjection,
+} from "../../shared/src/trainingMode";
 import { Vector3 } from "@babylonjs/core";
 import { PCAProjection, ProjectionManager } from "./ProjectionManager";
 import { TimedLogEvent } from "../../shared/src/logging";
@@ -106,15 +110,19 @@ export class SyncManager2D implements PointIdProvider {
         this.syncedPCADataMap = this.ydoc.getMap("pca") as Y.Map<PlaneSyncData>;
 
         // 3) initialize projection manager
-        const projectionOption = import.meta.env.VITE_PROJECTION;
         let projectionType: "equirectangular" | "pca" | "vertical" | "horizontal" =
             "equirectangular";
-        if (projectionOption === "pca") {
-            projectionType = "pca";
-        } else if (projectionOption === "vertical") {
-            projectionType = "vertical";
-        } else if (projectionOption === "horizontal") {
-            projectionType = "horizontal";
+        if (isTrainingModeEnabled()) {
+            projectionType = getTrainingModeProjection();
+        } else {
+            const projectionOption = import.meta.env.VITE_PROJECTION;
+            if (projectionOption === "pca") {
+                projectionType = "pca";
+            } else if (projectionOption === "vertical") {
+                projectionType = "vertical";
+            } else if (projectionOption === "horizontal") {
+                projectionType = "horizontal";
+            }
         }
         this.projectionManager = new ProjectionManager(projectionType);
     }
@@ -681,6 +689,8 @@ export class SyncManager2D implements PointIdProvider {
                     ? new Vector3(cfg.color.x, cfg.color.y, cfg.color.z)
                     : new Vector3(1, 1, 1);
                 p.setBaseColor(base);
+                // Clear locked color from Task 3 when resetting to default
+                p.clearLockedColor();
             }
             p.resetToBaseColor();
             p.setSelectable(true);
@@ -1030,6 +1040,28 @@ export class SyncManager2D implements PointIdProvider {
         this.applyProjection(projectionType);
 
         // Start fresh from Task 1
+        const firstTask = getFirstEnabledTask();
+        if (firstTask === TASK1_ID) {
+            this.startTask1();
+        } else if (firstTask === TASK2_ID) {
+            this.startTask2();
+        } else if (firstTask === TASK3_ID) {
+            this.startTask3();
+        }
+    }
+
+    /**
+     * Restart the task flow from the beginning without changing projection.
+     * Used for training mode where trials loop forever.
+     */
+    public restartTasksForTraining() {
+        console.log("[SyncManager2D] Restarting tasks for training mode");
+
+        // Clear any existing task state to ensure fresh start
+        this.currentTask = null;
+        this.lastLoggedTask = null;
+
+        // Start fresh from Task 1 (this will also reset all point colors)
         const firstTask = getFirstEnabledTask();
         if (firstTask === TASK1_ID) {
             this.startTask1();

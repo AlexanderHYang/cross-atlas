@@ -64,6 +64,7 @@ export class TaskController2D {
         const instruction = getInstructionForTask(taskState);
         if (instruction.visible) {
             instructionBox.style.display = "block";
+            instructionBox.style.left = "220px";
             if (instruction.html) {
                 instructionBox.innerHTML = instruction.html;
             } else {

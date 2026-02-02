@@ -1,6 +1,7 @@
 import selectionData from "../../../data/point-selections.json";
 import { layoutType } from "./defaultPoints";
 import { getCurrentCounterbalanceProjection } from "./counterbalance";
+import { isTrainingModeEnabled, getTrainingModeProjection } from "./trainingMode";
 
 export type ProjectionType = "equirectangular" | "pca" | "vertical" | "horizontal";
 
@@ -15,6 +16,10 @@ const RANDOM_SELECTION_ENV = (import.meta.env.VITE_RANDOM_SELECTION as string | 
 const PROJECTION_ENV = (import.meta.env.VITE_PROJECTION as string | undefined)?.trim();
 
 function getDefaultProjection(): ProjectionType {
+    // Training mode forces vertical projection
+    if (isTrainingModeEnabled()) {
+        return getTrainingModeProjection();
+    }
     const counterbalanceProjection = getCurrentCounterbalanceProjection();
     if (counterbalanceProjection) {
         return counterbalanceProjection;

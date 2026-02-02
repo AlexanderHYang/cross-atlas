@@ -102,6 +102,9 @@ export class Logger2D {
     private endFlushTimer: ReturnType<typeof setTimeout> | null = null;
     private static readonly END_LOG_QUIET_MS = 250;
 
+    // Training mode: when true, all logging is disabled
+    private disabled = false;
+
     // Time-series logging
     private pendingTimeSeries: string[] = [];
     private timeSeriesSendInFlight = false;
@@ -123,8 +126,16 @@ export class Logger2D {
 
     private syncManager: SyncManager2D;
 
-    constructor(syncManager: SyncManager2D) {
+    constructor(syncManager: SyncManager2D, options?: { disabled?: boolean }) {
         this.syncManager = syncManager;
+        this.disabled = options?.disabled ?? false;
+
+        // If disabled (training mode), skip all initialization logging
+        if (this.disabled) {
+            this.sessionId = "training-mode";
+            return;
+        }
+
         this.sessionId = Logger2D.createSessionId();
         const selectionMode = isRandomSelectionEnabled() ? "random" : "precomputed";
         const projection = this.syncManager.getProjectionManager().getCurrentProjectionType();
@@ -211,6 +222,7 @@ export class Logger2D {
     }
 
     public addLogEvent(logEvent: LogEvent2D) {
+        if (this.disabled) return;
         const timestamp = Logger2D.formatLocalTimestamp(new Date());
         const trialLabel = this.currentTrial
             ? Logger2D.formatTrialLabel(
@@ -623,7 +635,7 @@ export class Logger2D {
     }
 
     public logCursorSample(time: number, x: number, y: number) {
-        if (this.finalized) {
+        if (this.disabled || this.finalized) {
             return;
         }
         if (this.suppressCursorTimeSeriesLogs) {
@@ -671,7 +683,7 @@ export class Logger2D {
         solvedCount?: number;
         totalPairs?: number;
     }) {
-        if (this.finalized) {
+        if (this.disabled || this.finalized) {
             return;
         }
         const time = Date.now();
@@ -692,7 +704,7 @@ export class Logger2D {
         solvedCount?: number;
         totalPairs?: number;
     }) {
-        if (this.finalized) {
+        if (this.disabled || this.finalized) {
             return;
         }
         const time = Date.now();
@@ -850,6 +862,7 @@ export class Logger2D {
         totalTrials: number,
         startTime?: number,
     ) {
+        if (this.disabled) return;
         const key = Logger2D.buildTrialKey(taskNumber, trialNumber, totalTrials);
         if (this.currentTrial?.key === key) {
             if (startTime !== undefined) {
@@ -882,7 +895,7 @@ export class Logger2D {
     }
 
     public logTaskLifecycle(nextState: TaskState | null) {
-        if (!nextState || this.finalized || this.suppressLifecycleLogs) {
+        if (this.disabled || !nextState || this.finalized || this.suppressLifecycleLogs) {
             this.lastLifecycleState = nextState;
             return;
         }
@@ -964,6 +977,7 @@ export class Logger2D {
         cumulativeDegrees: number;
         points: { pointId: string; degrees: number | null; difficulty: string }[];
     }) {
+        if (this.disabled) return;
         const timestamp = Logger2D.formatLocalTimestamp(new Date());
         const pointsLabel = params.points
             .map((entry) => {
@@ -985,6 +999,7 @@ export class Logger2D {
     }
 
     public logIncorrectClick2D(pointId: string) {
+        if (this.disabled) return;
         const context = this.ensureTrialContext();
         const time = Date.now();
         if (!context) {
@@ -1000,6 +1015,7 @@ export class Logger2D {
     }
 
     public logTrialEnd(taskNumber: number, trialNumber: number, totalTrials: number) {
+        if (this.disabled) return;
         const key = Logger2D.buildTrialKey(taskNumber, trialNumber, totalTrials);
         const trialLabel = Logger2D.formatTrialLabel(taskNumber, trialNumber, totalTrials);
         const endTime = Date.now();
@@ -1049,6 +1065,7 @@ export class Logger2D {
         projectionIndex: number,
         totalProjections: number,
     ) {
+        if (this.disabled) return;
         // Save current summaries for the completed projection
         this.projectionSummaries.set(this.currentProjectionIndex, this.getSortedSummaries());
         this.suppressLifecycleLogs = true;
@@ -1102,6 +1119,7 @@ export class Logger2D {
         projectionIndex: number,
         totalProjections: number,
     ) {
+        if (this.disabled) return;
         this.suppressLifecycleLogs = true;
         this.flushEndLines(true);
 
@@ -1184,6 +1202,7 @@ export class Logger2D {
      * Called before starting trials with a new projection.
      */
     public resetForNewProjection() {
+        if (this.disabled) return;
         this.trialSamples.clear();
         this.trialSummaries.clear();
         this.lastRotationSample = null;
@@ -1208,6 +1227,7 @@ export class Logger2D {
         projectionIndex: number,
         totalProjections: number,
     ) {
+        if (this.disabled) return;
         const timestamp = Logger2D.formatLocalTimestamp(new Date());
         const lines: string[] = [];
         lines.push("");
@@ -1227,7 +1247,7 @@ export class Logger2D {
     }
 
     public finalizeStudy() {
-        if (this.finalized) {
+        if (this.disabled || this.finalized) {
             return;
         }
         this.finalized = true;
@@ -1292,7 +1312,7 @@ export class Logger2D {
     }
 
     public finalizeCounterbalanceStudy() {
-        if (this.finalized) {
+        if (this.disabled || this.finalized) {
             return;
         }
         this.finalized = true;
@@ -1419,6 +1439,7 @@ export class Logger2D {
     }
 
     public logCorrectClick2D(pointId: string) {
+        if (this.disabled) return;
         const context = this.ensureTrialContext();
         const time = Date.now();
         if (!context) {
