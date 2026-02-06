@@ -1,6 +1,12 @@
 import { Color3, Vector3 } from "@babylonjs/core";
 import type { ProjectionType } from "../pointSelections";
 import {
+    isTrainingModeEnabled,
+    TRAINING_TASK1_TRIAL_LIMIT,
+    TRAINING_TASK2_TRIAL_LIMIT,
+    TRAINING_TASK3_PAIR_COUNTS,
+} from "../trainingMode";
+import {
     getTask1PointVisual2D,
     evaluateTask1Selection2D,
     evaluateTask1Selection3D,
@@ -165,6 +171,10 @@ export type TaskState = {
      */
     trial7Assignments?: Trial7Assignment[];
     /**
+     * Training mode: which Task 3 round is active (1-based).
+     */
+    trainingTask3Round?: number;
+    /**
      * Pre-selected point IDs for this task (set at task initialization).
      * Task 1: 4 points (one per trial)
      * Task 2: 4 points (2 per trial x 2 trials)
@@ -293,21 +303,45 @@ export function createTaskState(
     };
 }
 
-export function getTaskAndTrial(trial: TaskTrial): {
+export function getTaskAndTrial(trialOrState: TaskTrial | TaskState): {
     taskNumber: number;
     trialNumber: number;
     totalTrials: number;
 } {
+    const state = typeof trialOrState === "object" ? trialOrState : null;
+    const trial = state ? state.trial : trialOrState;
+    const isTraining = isTrainingModeEnabled();
     if (trial >= 1 && trial <= 4) {
+        if (isTraining) {
+            const totalTrials = TRAINING_TASK1_TRIAL_LIMIT;
+            const trialNumber = Math.min(trial, totalTrials);
+            return { taskNumber: 1, trialNumber, totalTrials };
+        }
         return { taskNumber: 1, trialNumber: trial, totalTrials: 4 };
     }
     if (trial === 5) {
+        if (isTraining) {
+            const totalTrials = TRAINING_TASK2_TRIAL_LIMIT;
+            const trialNumber = Math.min(1, totalTrials);
+            return { taskNumber: 2, trialNumber, totalTrials };
+        }
         return { taskNumber: 2, trialNumber: 1, totalTrials: 2 };
     }
     if (trial === 6) {
+        if (isTraining) {
+            const totalTrials = TRAINING_TASK2_TRIAL_LIMIT;
+            const trialNumber = Math.min(2, totalTrials);
+            return { taskNumber: 2, trialNumber, totalTrials };
+        }
         return { taskNumber: 2, trialNumber: 2, totalTrials: 2 };
     }
     if (trial === 7) {
+        if (isTraining) {
+            const totalTrials = TRAINING_TASK3_PAIR_COUNTS.length;
+            const round = state?.trainingTask3Round ?? 1;
+            const trialNumber = Math.min(round, totalTrials);
+            return { taskNumber: 3, trialNumber, totalTrials };
+        }
         return { taskNumber: 3, trialNumber: 1, totalTrials: 1 };
     }
     // Fallback

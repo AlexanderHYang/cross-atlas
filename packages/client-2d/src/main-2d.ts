@@ -417,7 +417,7 @@ syncManager.onStudyStartedChange((started) => {
     });
     const currentTask = syncManager.getCurrentTask();
     if (currentTask) {
-        const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(currentTask.trial);
+        const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(currentTask);
         logger2d.setTrialContext(taskNumber, trialNumber, totalTrials);
         taskController2D.handleTaskStateChange(currentTask);
         logPointSelectionIfNeeded(currentTask, taskNumber);
@@ -432,7 +432,7 @@ syncManager.onTaskStateChange((taskState) => {
         return;
     }
     if (taskState) {
-        const { taskNumber } = getTaskAndTrial(taskState.trial);
+        const { taskNumber } = getTaskAndTrial(taskState);
         logPointSelectionIfNeeded(taskState, taskNumber);
     }
     logger2d.logTaskLifecycle(taskState);
@@ -534,7 +534,7 @@ syncManager.onTaskStateChange((taskState) => {
         });
     }
 
-    const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(taskState.trial);
+    const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(taskState);
     logger2d.setTrialContext(taskNumber, trialNumber, totalTrials);
 
     const completedSuccessfully =

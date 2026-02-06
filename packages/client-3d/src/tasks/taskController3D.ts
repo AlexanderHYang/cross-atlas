@@ -64,7 +64,7 @@ export class TaskController3D {
         }
 
         if (selection.isCorrect) {
-            const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(task.trial);
+            const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(task);
             this.deps.logger.addLogEvent({
                 eventName: "correctClick3d",
                 eventDetails: {
@@ -82,7 +82,7 @@ export class TaskController3D {
                 point.setSelectable(false);
             }
         } else {
-            const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(task.trial);
+            const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(task);
             this.deps.logger.addLogEvent({
                 eventName: "incorrectClick3d",
                 eventDetails: {

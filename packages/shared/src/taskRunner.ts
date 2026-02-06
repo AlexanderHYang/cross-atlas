@@ -7,7 +7,7 @@
  * - State management for the overall task flow
  */
 
-import type { TaskState, TaskId, TaskTrial, Trial7Assignment } from "./tasks/tasks";
+import type { TaskState, TaskId } from "./tasks/tasks";
 import { getTaskFlowConfig, getTaskAndTrial } from "./tasks/tasks";
 import {
     TASK1_ID,
@@ -35,8 +35,24 @@ import {
 } from "./tasks/task3";
 import { getPrecomputedTaskSelection, isRandomSelectionEnabled } from "./pointSelections";
 import type { ProjectionType } from "./pointSelections";
+import {
+    isTrainingModeEnabled,
+    TRAINING_TASK1_TRIAL_LIMIT,
+    TRAINING_TASK2_TRIAL_LIMIT,
+    TRAINING_TASK3_PAIR_COUNTS,
+} from "./trainingMode";
 
 export const TRANSITION_DELAY_MS = 2000;
+
+const TRAINING_TASK3_ROUNDS_TOTAL = TRAINING_TASK3_PAIR_COUNTS.length;
+
+function getTrainingTask2FinalTrial(): Task2Trial {
+    return TRAINING_TASK2_TRIAL_LIMIT <= 1 ? 5 : 6;
+}
+
+function getTrainingTask3Round(state: TaskState | null): number {
+    return state?.trainingTask3Round ?? 1;
+}
 
 /**
  * Helper to get the first enabled task
@@ -211,12 +227,13 @@ export function createNextTask2TrialState(
 
 /**
  * Creates an initial state for Task 3.
- * Selects all 10 points for color pairs upfront.
+ * Selects pairCount * 2 points for color pairs upfront.
  */
 export function createInitialTask3State(
     provider: PointIdProvider,
     pairCount = 5,
     options?: { layout?: string; projection?: ProjectionType },
+    trainingTask3Round?: number,
 ): TaskState {
     const precomputed = !isRandomSelectionEnabled()
         ? getPrecomputedTaskSelection(3, options)
@@ -227,9 +244,14 @@ export function createInitialTask3State(
     if (!state) {
         throw new Error("Failed to create Task 3 state: no assignments");
     }
+    const resolvedTrainingRound = isTrainingModeEnabled()
+        ? trainingTask3Round ?? 1
+        : undefined;
+
     return {
         ...state,
         preselectedPointIds: pointIds,
+        trainingTask3Round: resolvedTrainingRound,
     };
 }
 
@@ -240,14 +262,28 @@ export function createInitialTask3State(
 export function determineNextAction(currentState: TaskState): {
     action: "next-trial" | "next-task" | "advance-pair" | "all-complete";
     nextTaskId?: TaskId;
+    task3PairCount?: number;
+    trainingTask3Round?: number;
 } {
     const flowState = getTaskFlowState(currentState);
+    const isTraining = isTrainingModeEnabled();
 
     if (flowState === "task1") {
         const trial = currentState.trial as Task1Trial;
-        if (isTask1Complete(trial)) {
+        const task1Complete = isTraining
+            ? trial >= TRAINING_TASK1_TRIAL_LIMIT
+            : isTask1Complete(trial);
+        if (task1Complete) {
             const nextTask = getNextEnabledTask(TASK1_ID);
             if (nextTask) {
+                if (isTraining && nextTask === TASK3_ID) {
+                    return {
+                        action: "next-task",
+                        nextTaskId: nextTask,
+                        task3PairCount: TRAINING_TASK3_PAIR_COUNTS[0],
+                        trainingTask3Round: 1,
+                    };
+                }
                 return { action: "next-task", nextTaskId: nextTask };
             }
             return { action: "all-complete" };
@@ -257,9 +293,20 @@ export function determineNextAction(currentState: TaskState): {
 
     if (flowState === "task2") {
         const trial = currentState.trial as Task2Trial;
-        if (isTask2Complete(trial)) {
+        const task2Complete = isTraining
+            ? trial >= getTrainingTask2FinalTrial()
+            : isTask2Complete(trial);
+        if (task2Complete) {
             const nextTask = getNextEnabledTask(TASK2_ID);
             if (nextTask) {
+                if (isTraining && nextTask === TASK3_ID) {
+                    return {
+                        action: "next-task",
+                        nextTaskId: nextTask,
+                        task3PairCount: TRAINING_TASK3_PAIR_COUNTS[0],
+                        trainingTask3Round: 1,
+                    };
+                }
                 return { action: "next-task", nextTaskId: nextTask };
             }
             return { action: "all-complete" };
@@ -269,6 +316,21 @@ export function determineNextAction(currentState: TaskState): {
 
     if (flowState === "task3") {
         if (isTask3Complete(currentState)) {
+            if (isTraining && TRAINING_TASK3_ROUNDS_TOTAL > 1) {
+                const currentRound = getTrainingTask3Round(currentState);
+                if (currentRound < TRAINING_TASK3_ROUNDS_TOTAL) {
+                    const nextRound = currentRound + 1;
+                    const nextPairCount =
+                        TRAINING_TASK3_PAIR_COUNTS[nextRound - 1] ??
+                        TRAINING_TASK3_PAIR_COUNTS[TRAINING_TASK3_ROUNDS_TOTAL - 1];
+                    return {
+                        action: "next-task",
+                        nextTaskId: TASK3_ID,
+                        task3PairCount: nextPairCount,
+                        trainingTask3Round: nextRound,
+                    };
+                }
+            }
             return { action: "all-complete" };
         }
         return { action: "advance-pair" };
@@ -305,7 +367,12 @@ export function createNextState(
                 return createInitialTask2State(provider, options);
             }
             if (action.nextTaskId === TASK3_ID) {
-                return createInitialTask3State(provider, 5, options);
+                return createInitialTask3State(
+                    provider,
+                    action.task3PairCount ?? 5,
+                    options,
+                    action.trainingTask3Round,
+                );
             }
             return null;
         }
@@ -323,7 +390,7 @@ export function createNextState(
  * Logs trial start
  */
 export function logTrialStart(state: TaskState, side: "2D" | "3D" = "2D") {
-    const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(state.trial);
+    const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(state);
     console.log(
         `[${side}][${state.id}] Task ${taskNumber} trial ${trialNumber}/${totalTrials} start`,
     );
@@ -333,7 +400,7 @@ export function logTrialStart(state: TaskState, side: "2D" | "3D" = "2D") {
  * Logs trial end
  */
 export function logTrialEnd(state: TaskState, side: "2D" | "3D" = "2D") {
-    const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(state.trial);
+    const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(state);
     if (state.trial === 7 && state.trial7Assignments) {
         const totalPairs = state.trial7Assignments.length;
         const solvedPairs = state.trial7Assignments.filter((a) => a.done2D && a.done3D).length;
@@ -361,10 +428,14 @@ export function logTaskLifecycle(
 ) {
     if (!nextState) return;
 
-    const prevInfo = prevState ? getTaskAndTrial(prevState.trial) : null;
-    const nextInfo = getTaskAndTrial(nextState.trial);
+    const prevInfo = prevState ? getTaskAndTrial(prevState) : null;
+    const nextInfo = getTaskAndTrial(nextState);
     const taskChanged = !prevInfo || prevInfo.taskNumber !== nextInfo.taskNumber;
-    const trialChanged = prevState ? prevState.trial !== nextState.trial : true;
+    const trialChanged =
+        !prevInfo ||
+        prevInfo.taskNumber !== nextInfo.taskNumber ||
+        prevInfo.trialNumber !== nextInfo.trialNumber ||
+        prevInfo.totalTrials !== nextInfo.totalTrials;
 
     if (taskChanged) {
         console.log(`[${side}][${nextState.id}] Task ${nextInfo.taskNumber} start`);

@@ -59,7 +59,7 @@ export class TaskController2D {
     public handleTaskStateChange = (taskState: ReturnType<SyncManager2D["getCurrentTask"]>) => {
         const { trialBox, instructionBox } = this.deps.ui;
         const trial = taskState?.trial ?? 1;
-        const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(trial);
+        const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(taskState ?? trial);
         trialBox.innerHTML = `Task ${taskNumber} <span style='opacity: 0.5; margin: 0 8px;'>|</span> Trial <span style='color: #a8d5ff; font-weight: 600;'>${trialNumber}</span>/<span style='opacity: 0.7;'>${totalTrials}</span>`;
         const instruction = getInstructionForTask(taskState);
         if (instruction.visible) {

@@ -45,6 +45,7 @@ import {
 import {
     isTrainingModeEnabled,
     getTrainingModeProjection,
+    TRAINING_TASK3_PAIR_COUNTS,
 } from "../../shared/src/trainingMode";
 import { Vector3 } from "@babylonjs/core";
 import { PCAProjection, ProjectionManager } from "./ProjectionManager";
@@ -176,6 +177,7 @@ export class SyncManager2D implements PointIdProvider {
         const colorPairKey = task.colorPairKey;
         const colorPairIndex = task.colorPairIndex;
         const trial7Assignments = task.trial7Assignments ?? [];
+        const trainingTask3Round = task.trainingTask3Round;
         const preselectedPointIds = task.preselectedPointIds ?? [];
         const preselectedIndex = task.preselectedIndex ?? 0;
 
@@ -191,7 +193,8 @@ export class SyncManager2D implements PointIdProvider {
             errorPointId3D === task.errorPointId3D &&
             colorPairKey === task.colorPairKey &&
             colorPairIndex === task.colorPairIndex &&
-            trial7Assignments === task.trial7Assignments
+            trial7Assignments === task.trial7Assignments &&
+            trainingTask3Round === task.trainingTask3Round
         ) {
             return task;
         }
@@ -211,6 +214,7 @@ export class SyncManager2D implements PointIdProvider {
             colorPairKey,
             colorPairIndex,
             trial7Assignments,
+            trainingTask3Round,
             preselectedPointIds,
             preselectedIndex,
         };
@@ -523,12 +527,17 @@ export class SyncManager2D implements PointIdProvider {
     /**
      * Start Task 3 from the beginning
      */
-    private startTask3() {
+    private startTask3(pairCount?: number, trainingTask3Round?: number) {
         this.resetAllPointColors({ resetBaseToDefault: true });
 
-        const taskState = createInitialTask3State(this, 5, {
-            projection: this.getSelectionProjection(),
-        });
+        const resolvedPairCount =
+            pairCount ?? (isTrainingModeEnabled() ? TRAINING_TASK3_PAIR_COUNTS[0] : 5);
+        const taskState = createInitialTask3State(
+            this,
+            resolvedPairCount,
+            { projection: this.getSelectionProjection() },
+            trainingTask3Round,
+        );
         if (!taskState) {
             console.warn("Unable to start Task 3: not enough selectable points");
             return;
@@ -847,8 +856,12 @@ export class SyncManager2D implements PointIdProvider {
                         console.log("🎉 Task 1 complete! Starting Task 2...");
                         this.startTask2();
                     } else if (action.nextTaskId === TASK3_ID) {
-                        console.log("🎉 Task 2 complete! Starting Task 3...");
-                        this.startTask3();
+                        if (latest.id === TASK3_ID) {
+                            console.log("🎉 Task 3 round complete! Starting next Task 3 round...");
+                        } else {
+                            console.log("🎉 Task 2 complete! Starting Task 3...");
+                        }
+                        this.startTask3(action.task3PairCount ?? 5, action.trainingTask3Round);
                     }
                     break;
                 }

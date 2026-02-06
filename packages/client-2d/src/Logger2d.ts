@@ -544,7 +544,7 @@ export class Logger2D {
             return null;
         }
 
-        const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(taskState.trial);
+        const { taskNumber, trialNumber, totalTrials } = getTaskAndTrial(taskState);
         this.setTrialContext(taskNumber, trialNumber, totalTrials);
         return this.currentTrial;
     }
@@ -1006,14 +1006,14 @@ export class Logger2D {
             return;
         }
 
-        const prevInfo = this.lastLifecycleState
-            ? getTaskAndTrial(this.lastLifecycleState.trial)
-            : null;
-        const nextInfo = getTaskAndTrial(nextState.trial);
+        const prevInfo = this.lastLifecycleState ? getTaskAndTrial(this.lastLifecycleState) : null;
+        const nextInfo = getTaskAndTrial(nextState);
         const taskChanged = !prevInfo || prevInfo.taskNumber !== nextInfo.taskNumber;
-        const trialChanged = this.lastLifecycleState
-            ? this.lastLifecycleState.trial !== nextState.trial
-            : true;
+        const trialChanged =
+            !prevInfo ||
+            prevInfo.taskNumber !== nextInfo.taskNumber ||
+            prevInfo.trialNumber !== nextInfo.trialNumber ||
+            prevInfo.totalTrials !== nextInfo.totalTrials;
 
         const time = Date.now();
         const timestamp = Logger2D.formatLocalTimestamp(time);
