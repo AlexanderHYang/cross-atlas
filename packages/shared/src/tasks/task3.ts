@@ -18,6 +18,7 @@ import type {
     TaskSelection3DEffect,
 } from "./tasks";
 import { Color3, Vector3 } from "@babylonjs/core";
+import { getDefaultPointConfig } from "../defaultPoints";
 
 export type Trial7ColorPair = {
     key: string;
@@ -532,6 +533,11 @@ export function setTrial7Selectability2D(
     }
 
     for (const p of points) {
+        const defaultSelectable = getDefaultPointConfig(p.id)?.selectable !== false;
+        if (!defaultSelectable) {
+            p.setSelectable(false);
+            continue;
+        }
         if (lockedIds.has(p.id)) {
             p.setSelectable(false);
         } else {
@@ -550,8 +556,14 @@ export function setTrial7Selectability3D(
     for (const entry of taskState.trial7Assignments) {
         const vrTarget = pointMap.get(entry.point3D);
         const pcHintSphere = pointMap.get(entry.point2D);
-        vrTarget?.setSelectable(!entry.done3D);
-        pcHintSphere?.setSelectable(!entry.done2D);
+        if (vrTarget) {
+            const defaultSelectable = getDefaultPointConfig(entry.point3D)?.selectable !== false;
+            vrTarget.setSelectable(defaultSelectable ? !entry.done3D : false);
+        }
+        if (pcHintSphere) {
+            const defaultSelectable = getDefaultPointConfig(entry.point2D)?.selectable !== false;
+            pcHintSphere.setSelectable(defaultSelectable ? !entry.done2D : false);
+        }
     }
 }
 
