@@ -4,7 +4,11 @@ import { Point3D } from "./Point3D";
 import { Vector3, Color3, HighlightLayer, PointerEventTypes, PointLight } from "@babylonjs/core";
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience";
 import { initWebXR } from "./xr/webxrExperience";
-import { DEFAULT_POINT_CONFIGS, DEFAULT_SPHERE_RADIUS } from "../../shared/src/defaultPoints";
+import {
+    DEFAULT_POINT_CONFIGS,
+    DEFAULT_SPHERE_RADIUS,
+    layoutType,
+} from "../../shared/src/defaultPoints";
 import {
     TaskColorConfig3D,
     determineNextAction,
@@ -45,6 +49,12 @@ const env = sceneManager.createEnvironment({ bigRadius: DEFAULT_SPHERE_RADIUS })
 const { bigRadius, plane } = env;
 
 const sphereCenter = new Vector3(0, liftOffset, 0);
+const curvatureGuide = sceneManager.createCurvatureGuide({
+    layout: layoutType,
+    radius: bigRadius,
+    center: sphereCenter,
+});
+let curvatureGuideVisible = false;
 const centerLight = new PointLight("centerLight", sphereCenter.clone(), scene);
 centerLight.intensity = 0.35;
 centerLight.range = bigRadius * 2.5;
@@ -465,5 +475,12 @@ window.addEventListener("keydown", (ev) => {
     if (ev.key === "p" || ev.key === "P") {
         console.log("Toggling projection plane visibility");
         plane.isVisible = !plane.isVisible;
+    }
+    if (ev.key === "v" || ev.key === "V") {
+        curvatureGuideVisible = !curvatureGuideVisible;
+        console.log(
+            `${curvatureGuideVisible ? "Showing" : "Hiding"} curvature guide for ${layoutType}`,
+        );
+        curvatureGuide.setEnabled(curvatureGuideVisible);
     }
 });

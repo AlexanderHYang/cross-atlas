@@ -25,7 +25,7 @@ export type DefaultPointConfig = {
 
 export const DEFAULT_SPHERE_RADIUS = 3;
 
-type LayoutType = "spherical" | "hemispherical" | "planar";
+export type LayoutType = "spherical" | "hemispherical" | "planar";
 const allowedLayouts: LayoutType[] = ["spherical", "hemispherical", "planar"];
 const layoutEnv = (import.meta.env.VITE_LAYOUT_TYPE ?? import.meta.env.VITE_LAYOUT) as
     | string
