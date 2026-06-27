@@ -3,7 +3,7 @@
 [![ISMAR 2026](https://img.shields.io/badge/ISMAR-2026-green)](https://www.ieeeismar.net/2026/)
 [![MIT License](https://img.shields.io/badge/License-MIT-orange)](https://opensource.org/license/mit)
 
-CrossAtlas is a <u>cross-reality collaboration platform</u> designed to help researchers study how **immersive 3D workspaces can be represented, shared, and referenced across devices** using <u>synchronized VR-PC views</u>, <u>bidirectional projection techniques</u>, and <u>shared spatial landmarks</u>.
+CrossAtlas is a <u>cross-reality collaboration platform</u> designed to help users **share, communicate, and understand spatial references across VR and desktop environments** using <u>synchronized VR-PC views</u>, <u>bidirectional projection techniques</u>, and <u>shared spatial landmarks</u>.
 
 <p align="center">
   <img src="./resources/img/banner.png" alt="CrossAtlas banner"/>
