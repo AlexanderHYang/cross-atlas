@@ -4,6 +4,8 @@ node_modules/
 dist/
 build/
 .env
+.env.*
+!.env.example
 # OS / editor
 .DS_Store
 .vscode/
@@ -14,5 +16,8 @@ logs/
 .env.local
 npm-debug.log
 yarn-error.log
+certs/
 cert.pem
 key.pem
+*.pem
+*.key

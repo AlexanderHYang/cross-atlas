@@ -1,62 +1,119 @@
-![demo](./demo.gif)
+<h1>CrossAtlas <img align="right" alt="CrossAtlas logo." src="./resources/img/logo.png" width="30" height="30"></h1>
 
-# Setup
+[![ISMAR 2026](https://img.shields.io/badge/ISMAR-2026-green)](https://www.ieeeismar.net/2026/)
+[![MIT License](https://img.shields.io/badge/License-MIT-orange)](https://opensource.org/license/mit)
 
-1. Install dependencies:
+CrossAtlas is a <u>cross-reality collaboration platform</u> designed to help researchers study how **immersive 3D workspaces can be represented, shared, and referenced across devices** using <u>synchronized VR-PC views</u>, <u>bidirectional projection techniques</u>, and <u>shared spatial landmarks</u>.
 
-> ```bash
-> npm install
-> ```
+<p align="center">
+  <img src="./resources/img/banner.png" alt="CrossAtlas banner"/>
+</p>
 
-2. Launch the full dev stack (cert check → Yjs → 3D → 2D) in one terminal:
+>  📄 Paper details coming soon
 
-> ```bash
-> npm run dev
-> ```
->
-> On first run the script generates self-signed certificates (requires OpenSSL), then starts the Yjs server plus both Vite dev servers. All logs stream in the same window, and `Ctrl+C` stops everything.
+## Features
 
-> Open the HTTPS URL printed by Vite (e.g. https://<your-ip>:5173) in your browser and accept the self-signed certificate.
-> Open the HTTPS URL printed by Vite (e.g. https://<your-ip>:5174) in your browser.
+- 🧭 **Bidirectional Projection:** Four projection techniques (**Horizontal**, **Vertical**, **PCA**, **Equirectangular**) that transform the VR user's 3D layout into a 2D desktop view in real time, with inverse unprojection so desktop clicks map back into 3D space.
+- 🔄 **Cross-View Synchronization:** Real-time state sync between VR and PC clients using **Yjs** CRDTs over WebSocket, keeping selections, task progression, and visual feedback consistent across both views with no perceptible delay.
+- 🌐 **Configurable Spatial Layouts:** Parameterized layout curvature from flat front-facing arrangements to fully surrounding Full-Sphere configurations, with angular-distance-based point sampling relative to the VR user's headset.
+- 🥽 **Browser-Based, Hardware-Agnostic:** VR client built with **Babylon.js** and **Anu.js** running in **WebXR**; PC client in **React**. 
 
-## CLI flags (npm run dev)
+## Projection Techniques
 
-The `npm run dev` script supports a few flags that map to Vite env vars:
+<p align="center">
+  <img src="./resources/img/projections.png" alt="CrossAtlas projection techniques"/>
+</p>
 
-- `--projection=<equirectangular|pca|vertical|horizontal>`: projection mode (defaults to whatever the client selects).
-- `--layout=<spherical|hemispherical|planar>` (alias `--layout-type=<...>`): select the generated point layout.
-- `--tasks=<digits>` or `--task=<digits>`: enable specific tasks by number (e.g. `--tasks=1` for Task 1 only, `--tasks=13` for Tasks 1 and 3).
-- `--require-calibration-orientation=<true|false>` (alias `--calibration-orientation=<true|false>`): require the 3D user to face the landmark during calibration.
-- `--random-selection=<true|false>`: use randomized angular-distance sampling instead of the precomputed point selections.
-- `--counterbalance=<1|2|3|4>` (alias `--cb=<1|2|3|4>`): enable counterbalance mode with the specified sequence (see below).
+CrossAtlas implements four bidirectional projection techniques across two families:
 
-### Counterbalance Mode
+**Planar**
 
-When `--counterbalance` is specified, participants complete all 7 trials for one projection, then automatically restart from trial 1 with the next projection in the sequence. This continues until all 4 projections are completed.
+- **Horizontal** — Top-down (floor plane) view. Preserves lateral layout; collapses vertical structure.
+- **Vertical** — Front-facing (wall plane) view. Preserves left-right and up-down; compresses depth.
+- **PCA** — Adaptive plane maximizing point-cloud variance. Orientation is computed at task start; vertical gradient is used to establish a consistent "up."
 
-**Sequences (Latin Square design):**
-| Flag | Sequence |
-|------|----------|
-| `--counterbalance=1` (S1) | PCA → Horizontal → Equirectangular → Vertical |
-| `--counterbalance=2` (S2) | Horizontal → Vertical → PCA → Equirectangular |
-| `--counterbalance=3` (S3) | Vertical → Equirectangular → Horizontal → PCA |
-| `--counterbalance=4` (S4) | Equirectangular → PCA → Vertical → Horizontal |
+**Spherical**
 
-**Note:** When counterbalance mode is enabled, the `--projection` flag is ignored since the projection sequence is controlled by the counterbalance condition.
+- **Equirectangular** — Maps each point to its angular position on a unit sphere around the VR user, then linearly maps longitude and latitude to a 2D rectangle. Provides a continuous 360° panoramic view of the full surrounding space.
 
-Example:
+For more details, please check out our paper.
 
-```bash
-npm run dev -- --projection=pca --layout=planar --tasks=1 --require-calibration-orientation=false --random-selection=true
+## Repository Structure
+
+```
+cross-atlas/
+├── packages/
+│   ├── client-2d/      # PC (2D) client — React + D3, Vite
+│   ├── client-3d/      # VR (3D) client — Babylon.js + Anu.js + WebXR, Vite
+│   └── shared/         # Shared task definitions, projection math, sync types, logging
+├── scripts/
+│   ├── dev.mjs                     # Orchestrates full dev stack
+│   ├── yws-ssl-server.mjs          # Yjs WebSocket server
+│   ├── generate-certs.mjs          # Self-signed SSL cert generation
+│   └── generate-point-configs.ts   # Precomputed point selection generator
+├── data/
+│   └── point-selections.json       # Precomputed angular-distance point selections
+└── certs/                          # SSL certificates (not committed)
 ```
 
-**Counterbalance example** (runs all 4 projections in sequence S2):
+## Quick Start
 
-```bash
-npm run dev -- --counterbalance=2 --layout=planar
+### 1. Clone the Repository
+
+```sh
+git clone https://github.com/AlexanderHYang/cross-atlas.git
+cd cross-atlas
 ```
 
-3. Demo
+### 2. Install Dependencies
 
-> Place the two tabs side-by-side and drag the point around. Watch as the point is projected and bidirectionally synchronized.
-> If your browser supports WebXR, use the Enter VR button in the 3D view to explore the scene immersively.
+```sh
+npm install
+```
+
+### 3. Generate SSL Certificates
+
+The dev server requires HTTPS for WebXR. On first run, certificates are generated automatically if OpenSSL is available:
+
+```sh
+npm run generate-certs
+```
+
+> Certificates are written to `certs/` and are not committed to version control.
+
+### 4. Launch the Full Dev Stack
+
+Start the Yjs WebSocket server and both Vite clients in one terminal:
+
+```sh
+npm run dev
+```
+
+This starts the Yjs server plus the 3D (VR) and 2D (PC) Vite dev servers. All logs stream in the same window. `Ctrl+C` stops everything.
+
+- Open the **3D client** (e.g. `https://<your-ip>:5173`) in your VR headset's browser. Accept the self-signed certificate, then click the headset icon to enter immersive mode.
+- Open the **2D client** (e.g. `https://<your-ip>:5174`) on a desktop browser.
+
+### CLI Flags
+
+| Flag                                                        | Description                                                                |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `--projection=<equirectangular\|pca\|vertical\|horizontal>` | Set projection mode (default: client-selected)                             |
+| `--layout=<spherical\|hemispherical\|planar>`               | Set point layout curvature                                                 |
+| `--tasks=<digits>`                                          | Enable specific tasks, e.g. `--tasks=13` for Tasks 1 and 3                 |
+| `--require-calibration-orientation=<true\|false>`           | Require VR user to face landmark during calibration                        |
+| `--random-selection=<true\|false>`                          | Use randomized angular-distance sampling instead of precomputed selections |
+
+## Credits
+
+❤️ **CrossAtlas** is a collaborative project between [Georgia Tech](https://gatech.edu) and [JPMorgan Chase](https://github.com/jpmorganchase), created by [Alex Yang](https://alexanderyang.me), [Chenyang Zhang](https://www.chenyang.me), [Elliott H. Faa](https://www.linkedin.com/in/elliottfaa/), [Weijian Liu](https://www.linkedin.com/in/weijian-liu-77b643237/), [Lily Chisholm](https://www.linkedin.com/in/lilychisholm/), [Benjamin Lee](https://benjaminchlee.github.io), [David Saffo](https://dsaffo.dev), [Feiyu Lu](https://ericlu25.github.io), [Blair MacIntyre](https://blairmacintyre.me), and [Yalong Yang](https://ivi.cc.gatech.edu/pi.html).
+
+💙 CrossAtlas builds on [WebXR](https://immersiveweb.dev/), [Babylon.js](https://www.babylonjs.com/), and [Anu.js](https://jpmorganchase.github.io/anu/) ([GitHub](https://github.com/jpmorganchase/anu)), an open-source immersive analytics toolkit by JPMorgan Chase. Real-time synchronization is powered by [Yjs](https://yjs.dev/).
+
+## Citation
+
+> 📚 Citation details coming soon
+
+## License
+
+**CrossAtlas** is available under the MIT License. It uses [WebXR](https://immersiveweb.dev/) (W3C Software and Document License), [Babylon.js](https://www.babylonjs.com/) (Apache 2.0), [Anu.js](https://github.com/jpmorganchase/anu) (Apache 2.0), and [Yjs](https://yjs.dev/) (MIT).
