@@ -134,4 +134,4 @@ This starts the Yjs server plus the 3D (VR) and 2D (PC) Vite dev servers. All lo
 
 ## License
 
-**CrossAtlas** is available under the MIT License. It uses [WebXR](https://immersiveweb.dev/) (W3C Software and Document License), [Babylon.js](https://www.babylonjs.com/) (Apache 2.0), [Anu.js](https://github.com/jpmorganchase/anu) (Apache 2.0), and [Yjs](https://yjs.dev/) (MIT).
+**CrossAtlas** is available under the [MIT License](./LICENSE). It uses [WebXR](https://immersiveweb.dev/) (W3C Software and Document License), [Babylon.js](https://www.babylonjs.com/) (Apache 2.0), [Anu.js](https://github.com/jpmorganchase/anu) (Apache 2.0), and [Yjs](https://yjs.dev/) (MIT).
