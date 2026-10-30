@@ -1,7 +1,9 @@
-<h1>CrossAtlas <img align="right" alt="CrossAtlas logo." src="./resources/img/logo.png" width="30" height="30"></h1>
+<h1>CrossAtlas <a href="https://doi.org/10.1109/TVCG.2026.3747485"><img align="right" alt="CrossAtlas logo." src="./resources/img/logo.png" width="30" height="30"></a></h1>
 
 [![ISMAR 2026](https://img.shields.io/badge/ISMAR-2026-green)](https://www.ieeeismar.net/2026/)
 [![MIT License](https://img.shields.io/badge/License-MIT-orange)](https://opensource.org/license/mit)
+[![arxiv badge](https://img.shields.io/badge/arXiv-2607.28583-red)](https://arxiv.org/abs/2607.28583)
+[![DOI](https://img.shields.io/badge/DOI-10.1109%2FTVCG.2026.3747485-blue)](https://doi.org/10.1109/TVCG.2026.3747485)
 
 CrossAtlas is a <u>cross-reality collaboration platform</u> designed to help researchers study how **immersive 3D workspaces can be represented, shared, and referenced across devices** using <u>synchronized VR-PC views</u>, <u>bidirectional projection techniques</u>, and <u>shared spatial landmarks</u>.
 
@@ -9,7 +11,13 @@ CrossAtlas is a <u>cross-reality collaboration platform</u> designed to help res
   <img src="./resources/img/banner.png" alt="CrossAtlas banner"/>
 </p>
 
->  📄 Paper details coming soon
+<table>
+  <tr align="center">
+    <td><a href="https://youtu.be/74zgdUXYGtw"><b>📺 Preview</b></a></td>
+    <td><a href="https://youtu.be/zaG0kN3MoCw"><b>🎤 Paper Talk</b></a></td>
+    <td><a href="https://doi.org/10.1109/TVCG.2026.3747485"><b>📖 Paper Link</b></a></td>
+  </tr>
+</table>
 
 ## Features
 
@@ -36,7 +44,7 @@ CrossAtlas implements four bidirectional projection techniques across two famili
 
 - **Equirectangular** — Maps each point to its angular position on a unit sphere around the VR user, then linearly maps longitude and latitude to a 2D rectangle. Provides a continuous 360° panoramic view of the full surrounding space.
 
-For more details, please check out our paper.
+For more details, please check out our [paper](https://doi.org/10.1109/TVCG.2026.3747485).
 
 ## Repository Structure
 
@@ -112,7 +120,17 @@ This starts the Yjs server plus the 3D (VR) and 2D (PC) Vite dev servers. All lo
 
 ## Citation
 
-> 📚 Citation details coming soon
+```bibtex
+@article{yang2026crossatlas,
+  author={Yang, Haoyang and Zhang, Chenyang and Faa, Elliott H. and Liu, Weijian and Chisholm, Lily Seika and Lee, Benjamin and Saffo, David and Lu, Feiyu and MacIntyre, Blair and Yang, Yalong},
+  journal={IEEE Transactions on Visualization and Computer Graphics},
+  title={{CrossAtlas}: Evaluating Projection Techniques for Spatial Referencing in Cross-Reality Collaboration},
+  year={2026},
+  pages={1--11},
+  doi={10.1109/TVCG.2026.3747485},
+  url={https://doi.org/10.1109/TVCG.2026.3747485}
+}
+```
 
 ## License
 
