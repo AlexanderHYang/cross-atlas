@@ -5,7 +5,7 @@
 [![arxiv badge](https://img.shields.io/badge/arXiv-2607.28583-red)](https://arxiv.org/abs/2607.28583)
 [![DOI](https://img.shields.io/badge/DOI-10.1109%2FTVCG.2026.3747485-blue)](https://doi.org/10.1109/TVCG.2026.3747485)
 
-CrossAtlas is a <u>cross-reality collaboration platform</u> designed to help researchers study how **immersive 3D workspaces can be represented, shared, and referenced across devices** using <u>synchronized VR-PC views</u>, <u>bidirectional projection techniques</u>, and <u>shared spatial landmarks</u>.
+CrossAtlas is a <u>cross-reality collaboration platform</u> designed to help users **share, communicate, and understand spatial references across VR and desktop environments** using <u>synchronized VR-PC views</u>, <u>bidirectional projection techniques</u>, and <u>shared spatial landmarks</u>.
 
 <p align="center">
   <img src="./resources/img/banner.png" alt="CrossAtlas banner"/>
